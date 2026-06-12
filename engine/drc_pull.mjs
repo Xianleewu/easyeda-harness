@@ -1,5 +1,4 @@
-import { spawnSync } from 'node:child_process';
-import { readFileSync, writeFileSync } from 'node:fs';
+import { saveJsonResult, executeCode } from './bridge_client.mjs';
 
 const DIR = (process.env.EASYEDA_WORKDIR || process.cwd()).replace(/\\/g, '/') + '/';
 const MAX_DRC_INFO = Number(process.env.EASYEDA_MAX_DRC_INFO ?? 0);
@@ -45,25 +44,15 @@ if (errItems) errors = Math.max(errors, errItems);
 return { strictPass: strictPass === true, errors: fatal + errors, warnings, info, items: items.slice(-120), counts: { fatal, errors, warnings, info } };
 `;
 
-export function pullDrc() {
-	const ui = pullDrcFromUi();
+export async function pullDrc() {
+	const ui = await pullDrcFromUi();
 	if (ui.ok) return ui;
 
-	writeFileSync(DIR + '_drc_probe.js', DRC_JS + '\n');
-	const args = [
-		'-ExecutionPolicy', 'Bypass', '-File', `${DIR}run.ps1`,
-		'-JsFile', `${DIR}_drc_probe.js`,
-	];
-	if (TARGET_WINDOW_ID) args.push('-WindowId', TARGET_WINDOW_ID);
-	const ps = spawnSync('powershell', args, { encoding: 'utf8', cwd: DIR });
-	if (ps.status !== 0) {
-		return { ok: false, errors: 1, warnings: 0, items: [{ level: 'error', msg: ps.stderr || ps.stdout || 'DRC bridge failed' }] };
-	}
 	try {
-		const outer = JSON.parse(ps.stdout);
-		return { ok: true, ...outer.result };
-	} catch {
-		return { ok: false, errors: 1, warnings: 0, items: [{ level: 'error', msg: 'DRC response parse failed' }] };
+		const { result } = await executeCode(DRC_JS, { windowId: TARGET_WINDOW_ID, timeoutMs: 120000 });
+		return { ok: true, ...result };
+	} catch (e) {
+		return { ok: false, errors: 1, warnings: 0, items: [{ level: 'error', msg: e?.message || 'DRC bridge failed' }] };
 	}
 }
 
@@ -75,7 +64,7 @@ export async function pullStableDrc({ attempts = 3, delayMs = 5000, log = consol
 	let last = null;
 	for (let i = 0; i < attempts; i++) {
 		if (i > 0) await sleep(delayMs);
-		const result = pullDrc();
+		const result = await pullDrc();
 		last = result;
 		if (log) log(`DRC attempt ${i + 1}/${attempts}: errors=${result.errors ?? '?'} warnings=${result.warnings ?? '?'} info=${result.info ?? '?'}`);
 		if (result.strictPass && !(result.errors || 0) && !(result.warnings || 0) && !(result.info || 0)) return result;
@@ -155,18 +144,10 @@ function parseDrcItemsFromJson(json) {
 	return out.slice(-120);
 }
 
-function pullDrcFromUi() {
+async function pullDrcFromUi() {
 	const out = DIR + 'drc_ui_probe.json';
-	const args = [
-		'-ExecutionPolicy', 'Bypass', '-File', `${DIR}run-save.ps1`,
-		'-JsFile', `${DIR}_drc_click_warning.js`,
-		'-OutFile', out,
-	];
-	if (TARGET_WINDOW_ID) args.push('-WindowId', TARGET_WINDOW_ID);
-	const ps = spawnSync('powershell', args, { encoding: 'utf8', cwd: DIR });
-	if (ps.status !== 0) return pullDrcFromExistingUiText(ps.stderr || ps.stdout || 'DRC UI probe failed');
 	try {
-		const json = JSON.parse(readFileSync(out, 'utf8').replace(/^\uFEFF/, ''));
+		const json = await saveJsonResult({ jsFile: `${DIR}_drc_click_warning.js`, outFile: out, windowId: TARGET_WINDOW_ID, timeoutMs: 120000 });
 		const blob = JSON.stringify(json);
 		const counts = parseCompletionJson(json) || parseCompletionText(blob);
 		if (!counts) return { ok: false, errors: 1, warnings: 0, items: [{ level: 'error', msg: 'DRC UI completion summary not found' }] };
@@ -182,29 +163,19 @@ function pullDrcFromUi() {
 			source: 'ui',
 		};
 	} catch (e) {
-		return { ok: false, errors: 1, warnings: 0, items: [{ level: 'error', msg: e && e.message ? e.message : String(e) }] };
+		return pullDrcFromExistingUiText(e && e.message ? e.message : String(e));
 	}
 }
 
-function pullDrcFromExistingUiText(reason = '') {
-	const js = DIR + '_drc_existing_ui.js';
-	writeFileSync(js, `
+async function pullDrcFromExistingUiText(reason = '') {
+	const code = `
 const lines = (globalThis.document && document.body && document.body.innerText ? document.body.innerText : '')
   .split(/\\n+/).map(s => s.trim()).filter(Boolean);
 return { lines: lines.slice(-160) };
-`, 'utf8');
-	const args = [
-		'-ExecutionPolicy', 'Bypass', '-File', `${DIR}run.ps1`,
-		'-JsFile', js,
-	];
-	if (TARGET_WINDOW_ID) args.push('-WindowId', TARGET_WINDOW_ID);
-	const ps = spawnSync('powershell', args, { encoding: 'utf8', cwd: DIR });
-	if (ps.status !== 0) {
-		return { ok: false, errors: 1, warnings: 0, items: [{ level: 'error', msg: reason || ps.stderr || ps.stdout || 'DRC UI fallback failed' }] };
-	}
+`;
 	try {
-		const outer = JSON.parse(ps.stdout);
-		const lines = outer?.result?.lines || [];
+		const { result } = await executeCode(code, { windowId: TARGET_WINDOW_ID, timeoutMs: 120000 });
+		const lines = result?.lines || [];
 		const counts = parseCompletionText(lines.join('\n'));
 		if (!counts) return { ok: false, errors: 1, warnings: 0, items: [{ level: 'error', msg: reason || 'DRC UI fallback summary not found' }] };
 		const items = parseDrcItemsFromText(lines.join('\n'));
@@ -226,7 +197,11 @@ return { lines: lines.slice(-160) };
 
 export function drcQC(live = null) {
 	const findings = [];
-	const r = live || pullDrc();
+	const r = live;
+	if (!r) {
+		findings.push({ rule: 'DRC-result-required', severity: 'hard', category: 'drc', msg: 'DRC QC requires a pulled DRC result', where: {} });
+		return findings;
+	}
 	if (!r.ok) {
 		findings.push({ rule: 'DRC-bridge', severity: 'hard', category: 'drc', msg: 'DRC bridge failed', where: r.items });
 		return findings;

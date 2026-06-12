@@ -10,7 +10,11 @@
     "apply:gated": "node engine/apply_gated.mjs",
     "crops": "node engine/visual_crops.mjs",
     "visual": "node engine/visual_crops.mjs",
-    "test": "node engine/regression_tests.mjs"
+    "preview": "node engine/visual_crops.mjs",
+    "live:save": "node engine/bridge_exec.mjs --js snapshot2.js --out live.json",
+    "live:image": "node engine/bridge_exec.mjs --js snapshot-image.js --out live_canvas.png --mode image",
+    "bridge:save": "node engine/bridge_exec.mjs --js snapshot2.js --out live.json",
+    "test": "npm run fast && npm run preview"
   },
   "dependencies": {
     "@resvg/resvg-js": "^2.6.2"

@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs';
 import { Resvg } from '@resvg/resvg-js';
 import { inferModuleRegions, renderSheetOutput, transformFor } from './sheet_renderer.mjs';
 import { inspectPng } from './image_gate.mjs';
@@ -6,9 +6,12 @@ import { auditSheetOutput } from './sheet_output_gate.mjs';
 
 const DIR = (process.env.EASYEDA_WORKDIR || process.cwd()).replace(/\\/g, '/') + '/';
 const OUT = process.env.EASYEDA_VISUAL_CROPS_OUT || DIR + 'visual_crops/';
-const SNAP = process.env.EASYEDA_VISUAL_SNAP || (existsSync(DIR + 'live.json') ? DIR + 'live.json' : DIR + 'full_model.json');
+const SNAP = process.env.EASYEDA_VISUAL_SNAP || DIR + 'full_model.json';
 const REPORT = process.env.EASYEDA_VISUAL_REPORT || DIR + 'visual_review_report.json';
 mkdirSync(OUT, { recursive: true });
+for (const name of readdirSync(OUT)) {
+	if (/\.(png|svg)$/i.test(name)) unlinkSync(OUT + name);
+}
 
 function readJson(path) {
 	return JSON.parse(readFileSync(path, 'utf8').replace(/^\uFEFF/, ''));
@@ -52,15 +55,29 @@ function regionFromModule(name, label, width = 1200, height = 760) {
 	return { name: label, box: pxBoxFromModelBox(r.box), width, height };
 }
 
+function splitRegion(region, side) {
+	const [x1, y1, x2, y2] = region.box;
+	const mid = (x1 + x2) / 2;
+	const overlap = Math.max(32, (x2 - x1) * 0.08);
+	return {
+		...region,
+		box: side === 'left' ? [x1, y1, mid + overlap, y2] : [mid - overlap, y1, x2, y2],
+	};
+}
+
+function capRight(region, capX, pad = 18) {
+	return { ...region, box: [region.box[0], region.box[1], Math.min(region.box[2], capX - pad), region.box[3]] };
+}
+
 const regions = [
 	{ name: '00_global_sheet', box: [0, 0, renderReport.width, renderReport.height], width: 1600, height: 920 },
 	regionFromModule('usb', '01_usb'),
 	regionFromModule('ldo', '02_ldo'),
 	regionFromModule('btn1', '03_reset'),
 	regionFromModule('btn2', '04_boot'),
-	regionFromModule('mcu', '05_mcu_left'),
-	{ ...regionFromModule('mcu', '06_mcu_right'), name: '06_mcu_right' },
-	regionFromModule('pmos', '07_pmos'),
+	splitRegion(regionFromModule('mcu', '05_mcu_left'), 'left'),
+	splitRegion({ ...regionFromModule('mcu', '06_mcu_right'), name: '06_mcu_right' }, 'right'),
+	capRight(regionFromModule('pmos', '07_pmos'), pxBoxFromModelBox(moduleByName.get('relay1').box)[0]),
 	regionFromModule('relay1', '08_relay1'),
 	regionFromModule('relay2', '09_relay2'),
 	{ name: '10_title_template', box: [
@@ -99,13 +116,25 @@ for (const c of cropReports) {
 if (!sheetGate.pass) {
 	for (const f of sheetGate.findings || []) findings.push({ ...f, rule: `V3-${f.rule}`, where: f.where || {} });
 }
+const reviewSummary = cropReports.map(c => ({
+	region: c.region,
+	pass: c.pass,
+	fileBytes: c.metrics.fileBytes,
+	inkRatio: c.metrics.inkRatio,
+	contentWidthRatio: c.metrics.contentWidthRatio,
+	contentHeightRatio: c.metrics.contentHeightRatio,
+	note: c.pass ? 'rendered and nonblank' : 'inspect findings',
+}));
 const visualReport = {
 	generatedAt: new Date().toISOString(),
+	mode: 'offline-template-preview',
+	note: 'These images are rendered by the harness from full_model.json by default, not captured from the EasyEDA canvas. Use EASYEDA_VISUAL_SNAP to preview another snapshot and npm run live:image for real EasyEDA canvas evidence.',
 	source: SNAP,
 	outputDir: OUT,
 	pass: findings.length === 0,
 	severity: { hard: findings.length, soft: 0, info: 0 },
 	screenshots: cropReports.length,
+	reviewSummary,
 	regions: cropReports,
 	sheet: {
 		pass: sheetGate.pass,
@@ -116,6 +145,6 @@ const visualReport = {
 	findings,
 };
 writeFileSync(REPORT, JSON.stringify(visualReport, null, 2), 'utf8');
-console.log(`visual review ${visualReport.pass ? 'PASS' : 'FAIL'} screenshots=${visualReport.screenshots} hard=${visualReport.severity.hard}`);
+console.log(`preview review ${visualReport.pass ? 'PASS' : 'FAIL'} screenshots=${visualReport.screenshots} hard=${visualReport.severity.hard}`);
 console.log(`report -> ${REPORT}`);
 process.exit(visualReport.pass ? 0 : 1);

@@ -2,7 +2,7 @@
 
 [English](README.en.md)
 
-EasyEDA Harness 是一套给 Codex、Claude Code 等编程 Agent 使用的商业级原理图生成与门禁工程。它不是 EasyEDA API skill；官方 `easyeda-api-skill` 负责 API 文档、Bridge 和 EasyEDA 扩展，本仓库负责确定性铺图、质量门禁、截图证据和写回闭环。
+EasyEDA Harness 是一套给 Codex、Claude Code 等编程 Agent 使用的商业级原理图生成与门禁工程。它不是 EasyEDA API skill；官方 `easyeda-api-skill` 负责 API 文档、Bridge 和 EasyEDA 扩展，本仓库负责确定性铺图、质量门禁、离线预览、真实 EDA 快照证据和写回闭环。
 
 用户最简单的用法是：把这个仓库交给 Agent，并要求它按 `AGENTS.md` 或 `CLAUDE.md` 执行。Agent 应自动安装依赖、确认官方 EasyEDA API Skill/Bridge、运行门禁、生成截图证据，并在 PASS 后再写回 EasyEDA。
 
@@ -26,7 +26,7 @@ EasyEDA Harness 是一套给 Codex、Claude Code 等编程 Agent 使用的商业
 
 ## 环境要求
 
-- Windows + PowerShell
+- Windows、Linux 或 macOS
 - Node.js 18 或更新版本
 - EasyEDA / 嘉立创 EDA 客户端
 - 官方 EasyEDA API Skill：<https://github.com/easyeda/easyeda-api-skill>
@@ -46,7 +46,7 @@ npm install
 给 Agent 的一句话：
 
 ```text
-请按 AGENTS.md 接手这个仓库，安装依赖，确认 easyeda-api-skill/Bridge，运行 fast、pipeline、visual review，只有全部 PASS 后才写回 EasyEDA。
+请按 AGENTS.md 接手这个仓库，安装依赖，确认 easyeda-api-skill/Bridge，运行 fast、pipeline、preview gate；真实交付前必须拉取 EasyEDA live snapshot/截图复核，只有全部 PASS 后才写回 EasyEDA。
 ```
 
 手动运行时：
@@ -57,7 +57,7 @@ cd easyeda-harness
 npm install
 npm run fast
 npm run pipeline
-npm run visual
+npm run preview
 ```
 
 默认完整门禁使用确定性候选集进行质量评估。需要做全量候选审计时可设置：
@@ -87,21 +87,30 @@ npm run apply:gated
 ```powershell
 $env:EASYEDA_APPLY_FULL_AUTHORIZED='1'
 node engine/apply_full.mjs
-powershell -ExecutionPolicy Bypass -File apply_run.ps1
+$env:EASYEDA_APPLY_RUN_AUTHORIZED='1'
+node engine/apply_run.mjs --force
 ```
 
-## 实图快照与截图证据
+## 预览、实图快照与截图证据
+
+`npm run preview` 生成的是 harness renderer 的离线预览截图，用于快速检查结构、模块区域和明显重叠。它不是 EasyEDA 真实画布截图，不能单独作为最终交付证据。
 
 拉取当前 EDA 原理图：
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File run-save.ps1 -JsFile snapshot2.js -OutFile live.json
+npm run live:save
 ```
 
-生成本地裁剪预览：
+抓取真实 EasyEDA 画布截图：
+
+```bash
+npm run live:image
+```
+
+生成本地预览裁剪：
 
 ```powershell
-npm run crops
+npm run preview
 ```
 
 推荐每次交付至少检查全局图和各功能模块局部图：USB、LDO、RESET、BOOT、MCU 左右侧、PMOS、RELAY1、RELAY2、标题栏区域。
@@ -110,7 +119,8 @@ npm run crops
 
 - `npm run fast`：`HARD=0 SOFT=0 INFO=0`
 - `npm run pipeline`：`HARD=0 SOFT=0 INFO=0`
-- `npm run visual`：至少生成 10 张全局/局部截图，视觉审计 PASS
+- `npm run preview`：至少生成 10 张全局/局部离线预览图，视觉审计 PASS
+- EasyEDA live：拉取 `live.json`，并复核从真实 EasyEDA 画布抓取的 `live_canvas.png`
 - EasyEDA DRC：`0 error / 0 warning / 0 info`
 - 无普通文本伪装网络标签
 - 单页图纸不使用无必要的 NET PORT
@@ -132,7 +142,8 @@ npm run crops
 - `harness/`：统一规则门禁、模型归一化、模块注册。
 - `snap2.json`：参考工程器件快照。
 - `comp_state.json`：参考工程器件状态，用于写回时保留器件绑定信息。
-- `run.ps1` / `run-save.ps1` / `run-image.ps1`：EasyEDA bridge 执行脚本。
+- `engine/bridge_client.mjs` / `engine/bridge_exec.mjs`：跨平台 EasyEDA bridge 执行入口。
+- `run.ps1` / `run-save.ps1` / `run-image.ps1`：Windows 便捷包装脚本。
 - `fix_wire_name_anchors.js`：修复 live 图中 wire `Name` 锚点的实用脚本。
 - `remove_duplicate_title_block.js`：删除 harness 旧版自绘标题块的迁移脚本。
 

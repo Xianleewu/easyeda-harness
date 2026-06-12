@@ -2,7 +2,7 @@
 
 [中文](README.md)
 
-EasyEDA Harness is a commercial-grade schematic generation and gating project intended for coding agents such as Codex and Claude Code. It is not the EasyEDA API skill. The official `easyeda-api-skill` owns the API docs, bridge, and EasyEDA extension; this repository owns deterministic placement, quality gates, visual evidence, and the write-back loop.
+EasyEDA Harness is a commercial-grade schematic generation and gating project intended for coding agents such as Codex and Claude Code. It is not the EasyEDA API skill. The official `easyeda-api-skill` owns the API docs, bridge, and EasyEDA extension; this repository owns deterministic placement, quality gates, offline previews, real EasyEDA snapshot evidence, and the write-back loop.
 
 The simplest user workflow is to hand this repository to an agent and ask it to follow `AGENTS.md` or `CLAUDE.md`. The agent should install dependencies, verify the official EasyEDA API Skill/Bridge, run the gates, generate visual evidence, and only write back to EasyEDA after every gate passes.
 
@@ -26,7 +26,7 @@ The repository includes `AIHWDEBUGER` as a reference design: USB-C input, 5V to 
 
 ## Requirements
 
-- Windows + PowerShell
+- Windows, Linux, or macOS
 - Node.js 18 or newer
 - EasyEDA / JLC EDA desktop client
 - Official EasyEDA API Skill: <https://github.com/easyeda/easyeda-api-skill>
@@ -46,7 +46,7 @@ npm install
 One prompt for an agent:
 
 ```text
-Follow AGENTS.md for this repository. Install dependencies, verify easyeda-api-skill/Bridge, run fast, pipeline, and visual review, and write back to EasyEDA only after every gate passes.
+Follow AGENTS.md for this repository. Install dependencies, verify easyeda-api-skill/Bridge, run fast, pipeline, and the preview gate. Before final delivery, pull a real EasyEDA live snapshot/screenshot and write back only after every gate passes.
 ```
 
 Manual run:
@@ -57,7 +57,7 @@ cd easyeda-harness
 npm install
 npm run fast
 npm run pipeline
-npm run visual
+npm run preview
 ```
 
 The full gate uses a deterministic candidate set for quality evaluation by default. To audit every generated candidate, set:
@@ -87,21 +87,30 @@ npm run apply:gated
 ```powershell
 $env:EASYEDA_APPLY_FULL_AUTHORIZED='1'
 node engine/apply_full.mjs
-powershell -ExecutionPolicy Bypass -File apply_run.ps1
+$env:EASYEDA_APPLY_RUN_AUTHORIZED='1'
+node engine/apply_run.mjs --force
 ```
 
-## Live Snapshot And Visual Evidence
+## Preview, Live Snapshot, And Visual Evidence
+
+`npm run preview` generates offline screenshots from the harness renderer. They are useful for fast structure, module-region, and obvious-overlap review, but they are not real EasyEDA canvas screenshots and are not sufficient as final delivery evidence.
 
 Pull the current schematic from EasyEDA:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File run-save.ps1 -JsFile snapshot2.js -OutFile live.json
+npm run live:save
 ```
 
-Generate local visual crops:
+Capture a real EasyEDA canvas screenshot:
 
 ```powershell
-npm run crops
+npm run live:image
+```
+
+Generate local preview crops:
+
+```powershell
+npm run preview
 ```
 
 For handoff, review the global sheet and local crops for USB, LDO, RESET, BOOT, MCU left/right, PMOS, RELAY1, RELAY2, and title-template area.
@@ -110,7 +119,8 @@ For handoff, review the global sheet and local crops for USB, LDO, RESET, BOOT, 
 
 - `npm run fast`: `HARD=0 SOFT=0 INFO=0`
 - `npm run pipeline`: `HARD=0 SOFT=0 INFO=0`
-- `npm run visual`: at least 10 global/local screenshots generated and visual audit passes
+- `npm run preview`: at least 10 global/local offline preview screenshots generated and visual audit passes
+- EasyEDA live: pull `live.json` and review `live_canvas.png` captured from the real EasyEDA canvas
 - EasyEDA DRC: `0 error / 0 warning / 0 info`
 - No fake text net labels
 - No unnecessary NET PORT symbols on a single-sheet schematic
@@ -132,7 +142,8 @@ For handoff, review the global sheet and local crops for USB, LDO, RESET, BOOT, 
 - `harness/`: normalized model, module registry, and rule gates.
 - `snap2.json`: reference project component snapshot.
 - `comp_state.json`: reference component state for write-back preservation.
-- `run.ps1` / `run-save.ps1` / `run-image.ps1`: EasyEDA bridge runners.
+- `engine/bridge_client.mjs` / `engine/bridge_exec.mjs`: cross-platform EasyEDA bridge runners.
+- `run.ps1` / `run-save.ps1` / `run-image.ps1`: Windows convenience wrappers.
 - `fix_wire_name_anchors.js`: utility for repairing live wire `Name` anchors.
 - `remove_duplicate_title_block.js`: migration utility for removing old harness-drawn title blocks.
 

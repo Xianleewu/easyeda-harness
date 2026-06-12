@@ -4,7 +4,8 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { isAbsolute, join } from 'node:path';
 import { normalizeLiveWires, validateLive } from './validate.mjs';
 import { pullStableDrc } from './drc_pull.mjs';
-import { runBridgeSave } from './bridge_run.mjs';
+import { runBridge, runBridgeSave } from './bridge_run.mjs';
+import { listEdaWindows } from './bridge_client.mjs';
 import { validateTargetContext } from './target_context_gate.mjs';
 import { netContractReport } from './net_contract.mjs';
 import { auditLibraryManifest } from './library_manifest.mjs';
@@ -20,29 +21,11 @@ const LIVE_HARNESS_REPORT = process.env.EASYEDA_LIVE_HARNESS_REPORT || DIR + 'ha
 const TARGET_CONTEXT_FILE = process.env.EASYEDA_TARGET_CONTEXT || DIR + 'target_context_apply_gate.json';
 const APPROVED_LIBRARY_MANIFEST = process.env.EASYEDA_APPROVED_LIBRARY_MANIFEST || DIR + 'approved_library_manifest.json';
 
-async function findBridge() {
-	for (let port = 49620; port <= 49629; port++) {
-		try {
-			const r = await fetch(`http://127.0.0.1:${port}/health`);
-			const h = await r.json();
-			if (h.service === 'easyeda-bridge') return { port, base: `http://127.0.0.1:${port}`, health: h };
-		} catch {}
-	}
-	throw new Error('EasyEDA bridge service not found on ports 49620-49629');
-}
-
 async function requireEdaWindow() {
-	const bridge = await findBridge();
+	const { bridge, windows } = await listEdaWindows();
 	const health = bridge.health;
 	if (health.service !== 'easyeda-bridge') {
 		throw new Error('unexpected bridge service response');
-	}
-	let windows;
-	try {
-		const r = await fetch(`${bridge.base}/eda-windows`);
-		windows = await r.json();
-	} catch (e) {
-		throw new Error(`failed to query EDA windows: ${e.message}`);
 	}
 	if (!health.edaConnected || !windows.count) {
 		throw new Error('no EasyEDA window connected, write-back blocked');
@@ -58,17 +41,10 @@ async function requireEdaWindow() {
 	return bridge;
 }
 
-function pullLive() {
-	const args = [
-		'-ExecutionPolicy', 'Bypass', '-File', `${DIR}run-save.ps1`,
-		'-JsFile', `${DIR}snapshot2.js`, '-OutFile', LIVE_SNAP,
-	];
-	if (TARGET_WINDOW_ID) args.push('-WindowId', TARGET_WINDOW_ID);
-	const ps = spawnSync('powershell', args, { encoding: 'utf8', cwd: DIR });
-	if (ps.status !== 0)
-		throw new Error(`live snapshot pull failed: ${ps.stdout || ps.stderr}`);
-	console.log(ps.stdout.trim());
-	return JSON.parse(readFileSync(LIVE_SNAP, 'utf8').replace(/^\uFEFF/, ''));
+async function pullLive() {
+	const snap = await runBridgeSave({ jsFile: DIR + 'snapshot2.js', outFile: LIVE_SNAP, windowId: TARGET_WINDOW_ID });
+	console.log(`SAVED ${LIVE_SNAP}`);
+	return snap;
 }
 
 function normalizeLiveContractModel(liveSnap) {
@@ -79,19 +55,13 @@ function normalizeLiveContractModel(liveSnap) {
 	};
 }
 
-function runBridge(jsFile) {
-	const args = [
-		'-ExecutionPolicy', 'Bypass', '-File', `${DIR}run.ps1`,
-		'-JsFile', jsFile,
-	];
-	if (TARGET_WINDOW_ID) args.push('-WindowId', TARGET_WINDOW_ID);
-	const ps = spawnSync('powershell', args, { encoding: 'utf8', cwd: DIR, stdio: 'inherit' });
-	if (ps.status !== 0) throw new Error(`${jsFile} failed`);
+async function runBridgeScript(jsFile) {
+	await runBridge({ jsFile, windowId: TARGET_WINDOW_ID });
 }
 
-function runBridgeBestEffort(jsFile) {
+async function runBridgeBestEffort(jsFile) {
 	try {
-		runBridge(jsFile);
+		await runBridgeScript(jsFile);
 		return true;
 	} catch (e) {
 		console.warn(`post-process helper failed, live gate will decide: ${jsFile} ${e && e.message ? e.message : String(e)}`);
@@ -146,7 +116,7 @@ try {
 	process.exitCode = 1;
 } 
 if (!process.exitCode) {
-	const targetContext = runBridgeSave({ dir: DIR, jsFile: DIR + 'target_context.js', outFile: TARGET_CONTEXT_FILE, windowId: TARGET_WINDOW_ID });
+	const targetContext = await runBridgeSave({ jsFile: DIR + 'target_context.js', outFile: TARGET_CONTEXT_FILE, windowId: TARGET_WINDOW_ID });
 	const targetGate = validateTargetContext(targetContext);
 	if (!targetGate.pass) {
 		saveApplyReport({
@@ -173,22 +143,22 @@ if (!process.exitCode) {
 		stdio: 'inherit',
 		env: { ...process.env, EASYEDA_APPLY_FULL_AUTHORIZED: '1' },
 	});
-	const applyArgs = ['-ExecutionPolicy', 'Bypass', '-File', 'apply_run.ps1', '-Force'];
-	if (TARGET_WINDOW_ID) applyArgs.push('-WindowId', TARGET_WINDOW_ID);
-	const applyPs = spawnSync('powershell', applyArgs, {
+	const applyArgs = ['engine/apply_run.mjs', '--force'];
+	if (TARGET_WINDOW_ID) applyArgs.push('--window-id', TARGET_WINDOW_ID);
+	const applyPs = spawnSync('node', applyArgs, {
 		cwd: DIR,
 		stdio: 'inherit',
 		env: { ...process.env, EASYEDA_APPLY_RUN_AUTHORIZED: '1' },
 	});
-	if (applyPs.status !== 0) throw new Error('apply_run.ps1 failed');
+	if (applyPs.status !== 0) throw new Error('apply_run.mjs failed');
 	const postProcess = {
-		clearStandardizationState: runBridgeBestEffort(DIR + 'clear_standardization_state.js'),
-		hidePartNameAttrs: runBridgeBestEffort(DIR + 'hide_part_name_attrs.js'),
-		normalizeVisibleAttrPlacement: runBridgeBestEffort(DIR + 'normalize_visible_attr_placement.js'),
-		normalizeRepeatedPartAttrs: runBridgeBestEffort(DIR + 'normalize_repeated_part_attrs.js'),
-		repairRepeatedLibraryBindings: runBridgeBestEffort(DIR + 'repair_repeated_library_bindings_live.js'),
+		clearStandardizationState: await runBridgeBestEffort(DIR + 'clear_standardization_state.js'),
+		hidePartNameAttrs: await runBridgeBestEffort(DIR + 'hide_part_name_attrs.js'),
+		normalizeVisibleAttrPlacement: await runBridgeBestEffort(DIR + 'normalize_visible_attr_placement.js'),
+		normalizeRepeatedPartAttrs: await runBridgeBestEffort(DIR + 'normalize_repeated_part_attrs.js'),
+		repairRepeatedLibraryBindings: await runBridgeBestEffort(DIR + 'repair_repeated_library_bindings_live.js'),
 	};
-	const liveSnap = pullLive();
+	const liveSnap = await pullLive();
 	const liveHarness = runHarness(LIVE_SNAP, LIVE_HARNESS_REPORT, 'live');
 	const documentStyle = auditDocumentStyleFromSnapshot(liveSnap);
 	const pageComposition = auditPageComposition(liveSnap);
