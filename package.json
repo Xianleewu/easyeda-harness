@@ -9,6 +9,7 @@
     "harness": "node harness/harness.mjs full_model.json harness_model_report.json",
     "apply:gated": "node engine/apply_gated.mjs",
     "crops": "node engine/visual_crops.mjs",
+    "visual": "node engine/visual_crops.mjs",
     "test": "node engine/regression_tests.mjs"
   },
   "dependencies": {

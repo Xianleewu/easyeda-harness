@@ -2,7 +2,9 @@
 
 [中文](README.md)
 
-EasyEDA Harness is a commercial-grade schematic generation and gating workflow for EasyEDA / JLC EDA. It separates deterministic schematic assembly, offline quality gates, real EasyEDA write-back, and live snapshot verification into a repeatable delivery loop.
+EasyEDA Harness is a commercial-grade schematic generation and gating project intended for coding agents such as Codex and Claude Code. It is not the EasyEDA API skill. The official `easyeda-api-skill` owns the API docs, bridge, and EasyEDA extension; this repository owns deterministic placement, quality gates, visual evidence, and the write-back loop.
+
+The simplest user workflow is to hand this repository to an agent and ask it to follow `AGENTS.md` or `CLAUDE.md`. The agent should install dependencies, verify the official EasyEDA API Skill/Bridge, run the gates, generate visual evidence, and only write back to EasyEDA after every gate passes.
 
 The repository includes `AIHWDEBUGER` as a reference design: USB-C input, 5V to 3V3 regulation, ESP32-C3 MCU, RESET/BOOT support, high-side power switching, and two relay outputs.
 
@@ -41,12 +43,21 @@ npm install
 
 ## Quick Start
 
+One prompt for an agent:
+
+```text
+Follow AGENTS.md for this repository. Install dependencies, verify easyeda-api-skill/Bridge, run fast, pipeline, and visual review, and write back to EasyEDA only after every gate passes.
+```
+
+Manual run:
+
 ```powershell
 git clone https://github.com/Xianleewu/easyeda-harness.git
 cd easyeda-harness
 npm install
 npm run fast
 npm run pipeline
+npm run visual
 ```
 
 The full gate uses a deterministic candidate set for quality evaluation by default. To audit every generated candidate, set:
@@ -99,6 +110,7 @@ For handoff, review the global sheet and local crops for USB, LDO, RESET, BOOT, 
 
 - `npm run fast`: `HARD=0 SOFT=0 INFO=0`
 - `npm run pipeline`: `HARD=0 SOFT=0 INFO=0`
+- `npm run visual`: at least 10 global/local screenshots generated and visual audit passes
 - EasyEDA DRC: `0 error / 0 warning / 0 info`
 - No fake text net labels
 - No unnecessary NET PORT symbols on a single-sheet schematic

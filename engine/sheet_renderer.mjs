@@ -351,7 +351,7 @@ function junctionPoints(snapshot) {
 	return [...counts.values()].filter(p => p.count >= 3);
 }
 
-function transformFor(sheetBox, width, height, marginPx) {
+export function transformFor(sheetBox, width, height, marginPx) {
 	const sx = (width - 2 * marginPx) / Math.max(1, sheetBox.maxX - sheetBox.minX);
 	const sy = (height - 2 * marginPx) / Math.max(1, sheetBox.maxY - sheetBox.minY);
 	const scale = Math.min(sx, sy);
@@ -393,7 +393,7 @@ function isSignalLabelFlag(f) {
 	return Math.max(w, h) >= 26 && !/^(GND|SYS_|VIN_|VOUT_)/.test(String(f.net || ''));
 }
 
-function inferModuleRegions(snapshot, pad = 24) {
+export function inferModuleRegions(snapshot, pad = 24) {
 	const byRef = new Map((snapshot?.components || []).map(c => [c.designator, c]));
 	const regions = [];
 	for (const mod of MODULES) {

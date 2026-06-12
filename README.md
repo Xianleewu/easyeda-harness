@@ -2,7 +2,9 @@
 
 [English](README.en.md)
 
-EasyEDA Harness 是一套面向嘉立创 EDA / EasyEDA 的商业级原理图生成与门禁方案。它把“程序确定性铺图、离线规则门禁、真实 EDA 写回、实图快照复核”拆成清晰的闭环，目标是让原理图不仅电气连接正确，也具备可审核、可维护、可交付的工程观感。
+EasyEDA Harness 是一套给 Codex、Claude Code 等编程 Agent 使用的商业级原理图生成与门禁工程。它不是 EasyEDA API skill；官方 `easyeda-api-skill` 负责 API 文档、Bridge 和 EasyEDA 扩展，本仓库负责确定性铺图、质量门禁、截图证据和写回闭环。
+
+用户最简单的用法是：把这个仓库交给 Agent，并要求它按 `AGENTS.md` 或 `CLAUDE.md` 执行。Agent 应自动安装依赖、确认官方 EasyEDA API Skill/Bridge、运行门禁、生成截图证据，并在 PASS 后再写回 EasyEDA。
 
 当前仓库内置 `AIHWDEBUGER` 作为参考工程：USB-C 输入、5V 到 3V3、ESP32-C3 MCU、复位/BOOT 支持、高边电源开关和两路继电器输出。
 
@@ -41,12 +43,21 @@ npm install
 
 ## 快速开始
 
+给 Agent 的一句话：
+
+```text
+请按 AGENTS.md 接手这个仓库，安装依赖，确认 easyeda-api-skill/Bridge，运行 fast、pipeline、visual review，只有全部 PASS 后才写回 EasyEDA。
+```
+
+手动运行时：
+
 ```powershell
 git clone https://github.com/Xianleewu/easyeda-harness.git
 cd easyeda-harness
 npm install
 npm run fast
 npm run pipeline
+npm run visual
 ```
 
 默认完整门禁使用确定性候选集进行质量评估。需要做全量候选审计时可设置：
@@ -99,6 +110,7 @@ npm run crops
 
 - `npm run fast`：`HARD=0 SOFT=0 INFO=0`
 - `npm run pipeline`：`HARD=0 SOFT=0 INFO=0`
+- `npm run visual`：至少生成 10 张全局/局部截图，视觉审计 PASS
 - EasyEDA DRC：`0 error / 0 warning / 0 info`
 - 无普通文本伪装网络标签
 - 单页图纸不使用无必要的 NET PORT
