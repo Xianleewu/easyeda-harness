@@ -1,0 +1,89 @@
+{
+  "schema": 1,
+  "source": "TigerBruce/lceda-operation-notes",
+  "remote": "https://github.com/TigerBruce/lceda-operation-notes.git",
+  "commit": "cc2719797f646e753242e96a1265b63a8f368b49",
+  "generatedAt": "2026-06-10T15:51:38.037Z",
+  "files": [
+    {
+      "rel": ".gitignore",
+      "bytes": 389,
+      "sha256": "7f6eb406bf49b7016abeacef86a0d1f9fb50a72844170d3d161982bf65315df0"
+    },
+    {
+      "rel": "README.md",
+      "bytes": 2493,
+      "sha256": "14b8b55ee82837bd14021862d530a8c31a527a31c87593fa12facebaf9f9da3b"
+    },
+    {
+      "rel": "docs/01-getting-started-and-safe-workflow.md",
+      "bytes": 20934,
+      "sha256": "0b38611b26edd80f9cd1bc811a08ebf8c5ebe89cd3a2d4b9c29a79bdefeea7e9"
+    },
+    {
+      "rel": "docs/02-schematic-quality-and-reference-study.md",
+      "bytes": 4891,
+      "sha256": "6c53111c115fcd051c0a40dc24d68d1c54b86825031b01ced423acc777a71f0f"
+    },
+    {
+      "rel": "docs/03-api-validation-notes.md",
+      "bytes": 3255,
+      "sha256": "532a1b47a471b6ec2ab087a0696c79caab62540e86e0a189a9c03061d511c917"
+    },
+    {
+      "rel": "tools/Invoke-LcedaBaselineCapture.ps1",
+      "bytes": 18710,
+      "sha256": "33b2824fe4889b7b3f18b63d8bcf3066d94bc7fef22ef1387e1e256cc0eb3322"
+    },
+    {
+      "rel": "原理图设计样板示例/TIDA-010979_E1_Sch.PDF",
+      "bytes": 3943120,
+      "sha256": "e31acbf3a472723529e9b813b29f95266108ebed02a1acea441c214e8159ccad"
+    },
+    {
+      "rel": "原理图设计样板示例/TI原理图样板.pdf",
+      "bytes": 563461,
+      "sha256": "ef530dff0a3486f5870da556ba82a56429efc491016f7e2ae7a4e9c0464253af"
+    },
+    {
+      "rel": "原理图设计样板示例/mb1136-default-c05_schematic.pdf",
+      "bytes": 1314434,
+      "sha256": "7f8795e66e692fe72125bc69613284676ebb6f5e63f0da4e053f1e184771cd26"
+    },
+    {
+      "rel": "原理图设计样板示例/mb1364-h743zi-e01_schematic.pdf",
+      "bytes": 2591896,
+      "sha256": "ce75fa011e0d393c8446cd83e8192fde0781617caf58bc74919eac2dd687ce0b"
+    },
+    {
+      "rel": "原理图设计样板示例/mb997-f407vgt6-g01-schematic.pdf",
+      "bytes": 3629341,
+      "sha256": "e96240a580124e0fc64d54dfcde8b2f4edbcd504eb88ae4d4eb20344a14564de"
+    },
+    {
+      "rel": "原理图设计样板示例/snlr041a.pdf",
+      "bytes": 460159,
+      "sha256": "95d86e18f7f72dd3e743af078ac1f25fee5d51d590283df64a09692f47bea422"
+    },
+    {
+      "rel": "原理图设计样板示例/tidmd37a.pdf",
+      "bytes": 869014,
+      "sha256": "c2ceed39d3d5203b3492a9ccb794170fb00e22f825513568c223a92214a570b0"
+    },
+    {
+      "rel": "参考样板截图/tidmd37a/tidmd37a-1.png",
+      "bytes": 276616,
+      "sha256": "a13551bbe559287d6cfd8388757597c9b812d5b1487962a741bf9b25d9a54d07"
+    },
+    {
+      "rel": "参考样板截图/tidmd37a/tidmd37a-2.png",
+      "bytes": 307954,
+      "sha256": "fe4977a6d84f3a1a8c06753d7a9953f148f65f67d868eb758bf544e35425181c"
+    },
+    {
+      "rel": "参考样板截图/tidmd37a/tidmd37a-3.png",
+      "bytes": 282674,
+      "sha256": "8ff7aab1f93984b3c76d610f52cb655da5bc86b07dc0fa226b5139f82e847fd0"
+    }
+  ]
+}

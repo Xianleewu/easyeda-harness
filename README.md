@@ -1,0 +1,129 @@
+# EasyEDA Harness
+
+[English](README.en.md)
+
+EasyEDA Harness 是一套面向嘉立创 EDA / EasyEDA 的商业级原理图生成与门禁方案。它把“程序确定性铺图、离线规则门禁、真实 EDA 写回、实图快照复核”拆成清晰的闭环，目标是让原理图不仅电气连接正确，也具备可审核、可维护、可交付的工程观感。
+
+当前仓库内置 `AIHWDEBUGER` 作为参考工程：USB-C 输入、5V 到 3V3、ESP32-C3 MCU、复位/BOOT 支持、高边电源开关和两路继电器输出。
+
+## 核心能力
+
+- 确定性原理图组装：`engine/cells.mjs` 定义功能单元，`engine/assemble.mjs` 负责整图拼装。
+- 快速离线门禁：`npm run fast` 在本机 CPU 上完成核心模板校验，适合日常坐标和规则迭代。
+- 完整布局门禁：`npm run pipeline` 运行布局搜索、结构审计、视觉节奏、文本覆盖、系统意图等检查。
+- 真实 EDA 闭环：通过 WebSocket 桥写回 EasyEDA，再用 `snapshot2.js` 拉取实图快照做 live 校验。
+- 网络标签约束：单页图纸优先使用 wire `Name` 属性作为真实网络名，不用普通文本伪装网络标签。
+- 文档模板兼容：图纸标题栏交给 EasyEDA 原生模板变量；harness 不再额外绘制重复标题块。
+
+## 设计原则
+
+- 电气正确优先：关键网络必须连通，引脚端点必须精确落在导线端点上。
+- 可读性同等重要：正交走线、模块分区、同侧对齐、网名不压器件、导线不穿符号。
+- 门禁不绕过：模板门禁、live 门禁、DRC 都通过后才视为可交付。
+- 小改快速闭环：日常调坐标先跑 `npm run fast`，批量稳定后再跑完整 pipeline 和 EDA live 验收。
+
+## 环境要求
+
+- Windows + PowerShell
+- Node.js 18 或更新版本
+- EasyEDA / 嘉立创 EDA 客户端
+- 官方 EasyEDA API Skill：<https://github.com/easyeda/easyeda-api-skill>
+- EasyEDA API bridge，默认监听 `http://127.0.0.1:49620/execute`
+
+先安装并启动官方 skill。该仓库提供 EasyEDA Pro API 文档、`SKILL.md`、WebSocket bridge 和 EasyEDA 端 `run-api-gateway.eext` 扩展；官方 README 的 Quick Start 包含 `npm install`、`npm run build:docs`、`npm run server`，然后在 EasyEDA 中安装该扩展。bridge 启动后会在 `49620-49629` 端口等待 EasyEDA 客户端连接。
+
+然后安装本 harness：
+
+```powershell
+npm install
+# 如果 PowerShell 禁止 npm.ps1，可使用 npm.cmd install
+```
+
+## 快速开始
+
+```powershell
+git clone https://github.com/Xianleewu/easyeda-harness.git
+cd easyeda-harness
+npm install
+npm run fast
+npm run pipeline
+```
+
+默认完整门禁使用确定性候选集进行质量评估。需要做全量候选审计时可设置：
+
+```powershell
+$env:EASYEDA_LAYOUT_MAX_CANDIDATES='0'
+npm run pipeline
+```
+
+成功时会看到类似输出：
+
+```text
+Fast Template Harness | Score 100/100 | PASS
+HARD=0 SOFT=0 INFO=0
+```
+
+## 写回 EasyEDA
+
+先启动并确认 EasyEDA bridge 已连接，然后执行：
+
+```powershell
+npm run apply:gated
+```
+
+`apply:gated` 会先运行门禁；未 PASS 时不会写回。调试低层写回脚本时才使用：
+
+```powershell
+$env:EASYEDA_APPLY_FULL_AUTHORIZED='1'
+node engine/apply_full.mjs
+powershell -ExecutionPolicy Bypass -File apply_run.ps1
+```
+
+## 实图快照与截图证据
+
+拉取当前 EDA 原理图：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File run-save.ps1 -JsFile snapshot2.js -OutFile live.json
+```
+
+生成本地裁剪预览：
+
+```powershell
+npm run crops
+```
+
+推荐每次交付至少检查全局图和各功能模块局部图：USB、LDO、RESET、BOOT、MCU 左右侧、PMOS、RELAY1、RELAY2、标题栏区域。
+
+## 商业级验收标准
+
+- `npm run fast`：`HARD=0 SOFT=0 INFO=0`
+- `npm run pipeline`：`HARD=0 SOFT=0 INFO=0`
+- EasyEDA DRC：`0 error / 0 warning / 0 info`
+- 无普通文本伪装网络标签
+- 单页图纸不使用无必要的 NET PORT
+- wire `Name` 锚点可读：左侧标签使用左下角，右侧标签使用右下角
+- 模块之间有清晰矩形空间和合理间距，不发生榫卯式穿插
+- 文本、器件属性、网名、GND/NC 符号无覆盖
+
+## 关键经验
+
+- EasyEDA wire `Name` 是真实网络名显示；`PrimitiveText` 只是文本，不能当网络标签。
+- 实测 wire `Name` 原点：左侧标签使用 `alignMode=6`，右侧标签使用 `alignMode=8`。
+- 修改 wire `Name` 属性时使用 `eda.sch_PrimitiveAttribute.modify()`；部分 `toAsync().setState_*().done()` 路径会产生坐标翻转问题。
+- EasyEDA 创建导线更可靠的方式是按单段写入，折线需要拆成两点一段。
+- 慢流程只应该用于最终验收；坐标和规则迭代必须先走本地快门禁。
+
+## 目录结构
+
+- `engine/`：模板组装、布局搜索、写回、渲染、DRC/live 辅助。
+- `harness/`：统一规则门禁、模型归一化、模块注册。
+- `snap2.json`：参考工程器件快照。
+- `comp_state.json`：参考工程器件状态，用于写回时保留器件绑定信息。
+- `run.ps1` / `run-save.ps1` / `run-image.ps1`：EasyEDA bridge 执行脚本。
+- `fix_wire_name_anchors.js`：修复 live 图中 wire `Name` 锚点的实用脚本。
+- `remove_duplicate_title_block.js`：删除 harness 旧版自绘标题块的迁移脚本。
+
+## 许可证
+
+请在正式发布前按项目需求补充 LICENSE。

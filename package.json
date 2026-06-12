@@ -1,0 +1,17 @@
+{
+  "name": "easyeda-harness",
+  "version": "0.1.0",
+  "private": false,
+  "type": "module",
+  "scripts": {
+    "fast": "node engine/pipeline_fast.mjs",
+    "pipeline": "node engine/pipeline.mjs",
+    "harness": "node harness/harness.mjs full_model.json harness_model_report.json",
+    "apply:gated": "node engine/apply_gated.mjs",
+    "crops": "node engine/visual_crops.mjs",
+    "test": "node engine/regression_tests.mjs"
+  },
+  "dependencies": {
+    "@resvg/resvg-js": "^2.6.2"
+  }
+}

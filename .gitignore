@@ -1,0 +1,31 @@
+node_modules/
+
+# Generated schematic outputs
+full_model.json
+report.json
+loop_report.json
+layout_planner_report.json
+layout_planner_*.json
+layout_planner_*.png
+live.json
+harness_*_report.json
+apply_report.json
+commercial_*_report.json
+design_memory_report.json
+system_intent_gate.json
+sheet_output*.json
+sheet_output*.png
+
+# Generated EasyEDA write-back scripts
+af_*.js
+
+# Visual evidence generated locally
+visual_crops/
+live_region_shots/*.png
+*.png
+*.svg
+
+# Logs and temporary probes
+*.log
+tmp_*/
+.tmp_*/

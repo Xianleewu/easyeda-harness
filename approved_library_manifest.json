@@ -1,0 +1,317 @@
+{
+  "generatedFrom": "live_commercial_gate.json",
+  "purpose": "Approved EasyEDA library bindings for AIHWDEBUGER commercial gate",
+  "bindingKeys": [
+    "Symbol",
+    "Device",
+    "Footprint"
+  ],
+  "parts": {
+    "J1": {
+      "name": "TYPE-C-31-M-12",
+      "value": "TYPE-C-31-M-12",
+      "addIntoBom": true,
+      "addIntoPcb": true,
+      "Symbol": "e26e20e73117ae48",
+      "Device": "15de7127bdcb758b",
+      "Footprint": "c9b96b229a43d71a"
+    },
+    "R9": {
+      "name": "0603WAF5101T5E",
+      "value": "5.1kÎ©",
+      "addIntoBom": true,
+      "addIntoPcb": true,
+      "Symbol": "1d36a63e24f15eb8",
+      "Device": "8c6911d22cbb63ef",
+      "Footprint": "8a685b94dcad62a7"
+    },
+    "R10": {
+      "name": "0603WAF5101T5E",
+      "value": "5.1kÎ©",
+      "addIntoBom": true,
+      "addIntoPcb": true,
+      "Symbol": "1d36a63e24f15eb8",
+      "Device": "8c6911d22cbb63ef",
+      "Footprint": "8a685b94dcad62a7"
+    },
+    "R11": {
+      "name": "0603WAF220JT5E",
+      "value": "22Î©",
+      "addIntoBom": true,
+      "addIntoPcb": true,
+      "Symbol": "c268da91f43baa33",
+      "Device": "9a40f29fb420257c",
+      "Footprint": "8a685b94dcad62a7"
+    },
+    "R12": {
+      "name": "0603WAF220JT5E",
+      "value": "22Î©",
+      "addIntoBom": true,
+      "addIntoPcb": true,
+      "Symbol": "c268da91f43baa33",
+      "Device": "9a40f29fb420257c",
+      "Footprint": "8a685b94dcad62a7"
+    },
+    "C1": {
+      "name": "CL10A106MA8NRNC",
+      "value": "10uF",
+      "addIntoBom": true,
+      "addIntoPcb": true,
+      "Symbol": "4563dac3d3c3b329",
+      "Device": "41f021d291db5f8e",
+      "Footprint": "52120ca459714db4"
+    },
+    "U2": {
+      "name": "AMS1117-3.3_C6186",
+      "value": "AMS1117-3.3_C6186",
+      "addIntoBom": true,
+      "addIntoPcb": true,
+      "Symbol": "bd8a1b6fa70423c4",
+      "Device": "24a53429c42527f0",
+      "Footprint": "4f07dd9149210fef"
+    },
+    "C2": {
+      "name": "CC0603KRX7R9BB104",
+      "value": "100nF",
+      "addIntoBom": true,
+      "addIntoPcb": true,
+      "Symbol": "9575c9afb15c9ae2",
+      "Device": "ac1f5f59542218b9",
+      "Footprint": "52120ca459714db4"
+    },
+    "C4": {
+      "name": "CL10A106MA8NRNC",
+      "value": "10uF",
+      "addIntoBom": true,
+      "addIntoPcb": true,
+      "Symbol": "4563dac3d3c3b329",
+      "Device": "41f021d291db5f8e",
+      "Footprint": "52120ca459714db4"
+    },
+    "SW1": {
+      "name": "DS-TS11B",
+      "value": "DS-TS11B",
+      "addIntoBom": true,
+      "addIntoPcb": true,
+      "Symbol": "36b8510a98cf4438",
+      "Device": "c5ea53c6c3f5734f",
+      "Footprint": "db324636a905df34"
+    },
+    "R18": {
+      "name": "0603WAF1002T5E",
+      "value": "10kÎ©",
+      "addIntoBom": true,
+      "addIntoPcb": true,
+      "Symbol": "76746bbab8ccdaf9",
+      "Device": "dce42123e557abf4",
+      "Footprint": "8a685b94dcad62a7"
+    },
+    "C3": {
+      "name": "CC0603KRX7R9BB104",
+      "value": "100nF",
+      "addIntoBom": true,
+      "addIntoPcb": true,
+      "Symbol": "9575c9afb15c9ae2",
+      "Device": "ac1f5f59542218b9",
+      "Footprint": "52120ca459714db4"
+    },
+    "SW2": {
+      "name": "DS-TS11B",
+      "value": "DS-TS11B",
+      "addIntoBom": true,
+      "addIntoPcb": true,
+      "Symbol": "36b8510a98cf4438",
+      "Device": "c5ea53c6c3f5734f",
+      "Footprint": "db324636a905df34"
+    },
+    "R17": {
+      "name": "0603WAF1002T5E",
+      "value": "10kÎ©",
+      "addIntoBom": true,
+      "addIntoPcb": true,
+      "Symbol": "76746bbab8ccdaf9",
+      "Device": "dce42123e557abf4",
+      "Footprint": "8a685b94dcad62a7"
+    },
+    "U1": {
+      "name": "ESP32-C3-WROOM-02U-N4",
+      "value": "2.4GHz",
+      "addIntoBom": true,
+      "addIntoPcb": true,
+      "Symbol": "6b31555932b9441e",
+      "Device": "1aa1d05ed02ffca9",
+      "Footprint": "a601964d5763f53e"
+    },
+    "Q1": {
+      "name": "AO4407A",
+      "value": "AO4407A",
+      "addIntoBom": true,
+      "addIntoPcb": true,
+      "Symbol": "c003a7014c4acdee",
+      "Device": "54490d416295ca7b",
+      "Footprint": "802eb5d187a88fe9"
+    },
+    "R1": {
+      "name": "0603WAF1003T5E",
+      "value": "100kÎ©",
+      "addIntoBom": true,
+      "addIntoPcb": true,
+      "Symbol": "3e49ef4f6100966e",
+      "Device": "a2ffb5d21a9bd60f",
+      "Footprint": "8a685b94dcad62a7"
+    },
+    "D1": {
+      "name": "BZT52C12",
+      "value": "BZT52C12",
+      "addIntoBom": true,
+      "addIntoPcb": true,
+      "Symbol": "46271d2f1ec3a508",
+      "Device": "af749b850d80be0d",
+      "Footprint": "891d3e08cde62478"
+    },
+    "R2": {
+      "name": "0603WAF1001T5E",
+      "value": "1kÎ©",
+      "addIntoBom": true,
+      "addIntoPcb": true,
+      "Symbol": "094517f6ba93c1eb",
+      "Device": "b79abe27275f3cd8",
+      "Footprint": "8a685b94dcad62a7"
+    },
+    "Q2": {
+      "name": "2N7002_C8545",
+      "value": "2N7002_C8545",
+      "addIntoBom": true,
+      "addIntoPcb": true,
+      "Symbol": "e47f270d7df662cc",
+      "Device": "5532ae3045227d43",
+      "Footprint": "c0d180af7bd20cb0"
+    },
+    "R3": {
+      "name": "0603WAF1000T5E",
+      "value": "100Î©",
+      "addIntoBom": true,
+      "addIntoPcb": true,
+      "Symbol": "bcfae26f89b2f06a",
+      "Device": "be24967cce09bf0c",
+      "Footprint": "8a685b94dcad62a7"
+    },
+    "R4": {
+      "name": "0603WAF1003T5E",
+      "value": "100kÎ©",
+      "addIntoBom": true,
+      "addIntoPcb": true,
+      "Symbol": "3e49ef4f6100966e",
+      "Device": "a2ffb5d21a9bd60f",
+      "Footprint": "8a685b94dcad62a7"
+    },
+    "CN1": {
+      "name": "2.54-2A-WT",
+      "value": "2.54-2A-WT",
+      "addIntoBom": true,
+      "addIntoPcb": true,
+      "Symbol": "2f8f034a29053c46",
+      "Device": "62d5864607aab360",
+      "Footprint": "ab564bc323c6b723"
+    },
+    "CN2": {
+      "name": "2.54-2A-WT",
+      "value": "2.54-2A-WT",
+      "addIntoBom": true,
+      "addIntoPcb": true,
+      "Symbol": "2f8f034a29053c46",
+      "Device": "62d5864607aab360",
+      "Footprint": "ab564bc323c6b723"
+    },
+    "Q3": {
+      "name": "AO3400A_C20917",
+      "value": "AO3400A_C20917",
+      "addIntoBom": true,
+      "addIntoPcb": true,
+      "Symbol": "891528405d3974df",
+      "Device": "1176e96400a51c48",
+      "Footprint": "c0d180af7bd20cb0"
+    },
+    "R13": {
+      "name": "0603WAF1000T5E",
+      "value": "100Î©",
+      "addIntoBom": true,
+      "addIntoPcb": true,
+      "Symbol": "bcfae26f89b2f06a",
+      "Device": "be24967cce09bf0c",
+      "Footprint": "8a685b94dcad62a7"
+    },
+    "R15": {
+      "name": "0603WAF1003T5E",
+      "value": "100kÎ©",
+      "addIntoBom": true,
+      "addIntoPcb": true,
+      "Symbol": "3e49ef4f6100966e",
+      "Device": "a2ffb5d21a9bd60f",
+      "Footprint": "8a685b94dcad62a7"
+    },
+    "D2": {
+      "name": "1N4148W_C81598",
+      "value": "1N4148W_C81598",
+      "addIntoBom": true,
+      "addIntoPcb": true,
+      "Symbol": "703c18046c7d1ac8",
+      "Device": "cb95f1734719a1ce",
+      "Footprint": "1fd32051a468dcc1"
+    },
+    "CN3": {
+      "name": "2.54-2A-WT",
+      "value": "2.54-2A-WT",
+      "addIntoBom": true,
+      "addIntoPcb": true,
+      "Symbol": "2f8f034a29053c46",
+      "Device": "62d5864607aab360",
+      "Footprint": "ab564bc323c6b723"
+    },
+    "Q4": {
+      "name": "AO3400A_C20917",
+      "value": "AO3400A_C20917",
+      "addIntoBom": true,
+      "addIntoPcb": true,
+      "Symbol": "891528405d3974df",
+      "Device": "1176e96400a51c48",
+      "Footprint": "c0d180af7bd20cb0"
+    },
+    "R14": {
+      "name": "0603WAF1000T5E",
+      "value": "100Î©",
+      "addIntoBom": true,
+      "addIntoPcb": true,
+      "Symbol": "bcfae26f89b2f06a",
+      "Device": "be24967cce09bf0c",
+      "Footprint": "8a685b94dcad62a7"
+    },
+    "R16": {
+      "name": "0603WAF1003T5E",
+      "value": "100kÎ©",
+      "addIntoBom": true,
+      "addIntoPcb": true,
+      "Symbol": "3e49ef4f6100966e",
+      "Device": "a2ffb5d21a9bd60f",
+      "Footprint": "8a685b94dcad62a7"
+    },
+    "D3": {
+      "name": "1N4148W_C81598",
+      "value": "1N4148W_C81598",
+      "addIntoBom": true,
+      "addIntoPcb": true,
+      "Symbol": "703c18046c7d1ac8",
+      "Device": "cb95f1734719a1ce",
+      "Footprint": "1fd32051a468dcc1"
+    },
+    "CN4": {
+      "name": "2.54-2A-WT",
+      "value": "2.54-2A-WT",
+      "addIntoBom": true,
+      "addIntoPcb": true,
+      "Symbol": "2f8f034a29053c46",
+      "Device": "62d5864607aab360",
+      "Footprint": "ab564bc323c6b723"
+    }
+  }
+}

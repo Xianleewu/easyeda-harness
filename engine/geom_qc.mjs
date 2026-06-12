@@ -1,0 +1,61 @@
+// 几何/视觉自检：器件重叠、标签重叠、线压器件、出格、导线交叉
+import { readFileSync } from 'node:fs';
+
+export function geomQC(model, opt = {}) {
+	const grid = opt.grid || 10;
+	const comps = model.components.filter(c => c.bbox);
+	const flags = (model.netflags || []);
+	const rects = [];
+	for (const c of comps) rects.push({ tag: c.designator, ...c.bbox });
+	for (const f of flags) if (f.bbox) rects.push({ tag: `[${f.net}]`, minX: f.bbox.minX, minY: f.bbox.minY, maxX: f.bbox.maxX, maxY: f.bbox.maxY });
+
+	const ov = (a, b) => a.minX < b.maxX && b.minX < a.maxX && a.minY < b.maxY && b.minY < a.maxY;
+	const inset = (r, m) => ({ minX: r.minX + m, minY: r.minY + m, maxX: r.maxX - m, maxY: r.maxY - m });
+
+	// 1) 矩形互相重叠（器件/标签 bbox）
+	const overlaps = [];
+	for (let i = 0; i < rects.length; i++) for (let j = i + 1; j < rects.length; j++)
+		if (ov(inset(rects[i], 1), inset(rects[j], 1))) overlaps.push(`${rects[i].tag} x ${rects[j].tag}`);
+
+	// 2) 导线段穿过器件 bbox 内部
+	const segs = [];
+	for (const w of model.wires) for (let i = 0; i + 3 < w.line.length; i += 2) {
+		const a = [w.line[i], w.line[i + 1]], b = [w.line[i + 2], w.line[i + 3]];
+		if (a[0] === b[0] && a[1] === b[1]) continue; segs.push({ a, b, net: w.net });
+	}
+	const segInRect = (s, r) => { // 仅判轴向线段是否穿过矩形内部（端点贴边不算）
+		const ri = inset(r, 1);
+		if (s.a[0] === s.b[0]) { const x = s.a[0]; if (x <= ri.minX || x >= ri.maxX) return false; const y0 = Math.min(s.a[1], s.b[1]), y1 = Math.max(s.a[1], s.b[1]); return y0 < ri.maxY && y1 > ri.minY; }
+		if (s.a[1] === s.b[1]) { const y = s.a[1]; if (y <= ri.minY || y >= ri.maxY) return false; const x0 = Math.min(s.a[0], s.b[0]), x1 = Math.max(s.a[0], s.b[0]); return x0 < ri.maxX && x1 > ri.minX; }
+		return false;
+	};
+	const wireThruComp = [];
+	for (const s of segs) for (const c of comps) if (segInRect(s, c.bbox)) wireThruComp.push(`net=${s.net || ''} thru ${c.designator}`);
+
+	// 3) 出格（引脚 / 导线点不在栅格）
+	let offgrid = 0; const offEx = [];
+	const chk = (x, y, tag) => { if (x % grid !== 0 || y % grid !== 0) { offgrid++; if (offEx.length < 8) offEx.push(`${tag}(${x},${y})`); } };
+	for (const c of comps) for (const p of c.pins || []) chk(p.x, p.y, c.designator);
+
+	// 4) 导线交叉（不同 net 的正交线相交于非端点）
+	let crossings = 0; const crossEx = [];
+	const H = segs.filter(s => s.a[1] === s.b[1]); const V = segs.filter(s => s.a[0] === s.b[0]);
+	for (const h of H) for (const v of V) {
+		if (!h.net || !v.net) continue;
+		const hx0 = Math.min(h.a[0], h.b[0]), hx1 = Math.max(h.a[0], h.b[0]), hy = h.a[1];
+		const vy0 = Math.min(v.a[1], v.b[1]), vy1 = Math.max(v.a[1], v.b[1]), vx = v.a[0];
+		if (vx > hx0 && vx < hx1 && hy > vy0 && hy < vy1 && (h.net || '') !== (v.net || '')) { crossings++; if (crossEx.length < 8) crossEx.push(`${h.net}x${v.net}@(${vx},${hy})`); }
+	}
+
+	return { overlaps, wireThruComp, offgrid, offEx, crossings, crossEx };
+}
+
+if (process.argv[1] && process.argv[1].endsWith('geom_qc.mjs') && process.argv[2]) {
+	const m = JSON.parse(readFileSync(process.argv[2], 'utf8').replace(/^\uFEFF/, ''));
+	const r = geomQC(m);
+	console.log('=== GEOM QC:', process.argv[2], '===');
+	console.log('bbox重叠:', r.overlaps.length); r.overlaps.slice(0, 20).forEach(s => console.log('  ', s));
+	console.log('线压器件:', r.wireThruComp.length); r.wireThruComp.slice(0, 12).forEach(s => console.log('  ', s));
+	console.log('出格脚:', r.offgrid, r.offEx.join(' '));
+	console.log('异网交叉:', r.crossings, r.crossEx.join(' '));
+}
