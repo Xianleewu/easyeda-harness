@@ -40,7 +40,10 @@ Before final delivery, pull a real EasyEDA live snapshot through the official br
 ```bash
 npm run live:save
 npm run live:image
+npm run live:shots
 ```
+
+`live:image` captures the current EasyEDA canvas. `live:shots` attempts 10+ module-level EasyEDA visual evidence and fails closed if the bridge returns identical fixed-viewport images. Crops derived from a fixed global canvas are diagnostic only, not final module-level proof.
 
 Only after local gates pass, live snapshot/DRC checks pass, and the EasyEDA bridge is connected may the agent write back:
 
@@ -68,6 +71,7 @@ Before claiming completion, produce or inspect:
 - `visual_crops/00_global_sheet.png`
 - `live.json` pulled from EasyEDA for final review
 - `live_canvas.png` captured from the real EasyEDA canvas for final visual proof
+- `live_shots_report.json` with `pass=true`, `screenshots>=10`, and distinct module-level live evidence
 - Local module crops for USB, LDO, RESET, BOOT, MCU left/right, PMOS, RELAY1, RELAY2, and title/template area
 
 If a visual or DRC issue appears, update the deterministic template/rules first, then rerun the gates.

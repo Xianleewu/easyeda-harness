@@ -107,6 +107,14 @@ Capture a real EasyEDA canvas screenshot:
 npm run live:image
 ```
 
+Generate module-level live visual evidence:
+
+```powershell
+npm run live:shots
+```
+
+`live:shots` is fail-closed. If EasyEDA returns identical images for different requested zoom regions, the report marks fallback crops as diagnostic only and does not accept them as final module-level proof.
+
 Generate local preview crops:
 
 ```powershell
@@ -121,6 +129,7 @@ For handoff, review the global sheet and local crops for USB, LDO, RESET, BOOT, 
 - `npm run pipeline`: `HARD=0 SOFT=0 INFO=0`
 - `npm run preview`: at least 10 global/local offline preview screenshots generated and visual audit passes
 - EasyEDA live: pull `live.json` and review `live_canvas.png` captured from the real EasyEDA canvas
+- EasyEDA live shots: `npm run live:shots` passes with at least 10 distinct module-level evidence images
 - EasyEDA DRC: `0 error / 0 warning / 0 info`
 - No fake text net labels
 - No unnecessary NET PORT symbols on a single-sheet schematic

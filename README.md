@@ -107,6 +107,14 @@ npm run live:save
 npm run live:image
 ```
 
+生成模块级真实视觉证据：
+
+```bash
+npm run live:shots
+```
+
+`live:shots` 是 fail-closed：如果 EasyEDA 对不同 zoom 区域返回相同的固定视口截图，报告会把全局图裁剪标记为诊断证据，不会把它当作最终模块级截图验收。
+
 生成本地预览裁剪：
 
 ```powershell
@@ -121,6 +129,7 @@ npm run preview
 - `npm run pipeline`：`HARD=0 SOFT=0 INFO=0`
 - `npm run preview`：至少生成 10 张全局/局部离线预览图，视觉审计 PASS
 - EasyEDA live：拉取 `live.json`，并复核从真实 EasyEDA 画布抓取的 `live_canvas.png`
+- EasyEDA live shots：`npm run live:shots` PASS，且至少 10 张模块级真实视觉证据互不重复
 - EasyEDA DRC：`0 error / 0 warning / 0 info`
 - 无普通文本伪装网络标签
 - 单页图纸不使用无必要的 NET PORT

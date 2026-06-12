@@ -8,6 +8,8 @@ layout_planner_report.json
 layout_planner_*.json
 layout_planner_*.png
 live.json
+live_shots_report.json
+live_region_shots/
 visual_review_report.json
 harness_*_report.json
 apply_report.json
