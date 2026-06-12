@@ -2,7 +2,7 @@
 
 [English](README.en.md)
 
-EasyEDA Harness 是一套给 Codex、Claude Code 等编程 Agent 使用的商业级原理图生成与门禁工程。它不是 EasyEDA API skill；官方 `easyeda-api-skill` 负责 API 文档、Bridge 和 EasyEDA 扩展，本仓库负责确定性铺图、质量门禁、离线预览、真实 EDA 快照证据和写回闭环。
+EasyEDA Harness 是一套给 Codex、Claude Code 等编程 Agent 使用的原理图生成与校验工具。它不是 EasyEDA API skill；官方 `easyeda-api-skill` 负责 API 文档、Bridge 和 EasyEDA 扩展，本仓库负责确定性铺图、质量检查、离线预览、真实 EDA 快照证据和写回闭环。
 
 用户最简单的用法是：把这个仓库交给 Agent，并要求它按 `AGENTS.md` 或 `CLAUDE.md` 执行。Agent 应自动安装依赖、确认官方 EasyEDA API Skill/Bridge、运行门禁、生成截图证据，并在 PASS 后再写回 EasyEDA。
 
@@ -11,8 +11,8 @@ EasyEDA Harness 是一套给 Codex、Claude Code 等编程 Agent 使用的商业
 ## 核心能力
 
 - 确定性原理图组装：`engine/cells.mjs` 定义功能单元，`engine/assemble.mjs` 负责整图拼装。
-- 快速离线门禁：`npm run fast` 在本机 CPU 上完成核心模板校验，适合日常坐标和规则迭代。
-- 完整布局门禁：`npm run pipeline` 运行布局搜索、结构审计、视觉节奏、文本覆盖、系统意图等检查。
+- 快速离线检查：`npm run fast` 在本机 CPU 上完成核心模板校验，适合日常坐标和规则迭代。
+- 完整布局检查：`npm run pipeline` 运行布局搜索、结构审计、视觉节奏、文本覆盖、系统意图等检查。
 - 真实 EDA 闭环：通过 WebSocket 桥写回 EasyEDA，再用 `snapshot2.js` 拉取实图快照做 live 校验。
 - 网络标签约束：单页图纸优先使用 wire `Name` 属性作为真实网络名，不用普通文本伪装网络标签。
 - 文档模板兼容：图纸标题栏交给 EasyEDA 原生模板变量；harness 不再额外绘制重复标题块。
@@ -21,7 +21,7 @@ EasyEDA Harness 是一套给 Codex、Claude Code 等编程 Agent 使用的商业
 
 - 电气正确优先：关键网络必须连通，引脚端点必须精确落在导线端点上。
 - 可读性同等重要：正交走线、模块分区、同侧对齐、网名不压器件、导线不穿符号。
-- 门禁不绕过：模板门禁、live 门禁、DRC 都通过后才视为可交付。
+- 写回前检查：模板检查、live 检查、DRC 都通过后再写回 EasyEDA。
 - 小改快速闭环：日常调坐标先跑 `npm run fast`，批量稳定后再跑完整 pipeline 和 EDA live 验收。
 
 ## 环境要求
@@ -46,7 +46,7 @@ npm install
 给 Agent 的一句话：
 
 ```text
-请按 AGENTS.md 接手这个仓库，安装依赖，确认 easyeda-api-skill/Bridge，运行 fast、pipeline、preview gate；真实交付前必须拉取 EasyEDA live snapshot/截图复核，只有全部 PASS 后才写回 EasyEDA。
+请按 AGENTS.md 接手这个仓库，安装依赖，确认 easyeda-api-skill/Bridge，运行 fast、pipeline、preview；写回前必须拉取 EasyEDA live snapshot/截图复核，只有全部 PASS 后才写回 EasyEDA。
 ```
 
 手动运行时：
@@ -58,7 +58,7 @@ npm install
 npm run accept
 ```
 
-默认完整门禁使用确定性候选集进行质量评估。需要做全量候选审计时可设置：
+默认完整检查使用确定性候选集进行质量评估。需要做全量候选审计时可设置：
 
 ```powershell
 $env:EASYEDA_LAYOUT_MAX_CANDIDATES='0'
@@ -93,7 +93,7 @@ node engine/apply_run.mjs --force
 
 ## 预览、实图快照与截图证据
 
-`npm run preview` 生成的是 harness renderer 的离线预览截图，用于快速检查结构、模块区域和明显重叠。它不是 EasyEDA 真实画布截图，不能单独作为最终交付证据。
+`npm run preview` 生成的是 harness renderer 的离线预览截图，用于快速检查结构、模块区域和明显重叠。它不是 EasyEDA 真实画布截图，不能单独作为最终复核证据。
 
 拉取当前 EDA 原理图：
 
@@ -119,12 +119,12 @@ npm run live:shots
 npm run accept:live
 ```
 
-它会运行本地门禁、live snapshot、真实画布图、模块级 live shots，并在需要时自动运行 live diagnose，最后写出 `acceptance_report.json`。
-如果仍有门禁未闭合，先看 `next_actions.json`；它是给下一个 agent 的机器可读接手清单。
+它会运行本地检查、live snapshot、真实画布图、EasyEDA DRC、模块级 live shots，并在需要时自动运行 live diagnose，最后写出 `acceptance_report.json`。
+如果仍有检查未通过，先看 `next_actions.json`；它是给下一个 agent 的机器可读接手清单。
 
-`live:shots` 是 fail-closed：如果 EasyEDA 对不同 zoom 区域返回相同的固定视口截图，报告会记录 `zoomEvidence`，把全局图裁剪标记为诊断证据，不会把它当作最终模块级截图验收。
+`live:shots` 会先尝试 EasyEDA zoom 区域截图。如果 EasyEDA API 对不同 zoom 请求返回同一张全页渲染图，工具会改用这张真实 EasyEDA 渲染图做坐标裁剪；只有模块图数量足够、裁剪区域在图内、hash 互不重复且图像检查通过时才算 PASS。
 
-当 `live:shots` 指向固定视口截图时，运行 `npm run live:diagnose`。诊断报告会记录 EasyEDA canvas 列表，以及不同 zoom 请求后的截图 hash。
+当 `live:shots` 指向固定渲染图时，运行 `npm run live:diagnose`。诊断报告会记录 EasyEDA canvas 列表、当前文档/tab 信息，以及不同 zoom 请求后的截图 hash。
 
 生成本地预览裁剪：
 
@@ -132,16 +132,16 @@ npm run accept:live
 npm run preview
 ```
 
-推荐每次交付至少检查全局图和各功能模块局部图：USB、LDO、RESET、BOOT、MCU 左右侧、PMOS、RELAY1、RELAY2、标题栏区域。
+推荐每次写回前至少检查全局图和各功能模块局部图：USB、LDO、RESET、BOOT、MCU 左右侧、PMOS、RELAY1、RELAY2、标题栏区域。
 
-## 商业级验收标准
+## 检查清单
 
 - `npm run fast`：`HARD=0 SOFT=0 INFO=0`
 - `npm run pipeline`：`HARD=0 SOFT=0 INFO=0`
 - `npm run preview`：至少生成 10 张全局/局部离线预览图，视觉审计 PASS
 - EasyEDA live：拉取 `live.json`，并复核从真实 EasyEDA 画布抓取的 `live_canvas.png`
+- EasyEDA DRC：`npm run drc` 证明 `0 error / 0 warning / 0 info`
 - EasyEDA live shots：`npm run live:shots` PASS，且至少 10 张模块级真实视觉证据互不重复
-- EasyEDA DRC：`0 error / 0 warning / 0 info`
 - 无普通文本伪装网络标签
 - 单页图纸不使用无必要的 NET PORT
 - wire `Name` 锚点可读：左侧标签使用左下角，右侧标签使用右下角
@@ -154,7 +154,7 @@ npm run preview
 - 实测 wire `Name` 原点：左侧标签使用 `alignMode=6`，右侧标签使用 `alignMode=8`。
 - 修改 wire `Name` 属性时使用 `eda.sch_PrimitiveAttribute.modify()`；部分 `toAsync().setState_*().done()` 路径会产生坐标翻转问题。
 - EasyEDA 创建导线更可靠的方式是按单段写入，折线需要拆成两点一段。
-- 慢流程只应该用于最终验收；坐标和规则迭代必须先走本地快门禁。
+- 慢流程只应该用于写回前复核；坐标和规则迭代先走本地快速检查。
 
 ## 目录结构
 

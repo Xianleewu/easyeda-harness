@@ -2,7 +2,7 @@
 
 [中文](README.md)
 
-EasyEDA Harness is a commercial-grade schematic generation and gating project intended for coding agents such as Codex and Claude Code. It is not the EasyEDA API skill. The official `easyeda-api-skill` owns the API docs, bridge, and EasyEDA extension; this repository owns deterministic placement, quality gates, offline previews, real EasyEDA snapshot evidence, and the write-back loop.
+EasyEDA Harness is a schematic generation and checking tool intended for coding agents such as Codex and Claude Code. It is not the EasyEDA API skill. The official `easyeda-api-skill` owns the API docs, bridge, and EasyEDA extension; this repository owns deterministic placement, quality checks, offline previews, real EasyEDA snapshot evidence, and the write-back loop.
 
 The simplest user workflow is to hand this repository to an agent and ask it to follow `AGENTS.md` or `CLAUDE.md`. The agent should install dependencies, verify the official EasyEDA API Skill/Bridge, run the gates, generate visual evidence, and only write back to EasyEDA after every gate passes.
 
@@ -11,8 +11,8 @@ The repository includes `AIHWDEBUGER` as a reference design: USB-C input, 5V to 
 ## Capabilities
 
 - Deterministic schematic assembly: functional cells live in `engine/cells.mjs`, and whole-sheet composition lives in `engine/assemble.mjs`.
-- Fast offline gate: `npm run fast` validates the reference template on local CPU and is intended for daily coordinate and rule iteration.
-- Full layout gate: `npm run pipeline` runs layout search, structure checks, visual rhythm checks, text clearance, and system-intent audits.
+- Fast offline check: `npm run fast` validates the reference template on local CPU and is intended for daily coordinate and rule iteration.
+- Full layout check: `npm run pipeline` runs layout search, structure checks, visual rhythm checks, text clearance, and system-intent audits.
 - Real EasyEDA loop: write back through the WebSocket bridge, then pull a live schematic snapshot with `snapshot2.js`.
 - Net-label discipline: single-sheet signal labels use the real wire `Name` attribute instead of fake `PrimitiveText` labels.
 - Native sheet-template friendly: title-block metadata should come from the EasyEDA native sheet template, not a duplicate title block drawn by the harness.
@@ -21,7 +21,7 @@ The repository includes `AIHWDEBUGER` as a reference design: USB-C input, 5V to 
 
 - Electrical correctness first: key nets must be connected, and wire endpoints must land exactly on pin coordinates.
 - Readability is a gate, not decoration: orthogonal wiring, clean module boxes, same-side alignment, no labels on component bodies, and no wires through symbols.
-- Fail closed: template gates, live gates, and EasyEDA DRC must pass before delivery.
+- Check before write-back: template checks, live checks, and EasyEDA DRC must pass before applying changes.
 - Fast iteration: use `npm run fast` for coordinate and rule edits, then run the full pipeline and live EasyEDA checks before handoff.
 
 ## Requirements
@@ -46,7 +46,7 @@ npm install
 One prompt for an agent:
 
 ```text
-Follow AGENTS.md for this repository. Install dependencies, verify easyeda-api-skill/Bridge, run fast, pipeline, and the preview gate. Before final delivery, pull a real EasyEDA live snapshot/screenshot and write back only after every gate passes.
+Follow AGENTS.md for this repository. Install dependencies, verify easyeda-api-skill/Bridge, run fast, pipeline, and preview. Before write-back, pull a real EasyEDA live snapshot/screenshot and write back only after every check passes.
 ```
 
 Manual run:
@@ -58,7 +58,7 @@ npm install
 npm run accept
 ```
 
-The full gate uses a deterministic candidate set for quality evaluation by default. To audit every generated candidate, set:
+The full check uses a deterministic candidate set for quality evaluation by default. To audit every generated candidate, set:
 
 ```powershell
 $env:EASYEDA_LAYOUT_MAX_CANDIDATES='0'
@@ -134,7 +134,7 @@ npm run preview
 
 For handoff, review the global sheet and local crops for USB, LDO, RESET, BOOT, MCU left/right, PMOS, RELAY1, RELAY2, and title-template area.
 
-## Commercial Acceptance Criteria
+## Check List
 
 - `npm run fast`: `HARD=0 SOFT=0 INFO=0`
 - `npm run pipeline`: `HARD=0 SOFT=0 INFO=0`

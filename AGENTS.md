@@ -1,6 +1,6 @@
 # Agent Quick Start
 
-This repository is a commercial schematic harness for Codex, Claude Code, and similar coding agents. It is not the EasyEDA API skill.
+This repository is a schematic generation and checking harness for Codex, Claude Code, and similar coding agents. It is not the EasyEDA API skill.
 
 ## Required External Skill
 
@@ -62,7 +62,7 @@ Do not run `engine/apply_full.mjs` directly unless debugging the low-level write
 - Do not use unnecessary NET PORT symbols on a single-sheet schematic.
 - Left-side wire `Name` labels use `alignMode=6`; right-side labels use `alignMode=8`.
 - Do not draw a duplicate title block; use the native EasyEDA sheet template variables.
-- Commercial handoff requires EasyEDA DRC `0 error / 0 warning / 0 info`.
+- Write-back review requires EasyEDA DRC `0 error / 0 warning / 0 info`.
 
 ## Evidence To Produce
 
