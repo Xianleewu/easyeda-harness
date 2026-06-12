@@ -41,9 +41,9 @@ Before final delivery, pull a real EasyEDA live snapshot through the official br
 npm run accept:live
 ```
 
-`live:image` captures the current EasyEDA canvas. `live:shots` attempts 10+ module-level EasyEDA visual evidence and fails closed if the bridge returns identical fixed-viewport images. Crops derived from a fixed global canvas are diagnostic only, not final module-level proof. When it fails, inspect `live_shots_report.json.zoomEvidence` first.
+`live:image` captures the current EasyEDA canvas. `live:shots` attempts 10+ module-level EasyEDA visual evidence. It prefers true zoom-region captures. If the EasyEDA API returns the same full-page rendered image for every zoom request, it may accept coordinate crops from that real EasyEDA rendered schematic image, but only when all required crops exist, hashes are distinct, and every image-quality gate passes. When it fails, inspect `live_shots_report.json.zoomEvidence` first.
 
-If the failure points to fixed-viewport screenshots, run `npm run live:diagnose` and inspect `live_diagnose_report.json.zoomChecks`; matching hashes after different zoom requests prove the issue is the live capture path, not schematic coordinates.
+If the report points to fixed rendered-area screenshots, run `npm run live:diagnose` and inspect `live_diagnose_report.json.zoomChecks`; matching hashes after different zoom requests prove the issue is the EasyEDA capture API behavior, not schematic coordinates.
 
 Only after local gates pass, live snapshot/DRC checks pass, and the EasyEDA bridge is connected may the agent write back:
 

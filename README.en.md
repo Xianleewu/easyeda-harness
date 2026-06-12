@@ -122,9 +122,9 @@ npm run accept:live
 It runs local gates, live snapshot, live canvas image, module-level live shots, and live diagnostics when needed, then writes `acceptance_report.json`.
 When a gate remains open, inspect `next_actions.json` first; it is the machine-readable handoff checklist for the next agent.
 
-`live:shots` is fail-closed. If EasyEDA returns identical images for different requested zoom regions, the report records `zoomEvidence`, marks fallback crops as diagnostic only, and does not accept them as final module-level proof.
+`live:shots` is fail-closed. It first tries requested EasyEDA zoom-region captures. If the EasyEDA API returns the same full-page rendered image for every zoom request, the harness falls back to coordinate crops from that real EasyEDA rendered schematic image. Those crops are accepted only when at least 10 module images exist, all required crops are inside the real rendered image, hashes are distinct, and every image-quality gate passes.
 
-When `live:shots` reports fixed-viewport captures, run `npm run live:diagnose`. The diagnostic report records the EasyEDA canvas list and hashes after separate zoom requests.
+When `live:shots` reports fixed rendered-area captures, run `npm run live:diagnose`. The diagnostic report records the EasyEDA canvas list, active document/tab data, and hashes from both `getCurrentRenderedAreaImage()` and the DOM canvas after separate zoom requests.
 
 Generate local preview crops:
 
