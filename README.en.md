@@ -6,12 +6,10 @@ EasyEDA Harness is a schematic generation and checking tool intended for coding 
 
 The simplest user workflow is to hand this repository to an agent and ask it to follow `AGENTS.md` or `CLAUDE.md`. The agent should install dependencies, verify the official EasyEDA API Skill/Bridge, run the gates, generate visual evidence, and only write back to EasyEDA after every gate passes.
 
-The repository includes `AIHWDEBUGER` as a reference design: USB-C input, 5V to 3V3 regulation, ESP32-C3 MCU, RESET/BOOT support, high-side power switching, and two relay outputs.
-
 ## Capabilities
 
 - Deterministic schematic assembly: functional cells live in `engine/cells.mjs`, and whole-sheet composition lives in `engine/assemble.mjs`.
-- Fast offline check: `npm run fast` validates the reference template on local CPU and is intended for daily coordinate and rule iteration.
+- Fast offline check: validates the schematic model on local CPU and is intended for daily coordinate and rule iteration.
 - Full layout check: `npm run pipeline` runs layout search, structure checks, visual rhythm checks, text clearance, and system-intent audits.
 - Real EasyEDA loop: write back through the WebSocket bridge, then pull a live schematic snapshot with `snapshot2.js`.
 - Net-label discipline: single-sheet signal labels use the real wire `Name` attribute instead of fake `PrimitiveText` labels.
@@ -89,8 +87,8 @@ For handoff, review the global sheet and local crops for USB, LDO, RESET, BOOT, 
 
 - `engine/`: template assembly, layout search, write-back, rendering, DRC and live helpers.
 - `harness/`: normalized model, module registry, and rule gates.
-- `snap2.json`: reference project component snapshot.
-- `comp_state.json`: reference component state for write-back preservation.
+- `snap2.json`: component snapshot input.
+- `comp_state.json`: component state input for write-back preservation.
 - `engine/bridge_client.mjs` / `engine/bridge_exec.mjs`: cross-platform EasyEDA bridge runners.
 - `run.ps1` / `run-save.ps1` / `run-image.ps1`: Windows convenience wrappers.
 - `fix_wire_name_anchors.js`: utility for repairing live wire `Name` anchors.

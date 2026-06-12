@@ -6,8 +6,6 @@ EasyEDA Harness 是一套给 Codex、Claude Code 等编程 Agent 使用的原理
 
 用户最简单的用法是：把这个仓库交给 Agent，并要求它按 `AGENTS.md` 或 `CLAUDE.md` 执行。Agent 应自动安装依赖、确认官方 EasyEDA API Skill/Bridge、运行门禁、生成截图证据，并在 PASS 后再写回 EasyEDA。
 
-当前仓库内置 `AIHWDEBUGER` 作为参考工程：USB-C 输入、5V 到 3V3、ESP32-C3 MCU、复位/BOOT 支持、高边电源开关和两路继电器输出。
-
 ## 核心能力
 
 - 确定性原理图组装：`engine/cells.mjs` 定义功能单元，`engine/assemble.mjs` 负责整图拼装。
@@ -89,8 +87,8 @@ Agent 会通过 `apply:gated` 写回 EasyEDA。这个入口会先运行检查；
 
 - `engine/`：模板组装、布局搜索、写回、渲染、DRC/live 辅助。
 - `harness/`：统一规则门禁、模型归一化、模块注册。
-- `snap2.json`：参考工程器件快照。
-- `comp_state.json`：参考工程器件状态，用于写回时保留器件绑定信息。
+- `snap2.json`：器件快照输入。
+- `comp_state.json`：器件状态输入，用于写回时保留器件绑定信息。
 - `engine/bridge_client.mjs` / `engine/bridge_exec.mjs`：跨平台 EasyEDA bridge 执行入口。
 - `run.ps1` / `run-save.ps1` / `run-image.ps1`：Windows 便捷包装脚本。
 - `fix_wire_name_anchors.js`：修复 live 图中 wire `Name` 锚点的实用脚本。
