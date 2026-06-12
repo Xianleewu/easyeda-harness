@@ -115,6 +115,8 @@ npm run live:shots
 
 `live:shots` 是 fail-closed：如果 EasyEDA 对不同 zoom 区域返回相同的固定视口截图，报告会记录 `zoomEvidence`，把全局图裁剪标记为诊断证据，不会把它当作最终模块级截图验收。
 
+当 `live:shots` 指向固定视口截图时，运行 `npm run live:diagnose`。诊断报告会记录 EasyEDA canvas 列表，以及不同 zoom 请求后的截图 hash。
+
 生成本地预览裁剪：
 
 ```powershell

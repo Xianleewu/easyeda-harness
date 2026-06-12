@@ -8,6 +8,7 @@ layout_planner_report.json
 layout_planner_*.json
 layout_planner_*.png
 live.json
+live_diagnose_report.json
 live_shots_report.json
 live_region_shots/
 visual_review_report.json
@@ -30,5 +31,7 @@ live_region_shots/*.png
 
 # Logs and temporary probes
 *.log
+_*.json
+_*.png
 tmp_*/
 .tmp_*/

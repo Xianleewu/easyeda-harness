@@ -14,6 +14,7 @@
     "live:save": "node engine/bridge_exec.mjs --js snapshot2.js --out live.json",
     "live:image": "node engine/bridge_exec.mjs --js snapshot-image.js --out live_canvas.png --mode image",
     "live:shots": "node engine/live_shots.mjs",
+    "live:diagnose": "node engine/live_diagnose.mjs",
     "bridge:save": "node engine/bridge_exec.mjs --js snapshot2.js --out live.json",
     "test": "npm run fast && npm run preview"
   },

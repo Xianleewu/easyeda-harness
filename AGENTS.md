@@ -45,6 +45,8 @@ npm run live:shots
 
 `live:image` captures the current EasyEDA canvas. `live:shots` attempts 10+ module-level EasyEDA visual evidence and fails closed if the bridge returns identical fixed-viewport images. Crops derived from a fixed global canvas are diagnostic only, not final module-level proof. When it fails, inspect `live_shots_report.json.zoomEvidence` first.
 
+If the failure points to fixed-viewport screenshots, run `npm run live:diagnose` and inspect `live_diagnose_report.json.zoomChecks`; matching hashes after different zoom requests prove the issue is the live capture path, not schematic coordinates.
+
 Only after local gates pass, live snapshot/DRC checks pass, and the EasyEDA bridge is connected may the agent write back:
 
 ```powershell

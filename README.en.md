@@ -115,6 +115,8 @@ npm run live:shots
 
 `live:shots` is fail-closed. If EasyEDA returns identical images for different requested zoom regions, the report records `zoomEvidence`, marks fallback crops as diagnostic only, and does not accept them as final module-level proof.
 
+When `live:shots` reports fixed-viewport captures, run `npm run live:diagnose`. The diagnostic report records the EasyEDA canvas list and hashes after separate zoom requests.
+
 Generate local preview crops:
 
 ```powershell
