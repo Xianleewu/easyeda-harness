@@ -43,7 +43,7 @@ npm run live:image
 npm run live:shots
 ```
 
-`live:image` captures the current EasyEDA canvas. `live:shots` attempts 10+ module-level EasyEDA visual evidence and fails closed if the bridge returns identical fixed-viewport images. Crops derived from a fixed global canvas are diagnostic only, not final module-level proof.
+`live:image` captures the current EasyEDA canvas. `live:shots` attempts 10+ module-level EasyEDA visual evidence and fails closed if the bridge returns identical fixed-viewport images. Crops derived from a fixed global canvas are diagnostic only, not final module-level proof. When it fails, inspect `live_shots_report.json.zoomEvidence` first.
 
 Only after local gates pass, live snapshot/DRC checks pass, and the EasyEDA bridge is connected may the agent write back:
 

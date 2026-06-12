@@ -113,7 +113,7 @@ Generate module-level live visual evidence:
 npm run live:shots
 ```
 
-`live:shots` is fail-closed. If EasyEDA returns identical images for different requested zoom regions, the report marks fallback crops as diagnostic only and does not accept them as final module-level proof.
+`live:shots` is fail-closed. If EasyEDA returns identical images for different requested zoom regions, the report records `zoomEvidence`, marks fallback crops as diagnostic only, and does not accept them as final module-level proof.
 
 Generate local preview crops:
 

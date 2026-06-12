@@ -373,6 +373,7 @@ if (regions.length < 10) findings.push({ rule: 'LS1-live-shot-count', severity: 
 
 let captureMode = 'zoomed-easyeda-canvas';
 let fallbackDiagnosticOnly = false;
+let zoomEvidence = null;
 if (MODE === 'crop-global') {
 	captureMode = 'cropped-from-easyeda-global-canvas';
 	fallbackDiagnosticOnly = true;
@@ -392,6 +393,11 @@ if (MODE === 'crop-global') {
 	}
 	const hashes = regions.map(r => hashFile(join(OUT, `${r.name}.png`)));
 	const unique = new Set(hashes).size;
+	zoomEvidence = {
+		requestedRegions: regions.length,
+		uniqueRequestedCaptures: unique,
+		hashes: regions.map((r, i) => ({ region: r.name, sha256: hashes[i] })),
+	};
 	if (unique < Math.min(4, regions.length)) {
 		if (MODE === 'auto') {
 			console.warn(`zoomed live shots are not distinct (${unique}/${hashes.length}); falling back to crops from the real EasyEDA global canvas`);
@@ -436,6 +442,7 @@ const liveReport = {
 	mode: 'easyeda-live-canvas-shots',
 	captureMode,
 	fallbackDiagnosticOnly,
+	zoomEvidence,
 	source: SNAP,
 	outputDir: OUT,
 	pass: findings.length === 0,
