@@ -34,12 +34,7 @@ EasyEDA Harness 是一套给 Codex、Claude Code 等编程 Agent 使用的原理
 
 先安装并启动官方 skill。该仓库提供 EasyEDA Pro API 文档、`SKILL.md`、WebSocket bridge 和 EasyEDA 端 `run-api-gateway.eext` 扩展；官方 README 的 Quick Start 包含 `npm install`、`npm run build:docs`、`npm run server`，然后在 EasyEDA 中安装该扩展。bridge 启动后会在 `49620-49629` 端口等待 EasyEDA 客户端连接。
 
-然后安装本 harness：
-
-```powershell
-npm install
-# 如果 PowerShell 禁止 npm.ps1，可使用 npm.cmd install
-```
+然后把本仓库交给 Codex、Claude Code 或类似 Agent。用户不需要逐条执行 harness 命令；Agent 应根据 `AGENTS.md` 完成依赖安装、连接检查、校验、截图证据和写回。
 
 ## 快速开始
 
@@ -49,99 +44,33 @@ npm install
 请按 AGENTS.md 接手这个仓库，安装依赖，确认 easyeda-api-skill/Bridge，运行 fast、pipeline、preview；写回前必须拉取 EasyEDA live snapshot/截图复核，只有全部 PASS 后才写回 EasyEDA。
 ```
 
-手动运行时：
-
-```powershell
-git clone https://github.com/Xianleewu/easyeda-harness.git
-cd easyeda-harness
-npm install
-npm run accept
-```
-
-默认完整检查使用确定性候选集进行质量评估。需要做全量候选审计时可设置：
-
-```powershell
-$env:EASYEDA_LAYOUT_MAX_CANDIDATES='0'
-npm run pipeline
-```
-
-成功时会看到类似输出：
-
-```text
-Fast Template Harness | Score 100/100 | PASS
-HARD=0 SOFT=0 INFO=0
-```
-
-`npm run accept` 会顺序运行 `fast`、`pipeline` 和 `preview`，并写出 `acceptance_report.json` 和 `next_actions.json`。
+Agent 会自动运行本地检查、生成预览图，并写出 `acceptance_report.json` 和 `next_actions.json`。如果检查未通过，`next_actions.json` 是下一步修复清单。
 
 ## 写回 EasyEDA
 
-先启动并确认 EasyEDA bridge 已连接，然后执行：
-
-```powershell
-npm run apply:gated
-```
-
-`apply:gated` 会先运行门禁；未 PASS 时不会写回。调试低层写回脚本时才使用：
-
-```powershell
-$env:EASYEDA_APPLY_FULL_AUTHORIZED='1'
-node engine/apply_full.mjs
-$env:EASYEDA_APPLY_RUN_AUTHORIZED='1'
-node engine/apply_run.mjs --force
-```
+Agent 会通过 `apply:gated` 写回 EasyEDA。这个入口会先运行检查；未 PASS 时不会写回。低层写回脚本只用于 Agent 调试，不作为用户入口。
 
 ## 预览、实图快照与截图证据
 
-`npm run preview` 生成的是 harness renderer 的离线预览截图，用于快速检查结构、模块区域和明显重叠。它不是 EasyEDA 真实画布截图，不能单独作为最终复核证据。
-
-拉取当前 EDA 原理图：
-
-```powershell
-npm run live:save
-```
-
-抓取真实 EasyEDA 画布截图：
-
-```bash
-npm run live:image
-```
-
-生成模块级真实视觉证据：
-
-```bash
-npm run live:shots
-```
-
-单命令 live 验收入口：
-
-```bash
-npm run accept:live
-```
+离线预览图由 harness renderer 生成，用于快速检查结构、模块区域和明显重叠。它不是 EasyEDA 真实画布截图，不能单独作为最终复核证据。
 
 它会运行本地检查、live snapshot、真实画布图、EasyEDA DRC、模块级 live shots，并在需要时自动运行 live diagnose，最后写出 `acceptance_report.json`。
 如果仍有检查未通过，先看 `next_actions.json`；它是给下一个 agent 的机器可读接手清单。
 
 `live:shots` 会先尝试 EasyEDA zoom 区域截图。如果 EasyEDA API 对不同 zoom 请求返回同一张全页渲染图，工具会改用这张真实 EasyEDA 渲染图做坐标裁剪；只有模块图数量足够、裁剪区域在图内、hash 互不重复且图像检查通过时才算 PASS。
 
-当 `live:shots` 指向固定渲染图时，运行 `npm run live:diagnose`。诊断报告会记录 EasyEDA canvas 列表、当前文档/tab 信息，以及不同 zoom 请求后的截图 hash。
-
-生成本地预览裁剪：
-
-```powershell
-npm run preview
-```
+当 `live:shots` 指向固定渲染图时，Agent 会运行 live diagnose。诊断报告会记录 EasyEDA canvas 列表、当前文档/tab 信息，以及不同 zoom 请求后的截图 hash。
 
 推荐每次写回前至少检查全局图和各功能模块局部图：USB、LDO、RESET、BOOT、MCU 左右侧、PMOS、RELAY1、RELAY2、标题栏区域。
 
 ## 检查清单
 
-- `npm run fast`：`HARD=0 SOFT=0 INFO=0`
-- `npm run pipeline`：`HARD=0 SOFT=0 INFO=0`
-- `npm run preview`：至少生成 10 张全局/局部离线预览图，视觉审计 PASS
+- 本地快速检查：`HARD=0 SOFT=0 INFO=0`
+- 完整布局检查：`HARD=0 SOFT=0 INFO=0`
+- 离线预览：至少生成 10 张全局/局部离线预览图，视觉审计 PASS
 - EasyEDA live：拉取 `live.json`，并复核从真实 EasyEDA 画布抓取的 `live_canvas.png`
-- EasyEDA DRC：`npm run drc` 证明 `0 error / 0 warning / 0 info`
-- EasyEDA live shots：`npm run live:shots` PASS，且至少 10 张模块级真实视觉证据互不重复
+- EasyEDA DRC：`0 error / 0 warning / 0 info`
+- EasyEDA live shots：至少 10 张模块级真实视觉证据互不重复
 - 无普通文本伪装网络标签
 - 单页图纸不使用无必要的 NET PORT
 - wire `Name` 锚点可读：左侧标签使用左下角，右侧标签使用右下角
