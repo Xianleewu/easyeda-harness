@@ -72,7 +72,7 @@ Fast Template Harness | Score 100/100 | PASS
 HARD=0 SOFT=0 INFO=0
 ```
 
-`npm run accept` runs `fast`, `pipeline`, and `preview`, then writes `acceptance_report.json`.
+`npm run accept` runs `fast`, `pipeline`, and `preview`, then writes `acceptance_report.json` and `next_actions.json`.
 
 ## Write Back To EasyEDA
 
@@ -120,6 +120,7 @@ npm run accept:live
 ```
 
 It runs local gates, live snapshot, live canvas image, module-level live shots, and live diagnostics when needed, then writes `acceptance_report.json`.
+When a gate remains open, inspect `next_actions.json` first; it is the machine-readable handoff checklist for the next agent.
 
 `live:shots` is fail-closed. If EasyEDA returns identical images for different requested zoom regions, the report records `zoomEvidence`, marks fallback crops as diagnostic only, and does not accept them as final module-level proof.
 

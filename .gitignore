@@ -15,6 +15,7 @@ visual_review_report.json
 harness_*_report.json
 apply_report.json
 acceptance_report.json
+next_actions.json
 commercial_*_report.json
 design_memory_report.json
 system_intent_gate.json

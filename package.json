@@ -10,6 +10,7 @@
     "apply:gated": "node engine/apply_gated.mjs",
     "accept": "node engine/acceptance_run.mjs",
     "accept:live": "node engine/acceptance_run.mjs --live",
+    "next:actions": "node engine/next_actions.mjs",
     "crops": "node engine/visual_crops.mjs",
     "visual": "node engine/visual_crops.mjs",
     "preview": "node engine/visual_crops.mjs",

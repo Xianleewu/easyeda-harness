@@ -26,6 +26,7 @@ npm.cmd run accept
 ```
 
 `accept` runs the local gates in order and writes `acceptance_report.json`.
+It also writes `next_actions.json`, which is the first file to inspect when a gate fails or when another agent takes over.
 Acceptance requires all three local gates to pass:
 
 - `fast`: `HARD=0 SOFT=0 INFO=0`
@@ -71,6 +72,7 @@ Before claiming completion, produce or inspect:
 - `live.json` pulled from EasyEDA for final review
 - `live_canvas.png` captured from the real EasyEDA canvas for final visual proof
 - `live_shots_report.json` with `pass=true`, `screenshots>=10`, and distinct module-level live evidence
+- `next_actions.json` with no open actions before final delivery
 - Local module crops for USB, LDO, RESET, BOOT, MCU left/right, PMOS, RELAY1, RELAY2, and title/template area
 
 If a visual or DRC issue appears, update the deterministic template/rules first, then rerun the gates.
