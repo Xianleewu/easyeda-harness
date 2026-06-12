@@ -32,6 +32,7 @@ steps.push(runStep('preview', 'node', ['engine/visual_crops.mjs']));
 if (RUN_LIVE) {
 	steps.push(runStep('live:save', 'node', ['engine/bridge_exec.mjs', '--js', 'snapshot2.js', '--out', 'live.json']));
 	steps.push(runStep('live:image', 'node', ['engine/bridge_exec.mjs', '--js', 'snapshot-image.js', '--out', 'live_canvas.png', '--mode', 'image']));
+	steps.push(runStep('drc', 'node', ['engine/drc_check.mjs']));
 	const liveShots = runStep('live:shots', 'node', ['engine/live_shots.mjs']);
 	steps.push(liveShots);
 	if (!liveShots.pass) steps.push(runStep('live:diagnose', 'node', ['engine/live_diagnose.mjs'], { required: false }));
@@ -41,6 +42,7 @@ const artifacts = {};
 for (const [key, path] of Object.entries({
 	report: DIR + 'report.json',
 	visualReview: DIR + 'visual_review_report.json',
+	drc: DIR + 'drc_report.json',
 	liveShots: DIR + 'live_shots_report.json',
 	liveDiagnose: DIR + 'live_diagnose_report.json',
 })) {
@@ -66,6 +68,7 @@ const acceptance = {
 		live: RUN_LIVE ? {
 			save: steps.find(s => s.name === 'live:save')?.pass === true,
 			image: steps.find(s => s.name === 'live:image')?.pass === true,
+			drc: steps.find(s => s.name === 'drc')?.pass === true,
 			shots: steps.find(s => s.name === 'live:shots')?.pass === true,
 			diagnose: steps.find(s => s.name === 'live:diagnose')?.pass === true,
 		} : null,
@@ -73,6 +76,7 @@ const acceptance = {
 	artifacts: {
 		report: artifacts.report ? { pass: artifacts.report.pass, severity: artifacts.report.severity, score: artifacts.report.score } : null,
 		visualReview: artifacts.visualReview ? { pass: artifacts.visualReview.pass, severity: artifacts.visualReview.severity, screenshots: artifacts.visualReview.screenshots, mode: artifacts.visualReview.mode } : null,
+		drc: artifacts.drc ? { pass: artifacts.drc.pass, severity: artifacts.drc.severity, drc: artifacts.drc.drc } : null,
 		liveShots: artifacts.liveShots ? {
 			pass: artifacts.liveShots.pass,
 			severity: artifacts.liveShots.severity,

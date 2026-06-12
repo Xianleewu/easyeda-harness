@@ -34,7 +34,7 @@ export async function executeCode(code, {
 	if (windowId) payload.windowId = windowId;
 	const resp = await fetch(`${bridge.base}/execute`, {
 		method: 'POST',
-		headers: { 'content-type': 'application/json' },
+		headers: { 'content-type': 'application/json', connection: 'close' },
 		body: JSON.stringify(payload),
 		signal: AbortSignal.timeout(timeoutMs),
 	});

@@ -16,6 +16,7 @@
     "preview": "node engine/visual_crops.mjs",
     "live:save": "node engine/bridge_exec.mjs --js snapshot2.js --out live.json",
     "live:image": "node engine/bridge_exec.mjs --js snapshot-image.js --out live_canvas.png --mode image",
+    "drc": "node engine/drc_check.mjs",
     "live:shots": "node engine/live_shots.mjs",
     "live:diagnose": "node engine/live_diagnose.mjs",
     "bridge:save": "node engine/bridge_exec.mjs --js snapshot2.js --out live.json",

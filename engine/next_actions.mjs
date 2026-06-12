@@ -27,6 +27,7 @@ function pushAction(actions, item) {
 const acceptance = readJson('acceptance_report.json');
 const template = readJson('report.json');
 const preview = readJson('visual_review_report.json');
+const drc = readJson('drc_report.json');
 const liveShots = readJson('live_shots_report.json');
 const liveDiagnose = readJson('live_diagnose_report.json');
 
@@ -47,6 +48,17 @@ const checks = {
 		mode: acceptance?.mode || null,
 		severity: acceptance?.severity || null,
 		evidence: 'acceptance_report.json',
+	},
+	drc: {
+		status: status(drc?.pass),
+		severity: drc?.severity || null,
+		counts: drc?.drc ? {
+			errors: drc.drc.errors ?? null,
+			warnings: drc.drc.warnings ?? null,
+			info: drc.drc.info ?? null,
+			source: drc.drc.source || null,
+		} : null,
+		evidence: 'drc_report.json',
 	},
 	liveShots: {
 		status: status(liveShots?.pass),
@@ -86,6 +98,14 @@ if (checks.preview.status !== 'pass' || checks.preview.screenshots < 10) {
 		area: 'offline-preview',
 		action: 'Fix offline preview renderer/model until visual_review_report.json passes with at least 10 screenshots.',
 		evidence: ['visual_review_report.json', 'visual_crops/'],
+	});
+}
+if (acceptance?.mode === 'full-with-live' && checks.drc.status !== 'pass') {
+	pushAction(actions, {
+		area: 'drc',
+		action: 'Fix EasyEDA DRC until drc_report.json proves 0 errors, 0 warnings, and 0 info.',
+		evidence: ['drc_report.json'],
+		observed: checks.drc.counts || checks.drc,
 	});
 }
 if (checks.liveShots.status === 'fail') {

@@ -10,6 +10,7 @@ layout_planner_*.png
 live.json
 live_diagnose_report.json
 live_shots_report.json
+drc_report.json
 live_region_shots/
 visual_review_report.json
 harness_*_report.json

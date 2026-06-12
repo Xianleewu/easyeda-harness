@@ -119,7 +119,7 @@ For a single live acceptance command, run:
 npm run accept:live
 ```
 
-It runs local gates, live snapshot, live canvas image, module-level live shots, and live diagnostics when needed, then writes `acceptance_report.json`.
+It runs local gates, live snapshot, live canvas image, EasyEDA DRC, module-level live shots, and live diagnostics when needed, then writes `acceptance_report.json`.
 When a gate remains open, inspect `next_actions.json` first; it is the machine-readable handoff checklist for the next agent.
 
 `live:shots` is fail-closed. It first tries requested EasyEDA zoom-region captures. If the EasyEDA API returns the same full-page rendered image for every zoom request, the harness falls back to coordinate crops from that real EasyEDA rendered schematic image. Those crops are accepted only when at least 10 module images exist, all required crops are inside the real rendered image, hashes are distinct, and every image-quality gate passes.
@@ -140,8 +140,8 @@ For handoff, review the global sheet and local crops for USB, LDO, RESET, BOOT, 
 - `npm run pipeline`: `HARD=0 SOFT=0 INFO=0`
 - `npm run preview`: at least 10 global/local offline preview screenshots generated and visual audit passes
 - EasyEDA live: pull `live.json` and review `live_canvas.png` captured from the real EasyEDA canvas
+- EasyEDA DRC: `npm run drc` proves `0 error / 0 warning / 0 info`
 - EasyEDA live shots: `npm run live:shots` passes with at least 10 distinct module-level evidence images
-- EasyEDA DRC: `0 error / 0 warning / 0 info`
 - No fake text net labels
 - No unnecessary NET PORT symbols on a single-sheet schematic
 - Readable wire `Name` anchors: left-side labels use bottom-left origin, right-side labels use bottom-right origin

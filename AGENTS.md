@@ -45,6 +45,8 @@ npm run accept:live
 
 If the report points to fixed rendered-area screenshots, run `npm run live:diagnose` and inspect `live_diagnose_report.json.zoomChecks`; matching hashes after different zoom requests prove the issue is the EasyEDA capture API behavior, not schematic coordinates.
 
+`accept:live` also runs `npm run drc`; final handoff requires `drc_report.json` to prove EasyEDA DRC `0 error / 0 warning / 0 info`.
+
 Only after local gates pass, live snapshot/DRC checks pass, and the EasyEDA bridge is connected may the agent write back:
 
 ```powershell
@@ -71,6 +73,7 @@ Before claiming completion, produce or inspect:
 - `visual_crops/00_global_sheet.png`
 - `live.json` pulled from EasyEDA for final review
 - `live_canvas.png` captured from the real EasyEDA canvas for final visual proof
+- `drc_report.json` with `pass=true` and `errors=0`, `warnings=0`, `info=0`
 - `live_shots_report.json` with `pass=true`, `screenshots>=10`, and distinct module-level live evidence
 - `next_actions.json` with no open actions before final delivery
 - Local module crops for USB, LDO, RESET, BOOT, MCU left/right, PMOS, RELAY1, RELAY2, and title/template area

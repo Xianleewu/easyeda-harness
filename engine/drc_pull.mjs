@@ -1,58 +1,72 @@
-import { saveJsonResult, executeCode } from './bridge_client.mjs';
+import { executeCode } from './bridge_client.mjs';
 
-const DIR = (process.env.EASYEDA_WORKDIR || process.cwd()).replace(/\\/g, '/') + '/';
 const MAX_DRC_INFO = Number(process.env.EASYEDA_MAX_DRC_INFO ?? 0);
 const TARGET_WINDOW_ID = process.env.EASYEDA_WINDOW_ID || '';
 
 const DRC_JS = `
-async function sleep(ms){ return new Promise(r => setTimeout(r, ms)); }
+async function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 function normalizeLevel(level) {
   const raw = String(level || '').toLowerCase();
-  if (/fatal|致命|鑷村懡|è´å½/.test(raw)) return 'fatal';
-  if (/error|错误|錯誤|閿欒|éè¯¯/.test(raw)) return 'error';
-  if (/warn|警告|璀﹀憡|è­¦å/.test(raw)) return 'warning';
-  if (/info|信息|淇℃伅|ä¿¡æ¯/.test(raw)) return 'info';
+  if (/fatal|致命/.test(raw)) return 'fatal';
+  if (/error|错误|錯誤/.test(raw)) return 'error';
+  if (/warn|警告/.test(raw)) return 'warning';
+  if (/info|信息/.test(raw)) return 'info';
   return raw || 'unknown';
 }
-const strictPass = await eda.sch_Drc.check(true, true, true);
-await sleep(1000);
-const text = (globalThis.document && document.body && document.body.innerText) ? document.body.innerText : '';
-const lines = text.split(/\\n+/).map(s => s.trim()).filter(Boolean);
-const items = [];
-for (const line of lines) {
-  const m = line.match(/^\\[([^\\]]+)\\]\\s*[:：]?\\s*(.*)$/);
-  if (!m || !m[2]) continue;
-  items.push({ level: normalizeLevel(m[1]), rawLevel: m[1], msg: m[2] });
-}
-let fatal = 0, errors = 0, warnings = 0, info = 0;
-for (const line of lines.slice().reverse()) {
-  if (!/(complete|完成|å®æ|瀹屾垚)/i.test(line)) continue;
-  const nums = [...line.matchAll(/(\\d+)/g)].map(m => Number(m[1]));
-  if (nums.length >= 4) {
-    const last4 = nums.slice(-4);
-    fatal = last4[0] || 0;
-    errors = last4[1] || 0;
-    warnings = last4[2] || 0;
-    info = last4[3] || 0;
-    break;
+function lastRunLines(lines) {
+  for (let i = lines.length - 1; i >= 0; i--) {
+    if (/开始设计规则检查|start.*design.*rule.*check/i.test(lines[i])) return lines.slice(i);
   }
+  return lines;
 }
-const warnItems = items.filter(x => x.level === 'warning').length;
-const errItems = items.filter(x => x.level === 'fatal' || x.level === 'error').length;
-if (warnItems) warnings = Math.max(warnings, warnItems);
-if (errItems) errors = Math.max(errors, errItems);
-return { strictPass: strictPass === true, errors: fatal + errors, warnings, info, items: items.slice(-120), counts: { fatal, errors, warnings, info } };
+function parseCompletion(lines) {
+  for (const line of lines.slice().reverse()) {
+    if (!/(complete|完成设计规则检查)/i.test(line)) continue;
+    const nums = [...line.matchAll(/\\d+/g)].map(m => Number(m[0]));
+    if (nums.length >= 4) {
+      const [fatal, errors, warnings, info] = nums.slice(-4);
+      return { fatal, errors, warnings, info };
+    }
+  }
+  return null;
+}
+function parseItems(lines) {
+  const out = [];
+  for (const line of lines) {
+    if (/开始设计规则检查|完成设计规则检查|start.*design.*rule.*check|complete.*design.*rule.*check/i.test(line)) continue;
+    const m = line.match(/^\\[([^\\]]+)\\]\\s*[:：]?\\s*(.*)$/);
+    if (!m || !m[2]) continue;
+    out.push({ level: normalizeLevel(m[1]), rawLevel: m[1], msg: m[2] });
+  }
+  return out;
+}
+const strictPass = await eda.sch_Drc.check(true, true, true);
+await sleep(2200);
+const text = (globalThis.document && document.body && document.body.innerText) ? document.body.innerText : '';
+const lines = lastRunLines(text.split(/\\n+/).map(s => s.trim()).filter(Boolean));
+const counts = parseCompletion(lines);
+if (!counts) return { ok: false, errors: 1, warnings: 0, info: 0, strictPass: false, counts: null, items: [{ level: 'error', msg: 'DRC completion summary not found' }], source: 'direct-check' };
+const items = parseItems(lines).slice(-120);
+const itemErrors = items.filter(x => x.level === 'fatal' || x.level === 'error').length;
+const itemWarnings = items.filter(x => x.level === 'warning').length;
+return {
+  ok: true,
+  strictPass: strictPass === true && counts.fatal === 0 && counts.errors === 0 && counts.warnings === 0 && counts.info === 0,
+  errors: Math.max(counts.fatal + counts.errors, itemErrors),
+  warnings: Math.max(counts.warnings, itemWarnings),
+  info: counts.info,
+  counts,
+  items,
+  source: 'direct-check'
+};
 `;
 
 export async function pullDrc() {
-	const ui = await pullDrcFromUi();
-	if (ui.ok) return ui;
-
 	try {
 		const { result } = await executeCode(DRC_JS, { windowId: TARGET_WINDOW_ID, timeoutMs: 120000 });
-		return { ok: true, ...result };
+		return result;
 	} catch (e) {
-		return { ok: false, errors: 1, warnings: 0, items: [{ level: 'error', msg: e?.message || 'DRC bridge failed' }] };
+		return { ok: false, strictPass: false, errors: 1, warnings: 0, info: 0, items: [{ level: 'error', msg: e?.message || 'DRC bridge failed' }], source: 'bridge-error' };
 	}
 }
 
@@ -72,127 +86,13 @@ export async function pullStableDrc({ attempts = 3, delayMs = 5000, log = consol
 	return last;
 }
 
-function parseCompletionText(text) {
-	const raw = String(text || '');
-	const rows = raw.split(/(?:\\n|\n|","|",")/).filter(x => /complete|完成|å®æ|瀹屾垚/i.test(x));
-	const candidates = rows.length ? rows.reverse() : [raw];
-	for (const candidate of candidates) {
-		const nums = [...String(candidate).matchAll(/\d+/g)].map(m => Number(m[0]));
-		if (nums.length >= 4) {
-			const [fatal, errors, warnings, info] = nums.slice(-4);
-			return { fatal, errors, warnings, info };
-		}
-	}
-	return null;
-}
-
-function parseCompletionJson(json) {
-	const lines = [];
-	if (Array.isArray(json?.afterLines)) lines.push(...json.afterLines);
-	if (Array.isArray(json?.visible)) {
-		for (const v of json.visible) if (v && typeof v.text === 'string') lines.push(v.text);
-	}
-	for (const line of lines.slice().reverse()) {
-		if (!/complete|完成|å®æ|瀹屾垚/i.test(String(line))) continue;
-		const nums = [...String(line).matchAll(/\d+/g)].map(m => Number(m[0]));
-		// Completion rows include a timestamp plus the four DRC totals.
-		if (nums.length < 10) continue;
-		const [fatal, errors, warnings, info] = nums.slice(-4);
-		return { fatal, errors, warnings, info };
-	}
-	return null;
-}
-
 function normalizeDrcLevel(level) {
 	const raw = String(level || '').toLowerCase();
-	if (/fatal|致命|鑷村懡|è´å½/.test(raw)) return 'fatal';
-	if (/error|错误|錯誤|閿欒|éè¯¯/.test(raw)) return 'error';
-	if (/warn|警告|璀﹀憡|è­¦å/.test(raw)) return 'warning';
-	if (/info|信息|淇℃伅|ä¿¡æ¯/.test(raw)) return 'info';
+	if (/fatal|致命/.test(raw)) return 'fatal';
+	if (/error|错误|錯誤/.test(raw)) return 'error';
+	if (/warn|警告/.test(raw)) return 'warning';
+	if (/info|信息/.test(raw)) return 'info';
 	return raw || 'unknown';
-}
-
-export function parseDrcItemsFromText(text) {
-	const raw = String(text || '').replace(/\r/g, '\n').replace(/[ \t]+/g, ' ');
-	const re = /(?:\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2}\s*)?\[([^\]]+)\]\s*[:：]?\s*([\s\S]*?)(?=(?:\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2}\s*)?\[[^\]]+\]\s*[:：]?|$)/g;
-	const items = [];
-	for (const m of raw.matchAll(re)) {
-		const rawLevel = String(m[1] || '').trim();
-		const msg = String(m[2] || '').replace(/\s+/g, ' ').trim();
-		if (!msg) continue;
-		items.push({ level: normalizeDrcLevel(rawLevel), rawLevel, msg });
-	}
-	return items;
-}
-
-function parseDrcItemsFromJson(json) {
-	const chunks = [];
-	if (Array.isArray(json?.afterLines)) chunks.push(json.afterLines.join('\n'));
-	if (Array.isArray(json?.visible)) {
-		for (const v of json.visible) if (v && typeof v.text === 'string') chunks.push(v.text);
-	}
-	const seen = new Set();
-	const out = [];
-	for (const chunk of chunks) {
-		for (const item of parseDrcItemsFromText(chunk)) {
-			const k = `${item.level}|${item.msg}`;
-			if (seen.has(k)) continue;
-			seen.add(k);
-			out.push(item);
-		}
-	}
-	return out.slice(-120);
-}
-
-async function pullDrcFromUi() {
-	const out = DIR + 'drc_ui_probe.json';
-	try {
-		const json = await saveJsonResult({ jsFile: `${DIR}_drc_click_warning.js`, outFile: out, windowId: TARGET_WINDOW_ID, timeoutMs: 120000 });
-		const blob = JSON.stringify(json);
-		const counts = parseCompletionJson(json) || parseCompletionText(blob);
-		if (!counts) return { ok: false, errors: 1, warnings: 0, items: [{ level: 'error', msg: 'DRC UI completion summary not found' }] };
-		const items = parseDrcItemsFromJson(json);
-		return {
-			ok: true,
-			strictPass: counts.fatal === 0 && counts.errors === 0 && counts.warnings === 0 && counts.info === 0,
-			errors: counts.fatal + counts.errors,
-			warnings: counts.warnings,
-			info: counts.info,
-			counts,
-			items,
-			source: 'ui',
-		};
-	} catch (e) {
-		return pullDrcFromExistingUiText(e && e.message ? e.message : String(e));
-	}
-}
-
-async function pullDrcFromExistingUiText(reason = '') {
-	const code = `
-const lines = (globalThis.document && document.body && document.body.innerText ? document.body.innerText : '')
-  .split(/\\n+/).map(s => s.trim()).filter(Boolean);
-return { lines: lines.slice(-160) };
-`;
-	try {
-		const { result } = await executeCode(code, { windowId: TARGET_WINDOW_ID, timeoutMs: 120000 });
-		const lines = result?.lines || [];
-		const counts = parseCompletionText(lines.join('\n'));
-		if (!counts) return { ok: false, errors: 1, warnings: 0, items: [{ level: 'error', msg: reason || 'DRC UI fallback summary not found' }] };
-		const items = parseDrcItemsFromText(lines.join('\n'));
-		return {
-			ok: true,
-			strictPass: counts.fatal === 0 && counts.errors === 0 && counts.warnings === 0 && counts.info === 0,
-			errors: counts.fatal + counts.errors,
-			warnings: counts.warnings,
-			info: counts.info,
-			counts,
-			items,
-			source: 'ui-fallback',
-			fallbackReason: reason,
-		};
-	} catch (e) {
-		return { ok: false, errors: 1, warnings: 0, items: [{ level: 'error', msg: e && e.message ? e.message : String(e) }] };
-	}
 }
 
 export function drcQC(live = null) {
