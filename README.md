@@ -55,9 +55,7 @@ npm install
 git clone https://github.com/Xianleewu/easyeda-harness.git
 cd easyeda-harness
 npm install
-npm run fast
-npm run pipeline
-npm run preview
+npm run accept
 ```
 
 默认完整门禁使用确定性候选集进行质量评估。需要做全量候选审计时可设置：
@@ -73,6 +71,8 @@ npm run pipeline
 Fast Template Harness | Score 100/100 | PASS
 HARD=0 SOFT=0 INFO=0
 ```
+
+`npm run accept` 会顺序运行 `fast`、`pipeline` 和 `preview`，并写出 `acceptance_report.json`。
 
 ## 写回 EasyEDA
 
@@ -112,6 +112,14 @@ npm run live:image
 ```bash
 npm run live:shots
 ```
+
+单命令 live 验收入口：
+
+```bash
+npm run accept:live
+```
+
+它会运行本地门禁、live snapshot、真实画布图、模块级 live shots，并在需要时自动运行 live diagnose，最后写出 `acceptance_report.json`。
 
 `live:shots` 是 fail-closed：如果 EasyEDA 对不同 zoom 区域返回相同的固定视口截图，报告会记录 `zoomEvidence`，把全局图裁剪标记为诊断证据，不会把它当作最终模块级截图验收。
 

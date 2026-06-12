@@ -55,9 +55,7 @@ Manual run:
 git clone https://github.com/Xianleewu/easyeda-harness.git
 cd easyeda-harness
 npm install
-npm run fast
-npm run pipeline
-npm run preview
+npm run accept
 ```
 
 The full gate uses a deterministic candidate set for quality evaluation by default. To audit every generated candidate, set:
@@ -73,6 +71,8 @@ A passing run prints output similar to:
 Fast Template Harness | Score 100/100 | PASS
 HARD=0 SOFT=0 INFO=0
 ```
+
+`npm run accept` runs `fast`, `pipeline`, and `preview`, then writes `acceptance_report.json`.
 
 ## Write Back To EasyEDA
 
@@ -112,6 +112,14 @@ Generate module-level live visual evidence:
 ```powershell
 npm run live:shots
 ```
+
+For a single live acceptance command, run:
+
+```powershell
+npm run accept:live
+```
+
+It runs local gates, live snapshot, live canvas image, module-level live shots, and live diagnostics when needed, then writes `acceptance_report.json`.
 
 `live:shots` is fail-closed. If EasyEDA returns identical images for different requested zoom regions, the report records `zoomEvidence`, marks fallback crops as diagnostic only, and does not accept them as final module-level proof.
 

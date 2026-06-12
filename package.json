@@ -8,6 +8,8 @@
     "pipeline": "node engine/pipeline.mjs",
     "harness": "node harness/harness.mjs full_model.json harness_model_report.json",
     "apply:gated": "node engine/apply_gated.mjs",
+    "accept": "node engine/acceptance_run.mjs",
+    "accept:live": "node engine/acceptance_run.mjs --live",
     "crops": "node engine/visual_crops.mjs",
     "visual": "node engine/visual_crops.mjs",
     "preview": "node engine/visual_crops.mjs",
