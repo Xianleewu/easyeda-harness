@@ -506,6 +506,89 @@ try {
 		checks.liveShotsUseContractEvidence,
 	);
 
+	const finalLiveEvidenceDir = `${TMP_DIR}/final_live_evidence_project`;
+	mkdirSync(finalLiveEvidenceDir, { recursive: true });
+	const finalLiveSpec = {
+		schemaVersion: 1,
+		projectId: 'workflow-smoke-final-live-evidence',
+		intent: 'Final live evidence coverage smoke.',
+		circuitPack: 'aihwdebugger',
+		modules: [{ id: 'sensor_frontend', title: 'Sensor Frontend', requiredNets: ['SENSE_OUT', 'GND'] }],
+		interfaces: [],
+	};
+	const finalLiveContract = {
+		...readJson(externalDocumentContractPath),
+		projectId: finalLiveSpec.projectId,
+	};
+	writeFileSync(`${finalLiveEvidenceDir}/project_spec.json`, JSON.stringify(finalLiveSpec, null, 2) + '\n', 'utf8');
+	writeFileSync(`${finalLiveEvidenceDir}/project_contract.json`, JSON.stringify(finalLiveContract, null, 2) + '\n', 'utf8');
+	writeFileSync(`${finalLiveEvidenceDir}/project_netlist.json`, JSON.stringify({ schemaVersion: 1, projectId: finalLiveSpec.projectId, nets: [{ name: 'SENSE_OUT', requiredPins: [] }, { name: 'GND', requiredPins: [] }] }, null, 2) + '\n', 'utf8');
+	writeFileSync(`${finalLiveEvidenceDir}/project_assembly.json`, JSON.stringify({ ...readJson(externalStructureAssemblyPath), projectId: finalLiveSpec.projectId }, null, 2) + '\n', 'utf8');
+	writeFileSync(`${finalLiveEvidenceDir}/approved_library_manifest.json`, JSON.stringify({ purpose: 'final live evidence smoke', parts: {} }, null, 2) + '\n', 'utf8');
+	writeFileSync(`${finalLiveEvidenceDir}/project_library_snapshot.json`, JSON.stringify({ project: finalLiveSpec.projectId, components: [] }, null, 2) + '\n', 'utf8');
+	writeFileSync(`${finalLiveEvidenceDir}/snap2.json`, JSON.stringify({ project: finalLiveSpec.projectId, components: [] }, null, 2) + '\n', 'utf8');
+	const passReport = projectId => ({ generatedAt: new Date().toISOString(), pass: true, projectId, severity: { hard: 0, soft: 0, info: 0 }, findings: [] });
+	for (const [name, data] of Object.entries({
+		workflow_smoke_report: passReport(finalLiveSpec.projectId),
+		gsd_plan_report: { ...passReport(finalLiveSpec.projectId), spec: 'project_spec.json' },
+		gsd_generate_report: { ...passReport(finalLiveSpec.projectId), spec: 'project_spec.json' },
+		next_actions: { ...passReport(finalLiveSpec.projectId), actions: [] },
+		repair_actions: { ...passReport(finalLiveSpec.projectId), actions: [] },
+		action_schema_report: passReport(finalLiveSpec.projectId),
+		project_contract_report: passReport(finalLiveSpec.projectId),
+		project_library_report: passReport(finalLiveSpec.projectId),
+		project_netlist_report: passReport(finalLiveSpec.projectId),
+		project_layout_report: passReport(finalLiveSpec.projectId),
+		project_visual_report: passReport(finalLiveSpec.projectId),
+		report: { ...passReport(finalLiveSpec.projectId), coverage: { layoutPlanner: true } },
+		acceptance_report: {
+			...passReport(finalLiveSpec.projectId),
+			context: {
+				specAbs: `${finalLiveEvidenceDir}/project_spec.json`,
+				contractPath: `${finalLiveEvidenceDir}/project_contract.json`,
+				netlistPath: `${finalLiveEvidenceDir}/project_netlist.json`,
+				assemblyPath: `${finalLiveEvidenceDir}/project_assembly.json`,
+				libraryManifestPath: `${finalLiveEvidenceDir}/approved_library_manifest.json`,
+				partLibPath: `${finalLiveEvidenceDir}/snap2.json`,
+			},
+		},
+		project_live_model_report: passReport(finalLiveSpec.projectId),
+		drc_report: { ...passReport(finalLiveSpec.projectId), drc: { strictPass: true, errors: 0, warnings: 0, info: 0 } },
+		live_shots_report: { ...passReport(finalLiveSpec.projectId), screenshots: 2, fallbackDiagnosticOnly: false, regions: [
+			{ region: '00_global_sheet', evidenceId: 'global-sheet', pass: true },
+			{ region: '02_title_template', evidenceId: 'title-template', pass: true },
+		] },
+	})) {
+		writeFileSync(`${finalLiveEvidenceDir}/${name}.json`, JSON.stringify(data, null, 2) + '\n', 'utf8');
+	}
+	writeFileSync(`${finalLiveEvidenceDir}/live_canvas.png`, Buffer.from('89504e470d0a1a0a', 'hex'));
+	writeFileSync(`${finalLiveEvidenceDir}/live.json`, '{}\n', 'utf8');
+	const finalEvidenceMissingLive = spawnSync(process.execPath, [`${ROOT}/engine/final_evidence_gate.mjs`, '--live', 'project_spec.json'], {
+		cwd: finalLiveEvidenceDir,
+		stdio: 'pipe',
+		shell: false,
+		env: {
+			...process.env,
+			EASYEDA_FINAL_EVIDENCE_REPORT: `${finalLiveEvidenceDir}/final_evidence_report.json`,
+			EASYEDA_EVIDENCE_MAX_AGE_MS: '0',
+		},
+		encoding: 'utf8',
+	});
+	const finalEvidenceMissingLiveReport = existsSync(`${finalLiveEvidenceDir}/final_evidence_report.json`) ? readJson(`${finalLiveEvidenceDir}/final_evidence_report.json`) : null;
+	checks.finalEvidenceRequiresLiveContractEvidence = {
+		status: finalEvidenceMissingLive.status,
+		pass: finalEvidenceMissingLiveReport?.pass ?? null,
+		rules: (finalEvidenceMissingLiveReport?.findings || []).map(f => f.rule),
+		firstFinding: finalEvidenceMissingLiveReport?.findings?.[0] || null,
+	};
+	assertFinding(
+		findings,
+		finalEvidenceMissingLive.status !== 0 && hasRule(finalEvidenceMissingLiveReport, 'FE10-live-shot-contract-evidence'),
+		'WS45-final-evidence-requires-live-contract-evidence',
+		'final live evidence must reject live_shots_report.json when it passes but omits a visual evidence region required by the active project contract',
+		checks.finalEvidenceRequiresLiveContractEvidence,
+	);
+
 	const oldProjectAssemblyForHarnessRules = process.env.EASYEDA_PROJECT_ASSEMBLY;
 	process.env.EASYEDA_PROJECT_ASSEMBLY = externalStructureAssemblyPath;
 	const externalRuleFindings = runRules(buildModel({

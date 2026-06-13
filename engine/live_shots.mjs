@@ -530,7 +530,7 @@ for (const region of regions) {
 	const image = inspectPng(pngFile, configFor(region));
 	const hash = hashFile(pngFile);
 	finalHashes.push(hash);
-	const report = { region: region.name, kind: region.kind, path: pngFile, box: region.box, pass: image.pass, metrics: image.metrics, findings: image.findings };
+	const report = { region: region.name, evidenceId: region.evidenceId || null, kind: region.kind, path: pngFile, box: region.box, pass: image.pass, metrics: image.metrics, findings: image.findings };
 	if (region.cropBoxPx) report.cropBoxPx = region.cropBoxPx;
 	if (region.captureResult) report.captureResult = region.captureResult;
 	if (region.infoFinding) report.infoFinding = region.infoFinding;

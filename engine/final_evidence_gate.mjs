@@ -40,6 +40,24 @@ function hard(findings, rule, msg, where = {}) {
 	findings.push({ rule, severity: 'hard', category: 'final-evidence', msg, where });
 }
 
+function asArray(value) {
+	return Array.isArray(value) ? value : [];
+}
+
+function normalizeId(value) {
+	return String(value || '').replace(/^\d+_/, '').replace(/_/g, '-');
+}
+
+function requiredVisualEvidence(contract) {
+	const required = [
+		'global-sheet',
+		...asArray(contract?.visualEvidenceRegions),
+		...asArray(contract?.modules).map(mod => mod.visualEvidence).filter(Boolean),
+		'title-template',
+	].map(normalizeId).filter(Boolean);
+	return [...new Set(required)];
+}
+
 function requireFresh(findings, rel, label) {
 	const info = fileInfo(rel);
 	if (!info.exists) {
@@ -149,6 +167,7 @@ if (acceptanceContext) {
 }
 
 if (REQUIRE_LIVE) {
+	const contract = readJson(CONTEXT.contractPath);
 	const live = {
 		liveModel: requireReportPass(findings, 'project_live_model_report.json', 'live model contract report'),
 		drc: requireReportPass(findings, 'drc_report.json', 'EasyEDA DRC report', data => data?.pass === true && data?.drc?.strictPass === true && !(data?.drc?.errors || 0) && !(data?.drc?.warnings || 0) && !(data?.drc?.info || 0)),
@@ -158,6 +177,16 @@ if (REQUIRE_LIVE) {
 	};
 	if (live.liveShots.data?.fallbackDiagnosticOnly === true) {
 		hard(findings, 'FE5-live-shots-diagnostic-only', 'live shots cannot be diagnostic-only for final evidence', { file: 'live_shots_report.json' });
+	}
+	const expectedEvidence = requiredVisualEvidence(contract);
+	const liveEvidence = new Set(asArray(live.liveShots.data?.regions).map(region => normalizeId(region.evidenceId || region.region)).filter(Boolean));
+	const missingLiveEvidence = expectedEvidence.filter(id => !liveEvidence.has(id));
+	if (missingLiveEvidence.length) {
+		hard(findings, 'FE10-live-shot-contract-evidence', 'live_shots_report.json must contain every visual evidence region required by the active project contract', {
+			missingEvidence: missingLiveEvidence,
+			availableEvidence: [...liveEvidence].sort(),
+			contractPath: CONTEXT.contractPath,
+		});
 	}
 }
 
