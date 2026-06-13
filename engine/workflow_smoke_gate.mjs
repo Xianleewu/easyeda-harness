@@ -10,6 +10,8 @@ import { buildAnchorFamily } from './layout_planner.mjs';
 import { computeStructureMetricsFromSnapshot } from './structure_metrics.mjs';
 import { auditPageComposition } from './page_composition.mjs';
 import { inferModuleRegions } from './sheet_renderer.mjs';
+import { auditCommercialArchitecture } from './commercial_architecture.mjs';
+import { auditSystemIntent } from './system_intent_gate.mjs';
 import { acquireRunLock } from '../workflows/run_lock.mjs';
 
 const ROOT = (process.env.EASYEDA_WORKDIR || process.cwd()).replace(/\\/g, '/');
@@ -335,6 +337,45 @@ try {
 		'WS38-visual-uses-project-assembly-modules',
 		'page composition and sheet module regions must derive visual evidence regions from active project_assembly.json instead of the bundled AIHWDEBUGER module registry',
 		checks.visualUsesProjectAssemblyModules,
+	);
+
+	const oldProjectAssemblyForIntent = process.env.EASYEDA_PROJECT_ASSEMBLY;
+	process.env.EASYEDA_PROJECT_ASSEMBLY = externalStructureAssemblyPath;
+	const externalIntentSnap = {
+		...externalVisualSnap,
+		texts: [{ role: 'module-title', module: 'sensor_frontend', content: 'SENSOR FRONTEND' }],
+	};
+	const externalArchitecture = auditCommercialArchitecture(externalIntentSnap);
+	const externalIntent = auditSystemIntent(externalIntentSnap);
+	if (oldProjectAssemblyForIntent === undefined) delete process.env.EASYEDA_PROJECT_ASSEMBLY;
+	else process.env.EASYEDA_PROJECT_ASSEMBLY = oldProjectAssemblyForIntent;
+	checks.genericIntentUsesProjectAssemblyModules = {
+		architecture: {
+			pass: externalArchitecture.pass,
+			mode: externalArchitecture.stats?.moduleRegistry?.mode || null,
+			modules: externalArchitecture.stats?.moduleRegistry?.modules ?? null,
+			hard: externalArchitecture.severity?.hard ?? null,
+			firstFinding: externalArchitecture.findings?.[0] || null,
+		},
+		systemIntent: {
+			pass: externalIntent.pass,
+			mode: externalIntent.stats?.moduleRegistry?.mode || null,
+			modules: externalIntent.stats?.moduleRegistry?.modules ?? null,
+			hard: externalIntent.severity?.hard ?? null,
+			firstFinding: externalIntent.findings?.[0] || null,
+		},
+	};
+	assertFinding(
+		findings,
+		checks.genericIntentUsesProjectAssemblyModules.architecture.pass === true
+			&& checks.genericIntentUsesProjectAssemblyModules.architecture.mode === 'generic-project-rules'
+			&& checks.genericIntentUsesProjectAssemblyModules.architecture.modules === 1
+			&& checks.genericIntentUsesProjectAssemblyModules.systemIntent.pass === true
+			&& checks.genericIntentUsesProjectAssemblyModules.systemIntent.mode === 'generic-project-rules'
+			&& checks.genericIntentUsesProjectAssemblyModules.systemIntent.modules === 1,
+		'WS39-generic-intent-uses-project-assembly-modules',
+		'commercial architecture and system intent audits must use generic project rules for non-AIHWDEBUGER assemblies instead of fixed USB/ESP32/relay assumptions',
+		checks.genericIntentUsesProjectAssemblyModules,
 	);
 
 	const noDrawingRulesContract = clone(contract);

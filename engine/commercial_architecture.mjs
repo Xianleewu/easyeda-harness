@@ -1,6 +1,6 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import { buildModel, rectsGap, round2 } from '../harness/model.mjs';
-import { MODULES, partToModuleMap } from '../harness/module_registry.mjs';
+import { activePartToModuleMap, loadProjectModuleRegistry } from '../harness/module_registry.mjs';
 import { INTERFACE_CONTRACTS, interfaceContractByNet } from './interface_contract.mjs';
 
 const DIR = (process.env.EASYEDA_WORKDIR || process.cwd()).replace(/\\/g, '/') + '/';
@@ -231,14 +231,16 @@ function pairedGroupedContracts(model, contracts, modules, partModule) {
 
 export function auditCommercialArchitecture(snap, opts = {}) {
 	const model = buildModel(snap);
+	const registry = loadProjectModuleRegistry();
+	const isBundledAihwdebugger = registry.assembly?.circuitPack === 'aihwdebugger' || registry.assembly?.projectId === 'easyeda-harness-default';
 	const findings = [];
 	const parts = new Map(model.parts.map(p => [p.designator, p]));
-	const partModule = partToModuleMap();
-	const modules = MODULES.map(mod => ({ ...mod, box: boxOf(parts, mod.refs) })).filter(m => m.box);
+	const partModule = activePartToModuleMap();
+	const modules = registry.modules.map(mod => ({ ...mod, box: boxOf(parts, mod.refs) })).filter(m => m.box);
 	const byName = Object.fromEntries(modules.map(m => [m.name, m]));
 
-	const interfaceNets = opts.interfaceNets || INTERFACE_CONTRACTS.map(x => x.net);
-	const contracts = interfaceContractByNet();
+	const interfaceNets = opts.interfaceNets || (isBundledAihwdebugger ? INTERFACE_CONTRACTS.map(x => x.net) : []);
+	const contracts = isBundledAihwdebugger ? interfaceContractByNet() : new Map();
 	const pairedContracts = pairedGroupedContracts(model, contracts, modules, partModule);
 	const islandsByNet = netModuleIslands(model, partModule);
 	const labelOnlyInterfaces = [];
@@ -280,7 +282,7 @@ export function auditCommercialArchitecture(snap, opts = {}) {
 			{ labelOnlyInterfaces: contractRequiredFailures, max: maxLabelOnlyInterfaces });
 	}
 
-	if (byName.usb && byName.ldo) {
+	if (isBundledAihwdebugger && byName.usb && byName.ldo) {
 		const usb = center(byName.usb.box);
 		const ldo = center(byName.ldo.box);
 		const spread = Math.abs(usb.y - ldo.y);
@@ -293,7 +295,7 @@ export function auditCommercialArchitecture(snap, opts = {}) {
 	}
 
 	const outputModules = [byName.pmos, byName.relay1, byName.relay2].filter(Boolean);
-	if (outputModules.length === 3) {
+	if (isBundledAihwdebugger && outputModules.length === 3) {
 		const outBox = union(outputModules.map(m => m.box));
 		const width = outBox.maxX - outBox.minX;
 		const height = outBox.maxY - outBox.minY;
@@ -324,6 +326,11 @@ export function auditCommercialArchitecture(snap, opts = {}) {
 		pass: severity.hard === 0 && severity.soft === 0 && severity.info === 0,
 		severity,
 		stats: {
+			moduleRegistry: {
+				source: registry.source,
+				modules: registry.modules.length,
+				mode: isBundledAihwdebugger ? 'aihwdebugger-rules' : 'generic-project-rules',
+			},
 			modules: modules.length,
 			labelOnlyInterfaces: labelOnlyInterfaces.length,
 			groupedContracts: groupedContracts.length,

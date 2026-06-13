@@ -1,6 +1,6 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import { buildModel, round2 } from '../harness/model.mjs';
-import { MODULES, partToModuleMap } from '../harness/module_registry.mjs';
+import { loadProjectModuleRegistry } from '../harness/module_registry.mjs';
 import { INTERFACE_CONTRACTS } from './interface_contract.mjs';
 import { KEY_NET_CONTRACT, netContractReport } from './net_contract.mjs';
 
@@ -59,12 +59,14 @@ function netNames(snap) {
 }
 
 function moduleMap(model) {
+	const registry = loadProjectModuleRegistry();
 	const parts = new Map(model.parts.map(p => [p.designator, p]));
-	const modules = MODULES.map(mod => ({ ...mod, box: boxOf(parts, mod.refs) })).filter(m => m.box);
+	const modules = registry.modules.map(mod => ({ ...mod, box: boxOf(parts, mod.refs) })).filter(m => m.box);
 	return {
 		parts,
 		modules,
 		byName: Object.fromEntries(modules.map(m => [m.name, m])),
+		registry,
 	};
 }
 
@@ -141,6 +143,7 @@ function bringupEntryCount(snap, net) {
 }
 
 function moduleTitleCoverage(snap) {
+	const registry = loadProjectModuleRegistry();
 	const titleMap = new Map([
 		['USB-C INPUT', 'usb'],
 		['5V TO 3V3 POWER', 'ldo'],
@@ -159,7 +162,7 @@ function moduleTitleCoverage(snap) {
 	}
 	return {
 		count: titles.size,
-		missing: MODULES.map(m => m.name).filter(name => !titles.has(name)),
+		missing: registry.modules.map(m => m.name).filter(name => !titles.has(name)),
 	};
 }
 
@@ -190,21 +193,22 @@ export function auditSystemIntent(snap, opts = {}) {
 	const model = buildModel(snap);
 	const findings = [];
 	const nets = netNames(snap);
-	const { parts, modules, byName } = moduleMap(model);
-	const contractChecks = contractFlagCoverage(snap);
-	const netContract = opts.netContract || netContractReport(snap);
+	const { parts, modules, byName, registry } = moduleMap(model);
+	const isBundledAihwdebugger = registry.assembly?.circuitPack === 'aihwdebugger' || registry.assembly?.projectId === 'easyeda-harness-default';
+	const contractChecks = isBundledAihwdebugger ? contractFlagCoverage(snap) : [];
+	const netContract = isBundledAihwdebugger ? (opts.netContract || netContractReport(snap)) : { checks: [] };
 
 	const titles = moduleTitleCoverage(snap);
 	if (titles.missing.length) {
 		hard(findings, 'SI2-module-title-coverage', 'every functional module needs a visible engineering title', { missingModules: titles.missing });
 	}
 
-	const missingExternal = EXTERNAL_CONNECTORS.filter(ref => !parts.has(ref));
-	if (missingExternal.length) {
+	const missingExternal = isBundledAihwdebugger ? EXTERNAL_CONNECTORS.filter(ref => !parts.has(ref)) : [];
+	if (isBundledAihwdebugger && missingExternal.length) {
 		hard(findings, 'SI3-external-interface-coverage', 'external board interfaces must be explicit and auditable', { missingExternal });
 	}
 
-	for (const tree of POWER_TREE) {
+	for (const tree of isBundledAihwdebugger ? POWER_TREE : []) {
 		const missingNets = [tree.from, tree.to].filter(net => !nets.has(net));
 		const missingEvidence = tree.evidence.filter(ref => !parts.has(ref));
 		if (missingNets.length || missingEvidence.length) {
@@ -216,9 +220,9 @@ export function auditSystemIntent(snap, opts = {}) {
 		}
 	}
 
-	const bringupFlags = BRINGUP_NETS.reduce((sum, net) => sum + bringupEntryCount(snap, net), 0);
-	const missingBringupFlags = BRINGUP_NETS.filter(net => bringupEntryCount(snap, net) === 0);
-	if (missingBringupFlags.length) {
+	const bringupFlags = isBundledAihwdebugger ? BRINGUP_NETS.reduce((sum, net) => sum + bringupEntryCount(snap, net), 0) : 0;
+	const missingBringupFlags = isBundledAihwdebugger ? BRINGUP_NETS.filter(net => bringupEntryCount(snap, net) === 0) : [];
+	if (isBundledAihwdebugger && missingBringupFlags.length) {
 		hard(findings, 'SI5-bringup-entry-points', 'reset, boot, and USB bring-up nets must be one-glance auditable with signal labels', {
 			bringupNets: BRINGUP_NETS,
 			missingBringupFlags,
@@ -235,7 +239,7 @@ export function auditSystemIntent(snap, opts = {}) {
 		});
 	}
 
-	const cats = netContractPinsByCategory();
+	const cats = isBundledAihwdebugger ? netContractPinsByCategory() : {};
 	const contractPass = new Map((netContract.checks || []).map(x => [x.net, x.pass]));
 	for (const [category, entries] of Object.entries(cats)) {
 		const failed = entries.filter(entry => contractPass.get(entry.net) !== true);
@@ -251,7 +255,7 @@ export function auditSystemIntent(snap, opts = {}) {
 		mcu: center(byName.mcu?.box),
 		output: center(outputBox),
 	};
-	if (flow.input && flow.mcu && flow.output && !(flow.input.x < flow.mcu.x && flow.mcu.x < flow.output.x)) {
+	if (isBundledAihwdebugger && flow.input && flow.mcu && flow.output && !(flow.input.x < flow.mcu.x && flow.mcu.x < flow.output.x)) {
 		hard(findings, 'SI8-system-reading-flow', 'system intent must read left-to-right from input/power to controller to switched outputs', flow);
 	}
 
@@ -261,9 +265,14 @@ export function auditSystemIntent(snap, opts = {}) {
 		pass: severity.hard === 0 && severity.soft === 0 && severity.info === 0,
 		severity,
 		stats: {
+			moduleRegistry: {
+				source: registry.source,
+				modules: registry.modules.length,
+				mode: isBundledAihwdebugger ? 'aihwdebugger-rules' : 'generic-project-rules',
+			},
 			modules: modules.length,
 			moduleTitles: titles.count,
-			externalConnectors: EXTERNAL_CONNECTORS.filter(ref => parts.has(ref)).length,
+			externalConnectors: isBundledAihwdebugger ? EXTERNAL_CONNECTORS.filter(ref => parts.has(ref)).length : null,
 			contractChecks: contractChecks.length,
 			contractEndpointFlags: contractChecks.reduce((sum, x) => sum + x.flagCount, 0),
 			bringupFlags,
@@ -275,8 +284,8 @@ export function auditSystemIntent(snap, opts = {}) {
 		},
 		checks: {
 			moduleTitles: { missing: titles.missing },
-			externalConnectors: EXTERNAL_CONNECTORS.map(ref => ({ ref, pass: parts.has(ref) })),
-			powerTree: POWER_TREE,
+			externalConnectors: isBundledAihwdebugger ? EXTERNAL_CONNECTORS.map(ref => ({ ref, pass: parts.has(ref) })) : [],
+			powerTree: isBundledAihwdebugger ? POWER_TREE : [],
 			interfaceContracts: contractChecks,
 			netContractCategories: cats,
 		},
