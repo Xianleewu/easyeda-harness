@@ -1,12 +1,26 @@
 import { existsSync, readFileSync, statSync, writeFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { generateContext } from '../workflows/gsd_generate.mjs';
 
 const DIR = (process.env.EASYEDA_WORKDIR || process.cwd()).replace(/\\/g, '/') + '/';
 const REPORT = process.env.EASYEDA_FINAL_EVIDENCE_REPORT || DIR + 'final_evidence_report.json';
 const REQUIRE_LIVE = process.argv.includes('--live') || process.env.EASYEDA_REQUIRE_LIVE_EVIDENCE === '1';
 const MAX_AGE_MS = Number(process.env.EASYEDA_EVIDENCE_MAX_AGE_MS || 30 * 60 * 1000);
+const SPEC_PATH = process.argv.slice(2).find(arg => !arg.startsWith('-')) || process.env.EASYEDA_PROJECT_SPEC || 'project_spec.json';
+const CONTEXT = generateContext(DIR.replace(/\/$/, ''), SPEC_PATH);
+
+function normalizePath(path) {
+	return path ? resolve(path).replace(/\\/g, '/') : '';
+}
+
+function relPath(path) {
+	const normalized = normalizePath(path);
+	const root = DIR.replace(/\/$/, '');
+	return normalized.startsWith(root) ? normalized.slice(root.length + 1) : normalized;
+}
 
 function readJson(rel) {
-	const path = DIR + rel;
+	const path = /^[A-Za-z]:[\\/]/.test(rel) || rel.startsWith('/') ? rel : DIR + rel;
 	if (!existsSync(path)) return null;
 	try {
 		return JSON.parse(readFileSync(path, 'utf8').replace(/^\uFEFF/, ''));
@@ -52,6 +66,16 @@ function requireReportPass(findings, rel, label, predicate = data => data?.pass 
 }
 
 const findings = [];
+let spec = null;
+if (!existsSync(CONTEXT.specAbs)) {
+	hard(findings, 'FE0-spec-file', 'current project spec is required before final evidence can pass', { spec: SPEC_PATH, specAbs: CONTEXT.specAbs });
+} else {
+	try { spec = JSON.parse(readFileSync(CONTEXT.specAbs, 'utf8').replace(/^\uFEFF/, '')); }
+	catch (e) { hard(findings, 'FE0-spec-parse', 'current project spec must parse as JSON', { spec: SPEC_PATH, error: e.message }); }
+}
+const expectedProjectId = spec?.projectId || null;
+const expectedSpecRel = relPath(CONTEXT.specAbs);
+
 const local = {
 	workflowSmoke: requireReportPass(findings, 'workflow_smoke_report.json', 'workflow smoke report'),
 	gsdPlan: requireReportPass(findings, 'gsd_plan_report.json', 'GSD plan report'),
@@ -65,6 +89,62 @@ const local = {
 	projectLayout: requireReportPass(findings, 'project_layout_report.json', 'project layout report'),
 	projectVisual: requireReportPass(findings, 'project_visual_report.json', 'project visual report'),
 };
+
+function requireProjectId(report, rel, label) {
+	if (!expectedProjectId || !report?.data || report.data.parseError) return;
+	if (report.data.projectId !== undefined && report.data.projectId !== expectedProjectId) {
+		hard(findings, 'FE6-project-context-match', `${label} projectId must match the current spec`, {
+			file: rel,
+			expectedProjectId,
+			actualProjectId: report.data.projectId,
+		});
+	}
+}
+
+for (const [rel, label, report] of [
+	['gsd_plan_report.json', 'GSD plan report', local.gsdPlan],
+	['gsd_generate_report.json', 'GSD generate report', local.gsdGenerate],
+	['project_contract_report.json', 'project contract report', local.projectContract],
+	['project_library_report.json', 'project library report', local.projectLibrary],
+	['project_netlist_report.json', 'project netlist report', local.projectNetlist],
+	['project_layout_report.json', 'project layout report', local.projectLayout],
+	['project_visual_report.json', 'project visual report', local.projectVisual],
+]) {
+	requireProjectId(report, rel, label);
+}
+
+if (local.gsdPlan.data?.spec !== undefined && relPath(local.gsdPlan.data.spec) !== expectedSpecRel) {
+	hard(findings, 'FE7-plan-spec-context-match', 'GSD plan report must be for the current spec path', {
+		expectedSpec: expectedSpecRel,
+		actualSpec: local.gsdPlan.data.spec,
+	});
+}
+if (local.gsdGenerate.data?.spec !== undefined && relPath(local.gsdGenerate.data.spec) !== expectedSpecRel) {
+	hard(findings, 'FE8-generate-spec-context-match', 'GSD generate report must be for the current spec path', {
+		expectedSpec: expectedSpecRel,
+		actualSpec: local.gsdGenerate.data.spec,
+	});
+}
+const acceptanceContext = readJson('acceptance_report.json')?.context || null;
+if (acceptanceContext) {
+	for (const [key, expected] of [
+		['specAbs', CONTEXT.specAbs],
+		['contractPath', CONTEXT.contractPath],
+		['netlistPath', CONTEXT.netlistPath],
+		['assemblyPath', CONTEXT.assemblyPath],
+		['libraryManifestPath', CONTEXT.libraryManifestPath],
+	]) {
+		if (normalizePath(acceptanceContext[key]) !== normalizePath(expected)) {
+			hard(findings, 'FE9-acceptance-context-match', 'acceptance_report.json context must match the current project spec context', {
+				key,
+				expected: normalizePath(expected),
+				actual: normalizePath(acceptanceContext[key]),
+			});
+		}
+	}
+} else {
+	hard(findings, 'FE9-acceptance-context-match', 'acceptance_report.json must include the current project spec context', { file: 'acceptance_report.json' });
+}
 
 if (REQUIRE_LIVE) {
 	const live = {
@@ -83,6 +163,16 @@ const report = {
 	generatedAt: new Date().toISOString(),
 	pass: findings.length === 0,
 	mode: REQUIRE_LIVE ? 'full-with-live' : 'local-only',
+	context: {
+		spec: SPEC_PATH,
+		specAbs: CONTEXT.specAbs,
+		specDir: CONTEXT.specDir,
+		projectId: expectedProjectId,
+		contractPath: CONTEXT.contractPath,
+		netlistPath: CONTEXT.netlistPath,
+		assemblyPath: CONTEXT.assemblyPath,
+		libraryManifestPath: CONTEXT.libraryManifestPath,
+	},
 	maxAgeMs: MAX_AGE_MS,
 	severity: { hard: findings.length, soft: 0, info: 0 },
 	local: Object.fromEntries(Object.entries(local).map(([key, value]) => [key, { file: value.info ? null : undefined, pass: value.data?.pass ?? null }])),

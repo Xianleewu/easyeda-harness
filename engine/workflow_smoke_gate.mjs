@@ -365,6 +365,38 @@ try {
 			expectedAssemblyPath: `${TMP_DIR}/custom_project/project_assembly.json`,
 		},
 	);
+	const customFinalEvidenceReportPath = `${TMP_DIR}/custom_final_evidence_report.json`;
+	const customFinalEvidence = spawnSync(process.execPath, ['engine/final_evidence_gate.mjs', '_tmp_workflow_smoke/custom_project/project_spec.json'], {
+		cwd: ROOT,
+		stdio: 'pipe',
+		shell: false,
+		env: {
+			...process.env,
+			EASYEDA_GSD_LOCK_TOKEN: LOCK.token,
+			EASYEDA_FINAL_EVIDENCE_REPORT: customFinalEvidenceReportPath,
+		},
+		encoding: 'utf8',
+	});
+	const customFinalEvidenceReport = existsSync(customFinalEvidenceReportPath) ? readJson(customFinalEvidenceReportPath) : null;
+	checks.customFinalEvidenceContext = {
+		status: customFinalEvidence.status,
+		pass: customFinalEvidenceReport?.pass ?? null,
+		rules: (customFinalEvidenceReport?.findings || []).map(f => f.rule),
+		contextProjectId: customFinalEvidenceReport?.context?.projectId || null,
+	};
+	assertFinding(
+		findings,
+		customFinalEvidence.status !== 0
+			&& (customFinalEvidenceReport?.findings || []).some(f => f.rule === 'FE6-project-context-match' || f.rule === 'FE7-plan-spec-context-match' || f.rule === 'FE9-acceptance-context-match'),
+		'WS19-final-evidence-context-bound',
+		'final evidence gate must reject stale root-project PASS reports when invoked for a different project spec',
+		{
+			status: customFinalEvidence.status,
+			stdout: customFinalEvidence.stdout,
+			stderr: customFinalEvidence.stderr,
+			report: checks.customFinalEvidenceContext,
+		},
+	);
 
 	const restoreGenerate = runGsdGenerate({ root: ROOT, specPath: 'project_spec.json', command: ['engine/pipeline_fast.mjs'] });
 	checks.restoreGenerate = {
