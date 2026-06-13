@@ -15,6 +15,7 @@ This repository is an executable workflow, not a prompt pack for free-form drawi
 A PASS on the current model only proves the current model. It does not validate another project, another schematic, or manual EasyEDA edits.
 
 `project_spec.json` is the machine-readable user-intent input. `project_contract.json` is the design contract derived from that spec. `npm run spec` checks that the contract covers the spec, and `npm run contract` / `npm run accept` continue checking the contract and generated model.
+`npm run spec:schema` validates the spec shape before contract coverage is checked.
 
 `project_contract.json` is the first machine-readable file an agent must update for a new project. `project_netlist.json` records the required electrical endpoints. `circuit_packs/*/cell_manifest.json` declares deterministic cell capabilities for the selected circuit pack, and `project_assembly.json` maps each contract module to those cells, refs, anchors, nets, and layout policy. `npm run contract`, `npm run contract:netlist`, `npm run contract:cells`, `npm run contract:assembly`, `npm run contract:layout`, and `npm run accept` check them; if they fail, the agent should not edit write-back scripts, apply to EasyEDA, or claim completion.
 
@@ -22,6 +23,7 @@ A PASS on the current model only proves the current model. It does not validate 
 
 - Deterministic schematic assembly: functional cells live in `engine/cells.mjs`, and whole-sheet composition lives in `engine/assemble.mjs`.
 - Project spec gate: `project_spec.json` defines user-level modules, nets, interfaces, and quality policy.
+- Spec schema gate: `spec:schema` validates `project_spec.json` as the first-layer user-intent contract.
 - Project contract gate: `project_contract.json` defines modules, key nets, interfaces, visual evidence regions, and the no-free-draw policy.
 - Project netlist gate: `project_netlist.json` defines required pins for key nets and proves the generated model connects them.
 - Cell manifest gate: `circuit_packs/*/cell_manifest.json` declares circuit-pack cell roles, required refs, net args, ports, and layout intent before assembly can use those cells.
@@ -99,6 +101,7 @@ For handoff, review the global sheet and local crops for USB, LDO, RESET, BOOT, 
 
 - Project contract check: `project_contract_report.json` has `HARD=0 SOFT=0 INFO=0`
 - Project spec coverage check: `project_spec_report.json` has `HARD=0 SOFT=0 INFO=0`
+- Spec schema check: `spec_schema_report.json` has `HARD=0 SOFT=0 INFO=0`
 - Project rule coverage check: `project_rule_report.json` has `HARD=0 SOFT=0 INFO=0`
 - Project netlist check: `project_netlist_report.json` has `HARD=0 SOFT=0 INFO=0`
 - Cell manifest check: `cell_manifest_report.json` has `HARD=0 SOFT=0 INFO=0`
@@ -138,6 +141,7 @@ For handoff, review the global sheet and local crops for USB, LDO, RESET, BOOT, 
 - `reports/README.md`: generated report contract notes, including the `next_actions.json` action schema.
 - `harness/`: normalized model, module registry, and rule gates.
 - `project_spec.json` / `project_contract.json` / `project_netlist.json` / `project_assembly.json`: user intent, design contract, structured electrical endpoints, executable assembly mapping, and layout policy.
+- `contracts/spec_schema.mjs`: reusable schema validation for the first user-intent input.
 - `circuit_packs/*/cell_manifest.json`: circuit-pack deterministic cell capability contracts.
 - `snap2.json`: component snapshot input.
 - `comp_state.json`: component state input for write-back preservation.

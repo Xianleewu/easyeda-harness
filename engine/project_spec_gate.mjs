@@ -1,4 +1,5 @@
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { validateSpecSchema, asArray } from '../contracts/spec_schema.mjs';
 
 const DIR = (process.env.EASYEDA_WORKDIR || process.cwd()).replace(/\\/g, '/') + '/';
 const SPEC = process.env.EASYEDA_PROJECT_SPEC || DIR + 'project_spec.json';
@@ -13,19 +14,13 @@ function hard(findings, rule, msg, where = {}) {
 	findings.push({ rule, severity: 'hard', category: 'project-spec', msg, where });
 }
 
-function asArray(value) {
-	return Array.isArray(value) ? value : [];
-}
-
 function keyOfInterface(x) {
 	return `${x?.net || ''}:${x?.from || ''}:${x?.to || ''}`;
 }
 
 function validateSpec(spec, contract) {
 	const findings = [];
-	if (spec.schemaVersion !== 1) hard(findings, 'PS1-schema-version', 'project spec schemaVersion must be 1', { schemaVersion: spec.schemaVersion });
-	if (!spec.projectId || typeof spec.projectId !== 'string') hard(findings, 'PS2-project-id', 'project spec needs a stable projectId');
-	if (!spec.intent || typeof spec.intent !== 'string') hard(findings, 'PS3-intent', 'project spec needs a concise design intent');
+	findings.push(...validateSpecSchema(spec).map(f => ({ ...f, category: 'project-spec' })));
 	if (contract.projectId && spec.projectId && contract.projectId !== spec.projectId) hard(findings, 'PS4-project-id-match', 'project spec and contract projectId must match', { spec: spec.projectId, contract: contract.projectId });
 
 	const specModules = asArray(spec.modules);

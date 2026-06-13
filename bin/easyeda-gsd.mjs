@@ -2,6 +2,7 @@
 import { spawnSync } from 'node:child_process';
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
+import { validateSpecSchema } from '../contracts/spec_schema.mjs';
 
 const ROOT = resolve(new URL('..', import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1')).replace(/\\/g, '/');
 
@@ -49,7 +50,8 @@ function runNode(args) {
 }
 
 function readJson(rel) {
-	return JSON.parse(readFileSync(`${ROOT}/${rel}`, 'utf8').replace(/^\uFEFF/, ''));
+	const path = /^[A-Za-z]:[\\/]/.test(rel) || rel.startsWith('/') ? rel : `${ROOT}/${rel}`;
+	return JSON.parse(readFileSync(path, 'utf8').replace(/^\uFEFF/, ''));
 }
 
 function optionValue(args, name) {
@@ -77,19 +79,27 @@ function writeInit(args) {
 
 function plan(args) {
 	const spec = args.find(a => !a.startsWith('-')) || 'project_spec.json';
-	if (!existsSync(resolve(ROOT, spec))) {
+	const specPath = resolve(ROOT, spec);
+	if (!existsSync(specPath)) {
 		console.error(`spec not found: ${spec}`);
 		process.exit(2);
+	}
+	const specDoc = readJson(specPath);
+	const findings = validateSpecSchema(specDoc);
+	if (findings.length) {
+		console.error(JSON.stringify({ pass: false, spec, findings }, null, 2));
+		process.exit(1);
 	}
 	const assembly = readJson('project_assembly.json');
 	const contract = readJson('project_contract.json');
 	log(JSON.stringify({
 		pass: true,
 		spec,
-		projectId: contract.projectId,
+		projectId: specDoc.projectId || contract.projectId,
 		circuitPack: assembly.circuitPack || 'aihwdebugger',
 		cellManifest: assembly.cellManifest || 'circuit_packs/aihwdebugger/cell_manifest.json',
-		modules: (contract.modules || []).map(mod => mod.id),
+		modules: (specDoc.modules || []).map(mod => mod.id),
+		interfaces: (specDoc.interfaces || []).length,
 		requiredLocalGate: 'node bin/easyeda-gsd.mjs accept',
 		requiredFinalGate: 'node bin/easyeda-gsd.mjs live-check',
 		finalApply: 'node bin/easyeda-gsd.mjs apply --gated',

@@ -27,6 +27,7 @@ function pushAction(actions, item) {
 
 const acceptance = readJson('acceptance_report.json');
 const agentInstructions = readJson('agent_instruction_report.json');
+const specSchema = readJson('spec_schema_report.json');
 const spec = readJson('project_spec_report.json');
 const contract = readJson('project_contract_report.json');
 const projectRules = readJson('project_rule_report.json');
@@ -51,6 +52,15 @@ const checks = {
 		filesChecked: agentInstructions?.filesChecked || null,
 		firstFinding: agentInstructions?.findings?.[0] || null,
 		evidence: 'agent_instruction_report.json',
+	},
+	specSchema: {
+		status: status(specSchema?.pass),
+		severity: specSchema?.severity || null,
+		projectId: specSchema?.projectId || null,
+		modules: specSchema?.modules ?? null,
+		interfaces: specSchema?.interfaces ?? null,
+		firstFinding: specSchema?.findings?.[0] || null,
+		evidence: 'spec_schema_report.json',
 	},
 	spec: {
 		status: status(spec?.pass),
@@ -213,6 +223,14 @@ if (checks.agentInstructions.status !== 'pass') {
 		action: 'Fix Codex/Claude-facing instructions so agents are forced through project spec, contract, netlist, assembly, local gates, live evidence, and fail-closed apply:gated instead of free-drawing in EasyEDA.',
 		evidence: ['AGENTS.md', 'CLAUDE.md', 'README.md', 'README.en.md', 'agent_instruction_report.json'],
 		observed: checks.agentInstructions.firstFinding || checks.agentInstructions,
+	});
+}
+if (checks.specSchema.status !== 'pass') {
+	pushAction(actions, {
+		area: 'spec-schema',
+		action: 'Fix project_spec.json shape before deriving contracts or editing schematic cells. The spec must be the first valid user-intent input.',
+		evidence: ['project_spec.json', 'spec_schema_report.json'],
+		observed: checks.specSchema.firstFinding || checks.specSchema,
 	});
 }
 if (checks.spec.status !== 'pass') {

@@ -17,7 +17,7 @@ For a new schematic project, do not draw directly in EasyEDA and then hope the g
 
 A PASS on the bundled model only proves that the bundled model passes. It does not validate another project, another schematic, or hand-drawn EasyEDA edits.
 
-`project_spec.json` is the first user-intent input. `project_contract.json` is the required machine contract derived from it. `project_netlist.json` records required electrical endpoints. `circuit_packs/*/cell_manifest.json` declares the deterministic cell capabilities for the selected circuit pack, and `project_assembly.json` maps each contract module to those cells, refs, anchors, nets, and layout policy. Update all of them before changing cells for a new project, then run `npm.cmd run spec`, `npm.cmd run contract`, `npm.cmd run contract:netlist`, `npm.cmd run contract:cells`, `npm.cmd run contract:assembly`, and `npm.cmd run accept`. A failing spec, contract, netlist, cell-manifest, assembly, or layout gate blocks all write-back and delivery claims.
+`project_spec.json` is the first user-intent input. `spec:schema` validates that input before any contract is trusted. `project_contract.json` is the required machine contract derived from it. `project_netlist.json` records required electrical endpoints. `circuit_packs/*/cell_manifest.json` declares the deterministic cell capabilities for the selected circuit pack, and `project_assembly.json` maps each contract module to those cells, refs, anchors, nets, and layout policy. Update all of them before changing cells for a new project, then run `npm.cmd run spec:schema`, `npm.cmd run spec`, `npm.cmd run contract`, `npm.cmd run contract:netlist`, `npm.cmd run contract:cells`, `npm.cmd run contract:assembly`, and `npm.cmd run accept`. A failing spec schema, spec coverage, contract, netlist, cell-manifest, assembly, or layout gate blocks all write-back and delivery claims.
 
 ## Required External Skill
 
@@ -39,6 +39,7 @@ For an existing harnessed project, run these commands from the repository root:
 
 ```powershell
 npm.cmd install
+npm.cmd run spec:schema
 npm.cmd run spec
 npm.cmd run contract
 npm.cmd run contract:netlist
@@ -59,6 +60,7 @@ It also writes `next_actions.json` and `repair_actions.json`. Inspect `next_acti
 Acceptance requires all local gates to pass:
 
 - `spec`: `project_contract.json` covers `project_spec.json`
+- `spec:schema`: `project_spec.json` is a valid first-layer user-intent contract
 - `contract`: `HARD=0 SOFT=0 INFO=0`
 - `contract:netlist`: `project_netlist.json` covers contract nets and generated pin connectivity
 - `contract:cells`: the selected circuit-pack `cell_manifest.json` declares every deterministic cell used by `project_assembly.json` and matches implemented builders

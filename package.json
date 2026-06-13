@@ -13,6 +13,7 @@
     "apply:gated": "node engine/apply_gated.mjs",
     "entrypoints": "node engine/entrypoint_audit.mjs",
     "agent:instructions": "node engine/agent_instruction_gate.mjs",
+    "spec:schema": "node engine/spec_schema_gate.mjs",
     "spec": "node engine/project_spec_gate.mjs",
     "contract": "node engine/project_contract_gate.mjs",
     "contract:cells": "node engine/project_cell_manifest_gate.mjs",

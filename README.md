@@ -15,6 +15,7 @@ EasyEDA Harness 是一套给 Codex、Claude Code 等编程 Agent 使用的原理
 当前模型 PASS 只证明当前模型 PASS，不能证明其它项目、其它原理图或手工绘制结果符合规则。
 
 `project_spec.json` 是用户电路需求的机器输入；`project_contract.json` 是 Agent 从 spec 落下来的设计合同；`project_assembly.json` 把每个合同模块映射到确定性 cell、refs、anchors、nets 和布局策略。`npm run spec` 会检查 spec 已被 contract 覆盖，`npm run contract:assembly`、`npm run contract:layout` 和 `npm run accept` 会继续检查合同、装配清单、布局策略与模型。
+`npm run spec:schema` 会先验证 spec 自身结构，再进入合同覆盖检查。
 
 `project_contract.json` 是 Agent 接手新项目时必须先修改的机器合同，`project_netlist.json` 记录关键网络的必连端点，`circuit_packs/*/cell_manifest.json` 声明所选电路包的确定性 cell 能力，`project_assembly.json` 是随后必须补齐的可执行装配映射和布局策略。`npm run contract`、`npm run contract:netlist`、`npm run contract:cells`、`npm run contract:assembly`、`npm run contract:layout` 和 `npm run accept` 会检查这些文件；未通过时，不应继续写回或声称已完成。
 
@@ -22,6 +23,7 @@ EasyEDA Harness 是一套给 Codex、Claude Code 等编程 Agent 使用的原理
 
 - 确定性原理图组装：`engine/cells.mjs` 定义功能单元，`engine/assemble.mjs` 负责整图拼装。
 - 项目规格门禁：`project_spec.json` 定义用户需求层的模块、网络、接口和质量策略。
+- Spec schema 门禁：`spec:schema` 验证 `project_spec.json` 是合法的第一层用户意图合同。
 - 项目合同门禁：`project_contract.json` 定义模块、关键网络、接口、视觉证据区域和禁止自由绘图策略。
 - 项目网表门禁：`project_netlist.json` 定义关键网络必连引脚，并证明生成模型实际连接这些端点。
 - Cell manifest 门禁：`circuit_packs/*/cell_manifest.json` 在装配前声明电路包 cell 的 ref role、netArg、端口和布局意图。
@@ -99,6 +101,7 @@ Agent 会通过 `apply:gated` 写回 EasyEDA。这个入口会先运行检查；
 
 - 项目合同检查：`project_contract_report.json` 中 `HARD=0 SOFT=0 INFO=0`
 - 项目规格覆盖检查：`project_spec_report.json` 中 `HARD=0 SOFT=0 INFO=0`
+- Spec schema 检查：`spec_schema_report.json` 中 `HARD=0 SOFT=0 INFO=0`
 - 项目规则覆盖检查：`project_rule_report.json` 中 `HARD=0 SOFT=0 INFO=0`
 - 项目网表检查：`project_netlist_report.json` 中 `HARD=0 SOFT=0 INFO=0`
 - Cell manifest 检查：`cell_manifest_report.json` 中 `HARD=0 SOFT=0 INFO=0`
@@ -138,6 +141,7 @@ Agent 会通过 `apply:gated` 写回 EasyEDA。这个入口会先运行检查；
 - `reports/README.md`：生成报告契约说明，包括 `next_actions.json` action schema。
 - `harness/`：统一规则门禁、模型归一化、模块注册。
 - `project_spec.json` / `project_contract.json` / `project_netlist.json` / `project_assembly.json`：用户意图、设计合同、结构化电气端点、可执行装配映射和布局策略。
+- `contracts/spec_schema.mjs`：第一层用户意图输入的可复用 schema 校验。
 - `circuit_packs/*/cell_manifest.json`：电路包确定性 cell 能力合同。
 - `snap2.json`：器件快照输入。
 - `comp_state.json`：器件状态输入，用于写回时保留器件绑定信息。

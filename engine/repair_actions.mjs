@@ -7,6 +7,7 @@ const REPORTS = [
 	{ gate: 'entrypoints', file: 'entrypoint_audit_report.json', rerun: 'npm.cmd run entrypoints' },
 	{ gate: 'agent-instructions', file: 'agent_instruction_report.json', rerun: 'npm.cmd run agent:instructions' },
 	{ gate: 'action-schema', file: 'action_schema_report.json', rerun: 'npm.cmd run action:schema' },
+	{ gate: 'spec-schema', file: 'spec_schema_report.json', rerun: 'npm.cmd run spec:schema' },
 	{ gate: 'project-spec', file: 'project_spec_report.json', rerun: 'npm.cmd run spec' },
 	{ gate: 'project-contract', file: 'project_contract_report.json', rerun: 'npm.cmd run contract' },
 	{ gate: 'project-rules', file: 'project_rule_report.json', rerun: 'npm.cmd run contract:rules' },
@@ -61,6 +62,13 @@ const RULE_PLANS = [
 		inspectFiles: ['next_actions.json', 'action_schema_report.json'],
 		nextCommand: 'npm.cmd run next:actions && npm.cmd run action:schema',
 		repairHint: 'Keep next_actions.json on the stable schema: schemaVersion, mode, normalized checks, action ids, severity/source/title/target, and evidence arrays.',
+	}],
+	[/^SS/, {
+		area: 'spec-schema',
+		editFiles: ['project_spec.json', 'contracts/spec_schema.mjs'],
+		inspectFiles: ['project_spec.json', 'spec_schema_report.json'],
+		nextCommand: 'npm.cmd run spec:schema',
+		repairHint: 'Fix the user-intent spec shape before deriving project_contract.json, project_netlist.json, or project_assembly.json.',
 	}],
 	[/^EA\d|entrypoint/i, {
 		area: 'entrypoints',

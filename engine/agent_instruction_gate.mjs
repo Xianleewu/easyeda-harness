@@ -50,6 +50,7 @@ if (docs['AGENTS.md']) {
 	requireAll(findings, 'AGENTS.md', docs['AGENTS.md'], 'AI1-agent-source-of-truth', [
 		'easyeda-api-skill',
 		'project_spec.json',
+		'spec:schema',
 		'project_contract.json',
 		'project_netlist.json',
 		'project_assembly.json',
@@ -78,6 +79,7 @@ if (docs['CLAUDE.md']) {
 		'AGENTS.md',
 		'easyeda-api-skill',
 		'project_spec.json',
+		'spec:schema',
 		'project_contract.json',
 		'project_netlist.json',
 		'project_assembly.json',
@@ -101,6 +103,7 @@ for (const file of ['README.md', 'README.en.md']) {
 		'easyeda-api-skill',
 		'AGENTS.md',
 		'project_spec.json',
+		'spec:schema',
 		'project_contract.json',
 		'project_netlist.json',
 		'project_assembly.json',
