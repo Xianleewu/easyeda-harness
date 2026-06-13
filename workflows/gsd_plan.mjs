@@ -3,6 +3,7 @@ import { asArray, validateSpecSchema } from '../contracts/spec_schema.mjs';
 import { validateModuleContract } from '../contracts/module_contract.mjs';
 import { validateNetContract } from '../contracts/net_contract.mjs';
 import { validateLibraryContract } from '../contracts/library_contract.mjs';
+import { asArray as cellArray, loadCellManifest, resolveCellManifestPath } from '../engine/cell_manifest.mjs';
 
 function hard(findings, rule, msg, where = {}) {
 	findings.push({ rule, severity: 'hard', category: 'gsd-plan', msg, where });
@@ -107,6 +108,45 @@ function validateSpecRealization(spec, contract, netlist, assembly, model = null
 	return findings;
 }
 
+function validateExecutableCells(assembly, pack) {
+	const findings = [];
+	if (!assembly || !pack) return findings;
+	let manifest = null;
+	let manifestPath = null;
+	try {
+		manifestPath = resolveCellManifestPath(assembly);
+		manifest = loadCellManifest(manifestPath);
+	} catch (e) {
+		hard(findings, 'GP15-cell-manifest-load', 'project_assembly.json must point to a readable cell manifest before generation', {
+			cellManifest: assembly.cellManifest || null,
+			error: e.message,
+		});
+		return findings;
+	}
+	const manifestCells = new Set(cellArray(manifest.cells).map(cell => cell.id).filter(Boolean));
+	const builderCells = new Set(Object.keys(pack.cellBuilders || {}));
+	for (const mod of asArray(assembly.modules)) {
+		if (!manifestCells.has(mod.cell)) {
+			hard(findings, 'GP16-assembly-cell-declared', `${mod.id} uses a cell not declared by the selected cell manifest`, {
+				module: mod.id,
+				cell: mod.cell,
+				manifestPath,
+				manifestCells: [...manifestCells],
+			});
+			continue;
+		}
+		if (!builderCells.has(mod.cell)) {
+			hard(findings, 'GP17-assembly-cell-builder', `${mod.id} uses a cell without an implemented pack builder`, {
+				module: mod.id,
+				cell: mod.cell,
+				circuitPack: pack.id,
+				implementedBuilders: [...builderCells],
+			});
+		}
+	}
+	return findings;
+}
+
 export function buildGsdPlan({ spec, contract, netlist, assembly, libraryManifest = null, model = null, specPath = 'project_spec.json' }) {
 	const findings = [];
 	findings.push(...validateSpecSchema(spec));
@@ -131,6 +171,7 @@ export function buildGsdPlan({ spec, contract, netlist, assembly, libraryManifes
 	} catch (e) {
 		hard(findings, 'GP13-pack-registered', 'spec/assembly circuitPack must be registered', { circuitPack: packId, registeredPacks: circuitPackIds(), error: e.message });
 	}
+	if (assembly && pack) findings.push(...validateExecutableCells(assembly, pack));
 
 	if (contract && netlist && assembly) findings.push(...validateSpecRealization(spec, contract, netlist, assembly, model));
 

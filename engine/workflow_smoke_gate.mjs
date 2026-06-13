@@ -153,6 +153,30 @@ try {
 		observedRules: checks.moduleDrawingRulesRequired.rules,
 	});
 
+	const missingBuilderAssembly = clone(assembly);
+	if (missingBuilderAssembly.modules?.[0]) missingBuilderAssembly.modules[0].cell = 'notImplementedCell';
+	const missingBuilderPlan = buildPlanForFiles({
+		spec,
+		contract,
+		netlist,
+		assembly: missingBuilderAssembly,
+		libraryManifest,
+		specPath: '_tmp_workflow_smoke/missing_builder_project_spec.json',
+	});
+	checks.planRejectsMissingCellBuilder = {
+		pass: !missingBuilderPlan.pass && (hasRule(missingBuilderPlan, 'GP16-assembly-cell-declared') || hasRule(missingBuilderPlan, 'GP17-assembly-cell-builder')),
+		rules: (missingBuilderPlan.findings || []).map(f => f.rule),
+	};
+	assertFinding(
+		findings,
+		checks.planRejectsMissingCellBuilder.pass,
+		'WS22-plan-rejects-missing-cell-builder',
+		'GSD plan must reject assembly cells that are not declared in the active manifest or not implemented by the selected circuit pack before generation runs',
+		{
+			observedRules: checks.planRejectsMissingCellBuilder.rules,
+		},
+	);
+
 	writeFileSync(BAD_SPEC, JSON.stringify(badSpec, null, 2) + '\n', 'utf8');
 	const fullModelPath = `${ROOT}/full_model.json`;
 	const beforeFullModelMtime = fileMtimeMs(fullModelPath);

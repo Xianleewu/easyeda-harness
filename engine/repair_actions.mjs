@@ -170,6 +170,13 @@ const RULE_PLANS = [
 		nextCommand: 'npm.cmd run contract:cells',
 		repairHint: 'Declare deterministic cell capabilities in the selected circuit-pack manifest and keep implemented builders plus project_assembly.json mappings in sync.',
 	}],
+	[/^GP1[5-7]/, {
+		area: 'gsd-plan',
+		editFiles: ['project_assembly.json', 'circuit_packs/<pack>/cell_manifest.json', 'circuit_packs/<pack>/pack.mjs'],
+		inspectFiles: ['gsd_plan_report.json', 'project_assembly.json', 'cell_manifest_report.json'],
+		nextCommand: 'node bin/easyeda-gsd.mjs plan project_spec.json',
+		repairHint: 'Make every assembly cell declared in the selected manifest and implemented by the selected circuit pack before generation runs.',
+	}],
 	[/^PA/, {
 		area: 'project-assembly',
 		editFiles: ['project_assembly.json', 'project_contract.json', 'circuit_packs/aihwdebugger/cell_manifest.json', 'engine/cells.mjs', 'engine/assemble.mjs'],
