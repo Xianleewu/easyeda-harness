@@ -1,5 +1,7 @@
 import { readFileSync, writeFileSync, existsSync } from 'node:fs';
 import { inspectPng, readPngPixels } from './image_gate.mjs';
+import { loadProjectModuleRegistry } from '../harness/module_registry.mjs';
+import { isBundledAihwdebuggerRegistry } from './project_mode.mjs';
 
 const DIR = (process.env.EASYEDA_WORKDIR || process.cwd()).replace(/\\/g, '/') + '/';
 const DEFAULT_RENDER = DIR + 'sheet_output_render.json';
@@ -16,6 +18,21 @@ function hard(findings, rule, msg, where = {}) {
 
 function finite(v) {
 	return typeof v === 'number' && Number.isFinite(v);
+}
+
+function asArray(value) {
+	return Array.isArray(value) ? value : [];
+}
+
+function union(boxes) {
+	const hit = boxes.filter(Boolean);
+	if (!hit.length) return null;
+	return {
+		minX: Math.min(...hit.map(b => b.minX)),
+		minY: Math.min(...hit.map(b => b.minY)),
+		maxX: Math.max(...hit.map(b => b.maxX)),
+		maxY: Math.max(...hit.map(b => b.maxY)),
+	};
 }
 
 function transformForReport(renderReport) {
@@ -189,6 +206,22 @@ function gapY(a, b) {
 	return Number(Math.max(0, b.minY - a.maxY, a.minY - b.maxY).toFixed(3));
 }
 
+function pairGaps(regions) {
+	const gaps = [];
+	for (let i = 0; i < regions.length; i++) {
+		for (let j = i + 1; j < regions.length; j++) {
+			const a = regions[i];
+			const b = regions[j];
+			gaps.push({
+				a: a.name,
+				b: b.name,
+				gap: Number(Math.hypot(Math.max(a.box.minX - b.box.maxX, b.box.minX - a.box.maxX, 0), Math.max(a.box.minY - b.box.maxY, b.box.minY - a.box.maxY, 0)).toFixed(3)),
+			});
+		}
+	}
+	return gaps;
+}
+
 export function measureModuleGridRhythm(renderReport) {
 	if (!Array.isArray(renderReport?.moduleRegions)) return null;
 	const byName = Object.fromEntries(renderReport.moduleRegions.filter(r => r?.name && r?.box).map(r => [r.name, {
@@ -238,7 +271,84 @@ export function measureModuleGridRhythm(renderReport) {
 	};
 }
 
+export function measureProjectColumnRhythm(renderReport, registry = loadProjectModuleRegistry()) {
+	if (!Array.isArray(renderReport?.moduleRegions)) return null;
+	const assembly = registry?.assembly || {};
+	const modules = asArray(registry?.modules);
+	const columns = asArray(assembly?.layoutPolicy?.columns);
+	if (!modules.length || !columns.length) return { missingPolicy: true, modules: modules.length, columns: columns.length };
+	const renderByName = new Map(renderReport.moduleRegions.filter(r => r?.name && r?.box).map(r => [r.name, {
+		name: r.name,
+		box: r.box,
+		center: centerOfBox(r.box),
+		width: boxWidth(r.box),
+		height: boxHeight(r.box),
+		parts: r.parts ?? null,
+	}]));
+	const moduleById = new Map(modules.map(mod => [mod.id || mod.name, mod]));
+	const requiredNames = [...new Set(modules.map(mod => mod.name).filter(Boolean))];
+	const missingModules = requiredNames.filter(name => !renderByName.has(name));
+	const columnSummaries = [];
+	const unknownColumnModules = [];
+	for (const [index, column] of columns.entries()) {
+		const entries = [];
+		for (const moduleId of asArray(column.modules)) {
+			const mod = moduleById.get(moduleId);
+			if (!mod) {
+				unknownColumnModules.push({ column: column.id || `column_${index + 1}`, module: moduleId });
+				continue;
+			}
+			const rendered = renderByName.get(mod.name);
+			entries.push({
+				id: mod.id,
+				name: mod.name,
+				rendered: Boolean(rendered),
+				box: rendered?.box || null,
+				center: rendered?.center || null,
+			});
+		}
+		const box = union(entries.map(entry => entry.box));
+		columnSummaries.push({
+			index,
+			id: column.id || `column_${index + 1}`,
+			role: column.role || '',
+			modules: entries.map(entry => entry.name),
+			missing: entries.filter(entry => !entry.rendered).map(entry => entry.name),
+			box,
+			center: box ? centerOfBox(box) : null,
+		});
+	}
+	const populatedColumns = columnSummaries.filter(col => col.box);
+	const reversedPairs = [];
+	const weakColumnGaps = [];
+	for (let i = 0; i < populatedColumns.length; i++) {
+		for (let j = i + 1; j < populatedColumns.length; j++) {
+			const left = populatedColumns[i];
+			const right = populatedColumns[j];
+			const gap = gapX(left.box, right.box);
+			if (left.center.x >= right.center.x) reversedPairs.push({ left: left.id, right: right.id, leftX: left.center.x, rightX: right.center.x });
+			weakColumnGaps.push({ left: left.id, right: right.id, gap });
+		}
+	}
+	const renderedRegions = requiredNames.map(name => renderByName.get(name)).filter(Boolean);
+	const gaps = pairGaps(renderedRegions);
+	return {
+		mode: 'project-columns',
+		source: registry?.source || null,
+		modules: requiredNames,
+		columns: columnSummaries,
+		missingModules,
+		unknownColumnModules,
+		reversedPairs,
+		weakColumnGaps,
+		minModuleGap: gaps.length ? Number(Math.min(...gaps.map(g => g.gap)).toFixed(3)) : null,
+		gaps,
+	};
+}
+
 export function auditSheetOutput(renderReport, imagePath = DEFAULT_IMAGE, opts = {}) {
+	const layoutRegistry = opts.layoutRegistry || loadProjectModuleRegistry();
+	const moduleGridRhythmMode = opts.moduleGridRhythmMode || (isBundledAihwdebuggerRegistry(layoutRegistry) ? 'aihwdebugger' : 'project-columns');
 	const cfg = {
 		minWidth: opts.minWidth ?? 1800,
 		minHeight: opts.minHeight ?? 1000,
@@ -274,8 +384,12 @@ export function auditSheetOutput(renderReport, imagePath = DEFAULT_IMAGE, opts =
 		maxRepeatedModuleInkDelta: opts.maxRepeatedModuleInkDelta ?? 0.015,
 		minTileActiveRatio: opts.minTileActiveRatio ?? 0.50,
 		maxTileEmptyRun: opts.maxTileEmptyRun ?? 1,
+		layoutRegistry,
+		moduleGridRhythmMode,
 		maxInputColumnSkew: opts.maxInputColumnSkew ?? 80,
 		minMainColumnGap: opts.minMainColumnGap ?? 80,
+		minProjectColumnGap: opts.minProjectColumnGap ?? 40,
+		minProjectModuleGap: opts.minProjectModuleGap ?? 20,
 		maxOutputStackXDelta: opts.maxOutputStackXDelta ?? 10,
 		maxOutputStackSizeDelta: opts.maxOutputStackSizeDelta ?? 10,
 		minOutputStackGap: opts.minOutputStackGap ?? 35,
@@ -481,13 +595,42 @@ export function auditSheetOutput(renderReport, imagePath = DEFAULT_IMAGE, opts =
 					});
 				}
 			}
-			moduleGridRhythm = measureModuleGridRhythm(renderReport);
+			moduleGridRhythm = cfg.moduleGridRhythmMode === 'project-columns'
+				? measureProjectColumnRhythm(renderReport, cfg.layoutRegistry)
+				: measureModuleGridRhythm(renderReport);
 			if (cfg.requireModuleGridRhythm === false) {
 				// Generic projects may use arbitrary module names; fixed USB/MCU/relay rhythm is checked only for the bundled reference pack.
 			} else if (!moduleGridRhythm || (moduleGridRhythm.missing || []).length) {
 				hard(findings, 'SO32-module-grid-rhythm-measurement', 'sheet-output must expose measurable module row/column rhythm evidence', {
 					missing: moduleGridRhythm?.missing || [],
 				});
+			} else if (cfg.moduleGridRhythmMode === 'project-columns') {
+				if (moduleGridRhythm.missingPolicy || moduleGridRhythm.missingModules.length || moduleGridRhythm.unknownColumnModules.length) {
+					hard(findings, 'SO32-module-grid-rhythm-measurement', 'sheet-output must expose every project assembly module in its declared layoutPolicy.columns rhythm', {
+						source: moduleGridRhythm.source,
+						missingPolicy: moduleGridRhythm.missingPolicy || false,
+						missingModules: moduleGridRhythm.missingModules,
+						unknownColumnModules: moduleGridRhythm.unknownColumnModules,
+					});
+				}
+				const weakColumnGaps = moduleGridRhythm.weakColumnGaps.filter(gap => gap.gap < cfg.minProjectColumnGap);
+				if (moduleGridRhythm.reversedPairs.length || weakColumnGaps.length) {
+					hard(findings, 'SO33-module-column-reading-order', 'sheet-output modules must follow the project_assembly.json layoutPolicy.columns reading order', {
+						source: moduleGridRhythm.source,
+						columns: moduleGridRhythm.columns.map(col => ({ id: col.id, modules: col.modules, center: col.center })),
+						reversedPairs: moduleGridRhythm.reversedPairs,
+						weakColumnGaps,
+						minProjectColumnGap: cfg.minProjectColumnGap,
+					});
+				}
+				if (moduleGridRhythm.minModuleGap != null && moduleGridRhythm.minModuleGap < cfg.minProjectModuleGap) {
+					hard(findings, 'SO11-module-region-gap', 'sheet-output project module regions are too close and may read as interlocking blocks', {
+						source: moduleGridRhythm.source,
+						minModuleGap: moduleGridRhythm.minModuleGap,
+						required: cfg.minProjectModuleGap,
+						gaps: moduleGridRhythm.gaps,
+					});
+				}
 			} else {
 				const weakColumnGaps = [
 					{ name: 'input-to-mcu', gap: moduleGridRhythm.inputToMcuGap },

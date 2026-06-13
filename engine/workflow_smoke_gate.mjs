@@ -7,6 +7,7 @@ import { writeScaffold } from '../workflows/gsd_scaffold.mjs';
 import { buildMinimalSpec, syncPackRegistry, writePackScaffold } from '../workflows/pack_scaffold.mjs';
 import { validateLibraryContract } from '../contracts/library_contract.mjs';
 import { buildAnchorFamily } from './layout_planner.mjs';
+import { measureProjectColumnRhythm } from './sheet_output_gate.mjs';
 import { computeStructureMetricsFromSnapshot } from './structure_metrics.mjs';
 import { auditPageComposition } from './page_composition.mjs';
 import { inferModuleRegions } from './sheet_renderer.mjs';
@@ -930,6 +931,60 @@ try {
 			stderr: genericRuleGate.stderr,
 			report: checks.genericProjectRules,
 		},
+	);
+
+	const genericColumnRegistry = {
+		source: `${GENERIC_RULE_DIR}/project_assembly.json`,
+		assembly: {
+			projectId: 'workflow-smoke-generic-sheet',
+			circuitPack: CUSTOM_PACK,
+			layoutPolicy: {
+				columns: [
+					{ id: 'sensor', modules: ['sensor_frontend'] },
+					{ id: 'processor', modules: ['processor_core'] },
+					{ id: 'output', modules: ['load_output'] },
+				],
+			},
+		},
+		modules: [
+			{ id: 'sensor_frontend', name: 'sensor_frontend', refs: ['U99'] },
+			{ id: 'processor_core', name: 'processor_core', refs: ['U100'] },
+			{ id: 'load_output', name: 'load_output', refs: ['Q99'] },
+		],
+	};
+	const genericSheetRhythm = measureProjectColumnRhythm({
+		moduleRegions: [
+			{ name: 'sensor_frontend', box: { minX: 100, minY: 100, maxX: 190, maxY: 190 } },
+			{ name: 'processor_core', box: { minX: 270, minY: 100, maxX: 360, maxY: 190 } },
+			{ name: 'load_output', box: { minX: 445, minY: 100, maxX: 535, maxY: 190 } },
+		],
+	}, genericColumnRegistry);
+	const reversedGenericSheetRhythm = measureProjectColumnRhythm({
+		moduleRegions: [
+			{ name: 'sensor_frontend', box: { minX: 445, minY: 100, maxX: 535, maxY: 190 } },
+			{ name: 'processor_core', box: { minX: 270, minY: 100, maxX: 360, maxY: 190 } },
+			{ name: 'load_output', box: { minX: 100, minY: 100, maxX: 190, maxY: 190 } },
+		],
+	}, genericColumnRegistry);
+	checks.genericSheetOutputColumns = {
+		mode: genericSheetRhythm?.mode || null,
+		source: genericSheetRhythm?.source || null,
+		modules: genericSheetRhythm?.modules || [],
+		reversedPairs: genericSheetRhythm?.reversedPairs || [],
+		reversedFailurePairs: reversedGenericSheetRhythm?.reversedPairs || [],
+		usesBundledNames: (genericSheetRhythm?.modules || []).some(name => ['usb', 'ldo', 'mcu', 'pmos', 'relay1', 'relay2'].includes(name)),
+	};
+	assertFinding(
+		findings,
+		genericSheetRhythm?.mode === 'project-columns'
+			&& genericSheetRhythm?.missingModules.length === 0
+			&& genericSheetRhythm?.unknownColumnModules.length === 0
+			&& genericSheetRhythm?.reversedPairs.length === 0
+			&& reversedGenericSheetRhythm?.reversedPairs.length > 0
+			&& checks.genericSheetOutputColumns.usesBundledNames === false,
+		'WS46-sheet-output-uses-project-columns',
+		'sheet-output review rhythm for external projects must use project_assembly.json layoutPolicy.columns instead of fixed USB/MCU/relay module names',
+		checks.genericSheetOutputColumns,
 	);
 
 	const customPackReport = writePackScaffold({ root: ROOT, packId: CUSTOM_PACK });
