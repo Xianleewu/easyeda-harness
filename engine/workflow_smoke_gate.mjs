@@ -36,6 +36,8 @@ const BAD_MANIFEST_ASSEMBLY = `${TMP_DIR}/bad_manifest_project_assembly.json`;
 const GENERIC_RULE_DIR = `${TMP_DIR}/generic_rule_project`;
 const CUSTOM_PACK = 'workflow_smoke_pack';
 const CUSTOM_PACK_DIR = `${ROOT}/circuit_packs/${CUSTOM_PACK}`;
+const BAD_BUILDER_PACK = 'workflow_bad_builder_pack';
+const BAD_BUILDER_PACK_DIR = `${ROOT}/circuit_packs/${BAD_BUILDER_PACK}`;
 
 process.on('exit', () => LOCK.release());
 process.on('SIGINT', () => {
@@ -1057,6 +1059,129 @@ try {
 		checks.genericSheetOutputColumns,
 	);
 
+	const badBuilderPackId = BAD_BUILDER_PACK;
+	const badBuilderPackDir = BAD_BUILDER_PACK_DIR;
+	mkdirSync(badBuilderPackDir, { recursive: true });
+	writeFileSync(`${badBuilderPackDir}/pack.mjs`, `export const fallbackAnchors = {};
+export const cellBuilders = {
+\tbadCell() {
+\t\treturn {
+\t\t\tplace: { U99: { x: 100, y: 100, rot: 0, mirror: false } },
+\t\t\twires: [{ net: 'UNDECLARED', line: [100, 100, 130, 140] }],
+\t\t\tflags: [{ kind: 'sig', content: 'TEXT_ONLY' }],
+\t\t};
+\t},
+};
+export function normalizeLibrarySnapshot(snap) { return snap; }
+export const pack = { id: '${badBuilderPackId}', fallbackAnchors, cellBuilders, normalizeLibrarySnapshot };
+`, 'utf8');
+	writeFileSync(`${badBuilderPackDir}/cell_manifest.json`, JSON.stringify({
+		schemaVersion: 1,
+		packId: badBuilderPackId,
+		purpose: 'Bad builder smoke manifest.',
+		requiredQualityRules: [
+			'orthogonal-wiring',
+			'real-net-labels',
+			'text-clearance',
+			'module-box-isolation',
+			'no-fake-net-text',
+			'no-unnecessary-net-ports',
+		],
+		cells: [{
+			id: 'badCell',
+			moduleType: 'bad_builder_smoke',
+			refs: ['U'],
+			netArgs: [],
+			ports: ['SENSE_OUT', 'GND'],
+			layoutIntent: 'deliberately invalid builder output',
+			qualityRules: [
+				'orthogonal-wiring',
+				'real-net-labels',
+				'text-clearance',
+				'module-box-isolation',
+				'no-fake-net-text',
+				'no-unnecessary-net-ports',
+			],
+		}],
+	}, null, 2) + '\n', 'utf8');
+	syncPackRegistry(ROOT);
+	const badBuilderSpec = {
+		schemaVersion: 1,
+		projectId: 'workflow-bad-builder',
+		intent: 'Bad builder contract smoke.',
+		circuitPack: badBuilderPackId,
+		modules: [{ id: 'sensor_frontend', title: 'Sensor Frontend', requiredNets: ['SENSE_OUT', 'GND'] }],
+		interfaces: [],
+	};
+	const badBuilderContract = {
+		...genericContract,
+		projectId: badBuilderSpec.projectId,
+		modules: [{
+			...genericContract.modules[0],
+			requiredParts: ['U99'],
+			drawingRules: [
+				'orthogonal-wiring',
+				'real-net-labels',
+				'text-clearance',
+				'module-box-isolation',
+				'no-fake-net-text',
+				'no-unnecessary-net-ports',
+			],
+		}],
+	};
+	const badBuilderAssembly = {
+		...genericAssembly,
+		projectId: badBuilderSpec.projectId,
+		circuitPack: badBuilderPackId,
+		cellManifest: `../../circuit_packs/${badBuilderPackId}/cell_manifest.json`,
+		layoutPolicy: {
+			...genericAssembly.layoutPolicy,
+			xProfiles: [{ sensorX: 300 }],
+		},
+		modules: [{
+			...genericAssembly.modules[0],
+			cell: 'badCell',
+			refs: { U: 'U99' },
+			nets: ['SENSE_OUT', 'GND'],
+		}],
+	};
+	const badBuilderDir = `${TMP_DIR}/bad_builder`;
+	mkdirSync(badBuilderDir, { recursive: true });
+	writeFileSync(`${badBuilderDir}/project_spec.json`, JSON.stringify(badBuilderSpec, null, 2) + '\n', 'utf8');
+	writeFileSync(`${badBuilderDir}/project_contract.json`, JSON.stringify(badBuilderContract, null, 2) + '\n', 'utf8');
+	writeFileSync(`${badBuilderDir}/project_netlist.json`, JSON.stringify({ schemaVersion: 1, projectId: badBuilderSpec.projectId, nets: [{ name: 'SENSE_OUT', requiredPins: [] }, { name: 'GND', requiredPins: [] }] }, null, 2) + '\n', 'utf8');
+	writeFileSync(`${badBuilderDir}/project_assembly.json`, JSON.stringify(badBuilderAssembly, null, 2) + '\n', 'utf8');
+	writeFileSync(`${badBuilderDir}/approved_library_manifest.json`, JSON.stringify({
+		purpose: 'Bad builder contract smoke.',
+		parts: { U99: { Symbol: 'S', Device: 'D', Footprint: 'F', name: 'U99', value: 'IC', addIntoBom: true, addIntoPcb: true } },
+	}, null, 2) + '\n', 'utf8');
+	writeFileSync(`${badBuilderDir}/project_library_snapshot.json`, JSON.stringify({ project: badBuilderSpec.projectId, components: [{ designator: 'U99', x: 0, y: 0, rotation: 0, mirror: false, bbox: { minX: -5, minY: -5, maxX: 5, maxY: 5 }, pins: [] }] }, null, 2) + '\n', 'utf8');
+	const badBuilderPlanCli = spawnSync(process.execPath, ['bin/easyeda-gsd.mjs', 'plan', '_tmp_workflow_smoke/bad_builder/project_spec.json'], {
+		cwd: ROOT,
+		stdio: 'pipe',
+		shell: false,
+		env: { ...process.env, EASYEDA_GSD_LOCK_TOKEN: LOCK.token },
+		encoding: 'utf8',
+	});
+	const badBuilderPlan = existsSync(`${ROOT}/gsd_plan_report.json`) ? readJson(`${ROOT}/gsd_plan_report.json`) : null;
+	checks.badBuilderDryRunRejected = {
+		status: badBuilderPlanCli.status,
+		pass: badBuilderPlan?.pass ?? null,
+		rules: (badBuilderPlan?.findings || []).map(f => f.rule),
+		firstFinding: badBuilderPlan?.findings?.[0] || null,
+	};
+	assertFinding(
+		findings,
+		badBuilderPlanCli.status !== 0
+			&& badBuilderPlan?.pass === false
+			&& hasRule(badBuilderPlan, 'CB8-wire-orthogonal')
+			&& hasRule(badBuilderPlan, 'CB10-flag-shape')
+			&& hasRule(badBuilderPlan, 'CB13-output-nets-declared'),
+		'WS48-cell-builder-output-contract',
+		'GSD plan must dry-run implemented cell builders and reject non-orthogonal wires, fake labels, or undeclared output nets before generation',
+		checks.badBuilderDryRunRejected,
+	);
+
 	const customPackReport = writePackScaffold({ root: ROOT, packId: CUSTOM_PACK });
 	const customSpec = buildMinimalSpec(CUSTOM_PACK);
 	const customDir = `${TMP_DIR}/custom_project`;
@@ -1594,6 +1719,7 @@ try {
 } finally {
 	rmSync(TMP_DIR, { recursive: true, force: true });
 	rmSync(CUSTOM_PACK_DIR, { recursive: true, force: true });
+	rmSync(BAD_BUILDER_PACK_DIR, { recursive: true, force: true });
 	try { syncPackRegistry(ROOT); } catch {}
 }
 

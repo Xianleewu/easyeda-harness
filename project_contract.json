@@ -109,6 +109,10 @@
       "requiredNets": [
         "EXT_PWR_EN",
         "PMOS_GATE",
+        "VIN_12_19V",
+        "VOUT_SW",
+        "PGATE_PULL",
+        "Q2_GATE",
         "SYS_5V",
         "GND"
       ],

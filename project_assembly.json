@@ -152,7 +152,7 @@
       "cell": "pmosCell",
       "anchor": "pmos",
       "refs": { "Q1": "Q1", "Q2": "Q2", "D1": "D1", "R1": "R1", "R2": "R2", "R3": "R3", "R4": "R4", "CN1": "CN1", "CN2": "CN2" },
-      "nets": ["EXT_PWR_EN", "PMOS_GATE", "SYS_5V", "GND"]
+      "nets": ["EXT_PWR_EN", "PMOS_GATE", "VIN_12_19V", "VOUT_SW", "PGATE_PULL", "Q2_GATE", "SYS_5V", "GND"]
     },
     {
       "id": "relay1",

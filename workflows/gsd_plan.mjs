@@ -4,7 +4,9 @@ import { validateModuleContract } from '../contracts/module_contract.mjs';
 import { validateNetContract } from '../contracts/net_contract.mjs';
 import { validateLibraryContract } from '../contracts/library_contract.mjs';
 import { validateDrawingRuleBindings } from '../contracts/drawing_rule_registry.mjs';
+import { validateCellBuilderDryRun } from '../contracts/cell_builder_contract.mjs';
 import { asArray as cellArray, cellContractMap, loadCellManifest, resolveCellManifestPath } from '../engine/cell_manifest.mjs';
+import { withLocalPins } from '../engine/transform.mjs';
 import { HARNESS_RULES } from '../harness/rule_registry.mjs';
 
 function hard(findings, rule, msg, where = {}) {
@@ -183,7 +185,7 @@ function validateSpecRealization(spec, contract, netlist, assembly, model = null
 	return findings;
 }
 
-function validateExecutableCells(assembly, pack, assemblyPath = '') {
+function validateExecutableCells(assembly, pack, assemblyPath = '', partLibSnapshot = null) {
 	const findings = [];
 	if (!assembly || !pack) return findings;
 	let manifest = null;
@@ -244,6 +246,11 @@ function validateExecutableCells(assembly, pack, assemblyPath = '') {
 				}
 			}
 		}
+	}
+	if (partLibSnapshot) {
+		const normalized = pack.normalizeLibrarySnapshot ? pack.normalizeLibrarySnapshot(JSON.parse(JSON.stringify(partLibSnapshot))) : partLibSnapshot;
+		const byDes = new Map(cellArray(normalized?.components).map(c => [c.designator, withLocalPins(c)]));
+		findings.push(...validateCellBuilderDryRun({ assembly, manifest, pack, byDes }).map(f => ({ ...f, category: 'gsd-plan' })));
 	}
 	return findings;
 }
@@ -341,7 +348,7 @@ export function buildGsdPlan({ spec, contract, netlist, assembly, libraryManifes
 	} catch (e) {
 		hard(findings, 'GP13-pack-registered', 'spec/assembly circuitPack must be registered', { circuitPack: packId, registeredPacks: circuitPackIds(), error: e.message });
 	}
-	if (assembly && pack) findings.push(...validateExecutableCells(assembly, pack, assemblyPath));
+	if (assembly && pack) findings.push(...validateExecutableCells(assembly, pack, assemblyPath, partLibSnapshot));
 	if (contract && assembly) findings.push(...validateExecutableDrawingRules(contract, assembly, assemblyPath));
 	findings.push(...validatePartLibrarySnapshot(contract, partLibSnapshot, partLibPath));
 

@@ -1,9 +1,12 @@
 import { existsSync, writeFileSync } from 'node:fs';
 import { asArray, cellContractMap, loadCellManifest, readJson, resolveCellManifestPath } from './cell_manifest.mjs';
+import { withLocalPins } from './transform.mjs';
 import { getCircuitPack } from '../circuit_packs/registry.mjs';
+import { validateCellBuilderDryRun } from '../contracts/cell_builder_contract.mjs';
 
 const DIR = (process.env.EASYEDA_WORKDIR || process.cwd()).replace(/\\/g, '/') + '/';
 const ASSEMBLY = process.env.EASYEDA_PROJECT_ASSEMBLY || DIR + 'project_assembly.json';
+const PART_LIB = process.env.EASYEDA_PART_LIB || DIR + 'snap2.json';
 const REPORT = process.env.EASYEDA_CELL_MANIFEST_REPORT || DIR + 'cell_manifest_report.json';
 
 function hard(findings, rule, msg, where = {}) {
@@ -103,7 +106,21 @@ if (assembly) {
 		try { manifest = loadCellManifest(manifestPath); } catch (e) { hard(findings, 'CM0-manifest-parse', 'cell manifest must parse as JSON', { path: manifestPath, error: e.message }); }
 	}
 }
-if (manifest && assembly && pack) findings.push(...validateManifest(manifest, assembly, manifestPath, pack));
+let partLib = null;
+let byDes = null;
+if (existsSync(PART_LIB)) {
+	try {
+		partLib = readJson(PART_LIB);
+		const normalized = pack?.normalizeLibrarySnapshot ? pack.normalizeLibrarySnapshot(partLib) : partLib;
+		byDes = new Map(asArray(normalized?.components).map(c => [c.designator, withLocalPins(c)]));
+	} catch (e) {
+		hard(findings, 'CM0-part-lib-parse', 'active part library snapshot must parse before cell builder dry-run', { path: PART_LIB, error: e.message });
+	}
+}
+if (manifest && assembly && pack) {
+	findings.push(...validateManifest(manifest, assembly, manifestPath, pack));
+	findings.push(...validateCellBuilderDryRun({ assembly, manifest, pack, byDes }));
+}
 
 const report = {
 	generatedAt: new Date().toISOString(),
@@ -115,6 +132,7 @@ const report = {
 	cellCount: asArray(manifest?.cells).length,
 	implementedBuilders: Object.keys(pack?.cellBuilders || {}),
 	assemblyCells: unique(asArray(assembly?.modules).map(mod => mod.cell)),
+	partLib: PART_LIB,
 	findings,
 };
 
