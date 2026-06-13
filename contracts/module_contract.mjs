@@ -40,12 +40,24 @@ export function validateModuleContract(contract, options = {}) {
 	const modules = asArray(contract.modules);
 	if (!modules.length) hard(findings, 'PC8-modules-present', 'project contract must define at least one functional module', {}, category);
 	const moduleIds = new Set();
+	const partOwners = new Map();
 	for (const [index, mod] of modules.entries()) {
 		if (!mod?.id) hard(findings, 'PC9-module-id', 'module needs id', { index }, category);
 		else if (moduleIds.has(mod.id)) hard(findings, 'PC10-module-id-unique', `duplicate module id: ${mod.id}`, { id: mod.id }, category);
 		else moduleIds.add(mod.id);
 		if (!mod?.title) hard(findings, 'PC11-module-title', 'module needs readable title', { module: mod?.id || index }, category);
 		if (!asArray(mod?.requiredParts).length) hard(findings, 'PC12-module-parts', 'module needs requiredParts', { module: mod?.id || index }, category);
+		for (const ref of asArray(mod?.requiredParts)) {
+			if (partOwners.has(ref)) {
+				hard(findings, 'PC28-required-part-owned-once', 'each physical designator in requiredParts must belong to exactly one contract module', {
+					designator: ref,
+					firstModule: partOwners.get(ref),
+					duplicateModule: mod?.id || index,
+				}, category);
+			} else {
+				partOwners.set(ref, mod?.id || index);
+			}
+		}
 		if (!asArray(mod?.requiredNets).length) hard(findings, 'PC13-module-nets', 'module needs requiredNets', { module: mod?.id || index }, category);
 		if (!mod?.visualEvidence) hard(findings, 'PC14-module-evidence', 'module needs visualEvidence region id', { module: mod?.id || index }, category);
 		const drawingRules = new Set(asArray(mod?.drawingRules));

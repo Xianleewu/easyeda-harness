@@ -31,6 +31,7 @@ function validateAssembly(contract, assembly, cellContracts) {
 	const contractModules = new Map(asArray(contract.modules).map(mod => [mod.id, mod]));
 	const assemblyModules = new Map(asArray(assembly.modules).map(mod => [mod.id, mod]));
 	const anchors = assembly.anchors || {};
+	const refOwners = new Map();
 
 	if (assembly.projectId !== contract.projectId) {
 		hard(findings, 'PA1-project-id-match', 'project_assembly.json projectId must match project_contract.json', {
@@ -74,6 +75,18 @@ function validateAssembly(contract, assembly, cellContracts) {
 		if (unknownRefKeys.length) hard(findings, 'PA8-cell-ref-roles-known', `${id} assembly has ref roles not accepted by ${mapping.cell}`, { module: id, cell: mapping.cell, unknownRefKeys });
 
 		const mappedRefs = new Set(values(mapping.refs));
+		for (const [role, ref] of Object.entries(mapping.refs || {})) {
+			if (!ref) continue;
+			if (refOwners.has(ref)) {
+				hard(findings, 'PA21-ref-owned-once', 'each physical designator in project_assembly.json refs must belong to exactly one assembly module', {
+					designator: ref,
+					first: refOwners.get(ref),
+					duplicate: { module: id, role },
+				});
+			} else {
+				refOwners.set(ref, { module: id, role });
+			}
+		}
 		const requiredParts = new Set(asArray(mod.requiredParts));
 		const missingParts = [...requiredParts].filter(ref => !mappedRefs.has(ref));
 		const staleRefs = [...mappedRefs].filter(ref => !requiredParts.has(ref));

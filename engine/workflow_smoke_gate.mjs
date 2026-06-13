@@ -152,6 +152,29 @@ try {
 		});
 	}
 
+	const duplicatePartContract = clone(contract);
+	if (duplicatePartContract.modules?.[0] && duplicatePartContract.modules?.[1]) {
+		const firstPart = duplicatePartContract.modules[0].requiredParts?.[0];
+		duplicatePartContract.modules[1].requiredParts = [...(duplicatePartContract.modules[1].requiredParts || []), firstPart];
+	}
+	const duplicatePartPlan = buildPlanForFiles({
+		spec,
+		contract: duplicatePartContract,
+		netlist,
+		assembly,
+		libraryManifest,
+		specPath: '_tmp_workflow_smoke/duplicate_required_part_project_spec.json',
+	});
+	checks.contractPartsOwnedOnce = {
+		pass: !duplicatePartPlan.pass && hasRule(duplicatePartPlan, 'PC28-required-part-owned-once'),
+		rules: (duplicatePartPlan.findings || []).map(f => f.rule),
+		firstFinding: duplicatePartPlan.findings?.[0] || null,
+	};
+	assertFinding(findings, checks.contractPartsOwnedOnce.pass, 'WS35-contract-required-parts-owned-once', 'GSD plan must reject project contracts that assign the same physical designator to more than one module', {
+		observedRules: checks.contractPartsOwnedOnce.rules,
+		firstFinding: checks.contractPartsOwnedOnce.firstFinding,
+	});
+
 	const noColumnsAssembly = clone(assembly);
 	delete noColumnsAssembly.layoutPolicy.columns;
 	const noColumnsPlan = buildPlanForFiles({
@@ -208,6 +231,35 @@ try {
 	assertFinding(findings, checks.layoutColumnsFollowAnchorOrder.pass, 'WS34-layout-columns-follow-anchor-order', 'GSD plan must reject layout policies whose declared reading-flow columns contradict module anchor X order', {
 		observedRules: checks.layoutColumnsFollowAnchorOrder.rules,
 		firstFinding: checks.layoutColumnsFollowAnchorOrder.firstFinding,
+	});
+
+	const duplicateRefAssembly = clone(assembly);
+	if (duplicateRefAssembly.modules?.[0] && duplicateRefAssembly.modules?.[1]) {
+		const firstRef = Object.values(duplicateRefAssembly.modules[0].refs || {})[0];
+		const firstRole = Object.keys(duplicateRefAssembly.modules[1].refs || {})[0];
+		if (firstRef && firstRole) duplicateRefAssembly.modules[1].refs[firstRole] = firstRef;
+	}
+	writeFileSync(`${TMP_DIR}/duplicate_ref_assembly.json`, JSON.stringify(duplicateRefAssembly, null, 2) + '\n', 'utf8');
+	const duplicateRefGate = spawnSync(process.execPath, ['engine/project_assembly_gate.mjs'], {
+		cwd: ROOT,
+		stdio: 'pipe',
+		shell: false,
+		env: {
+			...process.env,
+			EASYEDA_PROJECT_ASSEMBLY: `${TMP_DIR}/duplicate_ref_assembly.json`,
+			EASYEDA_PROJECT_ASSEMBLY_REPORT: `${TMP_DIR}/duplicate_ref_assembly_report.json`,
+		},
+		encoding: 'utf8',
+	});
+	const duplicateRefReport = existsSync(`${TMP_DIR}/duplicate_ref_assembly_report.json`) ? readJson(`${TMP_DIR}/duplicate_ref_assembly_report.json`) : null;
+	checks.assemblyRefsOwnedOnce = {
+		status: duplicateRefGate.status,
+		pass: duplicateRefReport?.pass ?? null,
+		rules: (duplicateRefReport?.findings || []).map(f => f.rule),
+		firstFinding: duplicateRefReport?.findings?.[0] || null,
+	};
+	assertFinding(findings, duplicateRefGate.status !== 0 && (duplicateRefReport?.findings || []).some(f => f.rule === 'PA21-ref-owned-once'), 'WS36-assembly-refs-owned-once', 'project assembly gate must reject refs that map the same physical designator into more than one module', {
+		report: checks.assemblyRefsOwnedOnce,
 	});
 
 	const noDrawingRulesContract = clone(contract);
