@@ -145,6 +145,7 @@ Agent 会通过 `apply:gated` 写回 EasyEDA。这个入口会先运行检查；
 - `harness/`：统一规则门禁、模型归一化、模块注册。
 - `project_spec.json` / `project_contract.json` / `project_netlist.json` / `project_assembly.json`：用户意图、设计合同、结构化电气端点、可执行装配映射和布局策略。
 - `contracts/spec_schema.mjs`：第一层用户意图输入的可复用 schema 校验。
+- `contracts/module_contract.mjs` / `contracts/net_contract.mjs` / `contracts/layout_contract.mjs`：功能模块、电气端点意图和项目驱动布局策略的可复用校验器。
 - `circuit_packs/*/cell_manifest.json`：电路包确定性 cell 能力合同。
 - `circuit_packs/*/pack.mjs`：电路包生成 hook 和器件库归一化。
 - `snap2.json`：器件快照输入。

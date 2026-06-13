@@ -145,6 +145,7 @@ For handoff, review the global sheet and local crops for USB, LDO, RESET, BOOT, 
 - `harness/`: normalized model, module registry, and rule gates.
 - `project_spec.json` / `project_contract.json` / `project_netlist.json` / `project_assembly.json`: user intent, design contract, structured electrical endpoints, executable assembly mapping, and layout policy.
 - `contracts/spec_schema.mjs`: reusable schema validation for the first user-intent input.
+- `contracts/module_contract.mjs` / `contracts/net_contract.mjs` / `contracts/layout_contract.mjs`: reusable validators for functional modules, electrical endpoint intent, and project-driven layout policy.
 - `circuit_packs/*/cell_manifest.json`: circuit-pack deterministic cell capability contracts.
 - `circuit_packs/*/pack.mjs`: circuit-pack generation hooks and library normalization.
 - `snap2.json`: component snapshot input.

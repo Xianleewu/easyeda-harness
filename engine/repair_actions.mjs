@@ -87,8 +87,8 @@ const RULE_PLANS = [
 	}],
 	[/^PC/, {
 		area: 'project-contract',
-		editFiles: ['project_contract.json'],
-		inspectFiles: ['project_spec.json', 'project_contract_report.json'],
+		editFiles: ['project_contract.json', 'contracts/module_contract.mjs'],
+		inspectFiles: ['project_spec.json', 'project_contract_report.json', 'contracts/module_contract.mjs'],
 		nextCommand: 'npm.cmd run contract',
 		repairHint: 'Fix the machine contract: modules, required parts/nets, interfaces, visual evidence, and no-free-draw policy.',
 	}],
@@ -136,8 +136,8 @@ const RULE_PLANS = [
 	}],
 	[/^PL/, {
 		area: 'project-layout',
-		editFiles: ['project_assembly.json', 'engine/layout_planner.mjs'],
-		inspectFiles: ['layout_planner_report.json', 'layout_planner_structure.json', 'project_layout_report.json'],
+		editFiles: ['project_assembly.json', 'engine/layout_planner.mjs', 'contracts/layout_contract.mjs'],
+		inspectFiles: ['layout_planner_report.json', 'layout_planner_structure.json', 'project_layout_report.json', 'contracts/layout_contract.mjs'],
 		nextCommand: 'npm.cmd run pipeline && npm.cmd run contract:layout',
 		repairHint: 'Fix project_assembly.json layoutPolicy or planner consumption until candidate source, module gaps, interlocks, and wire intrusions pass.',
 	}],
@@ -150,8 +150,8 @@ const RULE_PLANS = [
 	}],
 	[/^PN/, {
 		area: 'project-netlist',
-		editFiles: ['project_netlist.json', 'project_contract.json', 'engine/cells.mjs', 'engine/connectivity_qc.mjs'],
-		inspectFiles: ['project_netlist_report.json', 'full_model.json', 'project_contract.json'],
+		editFiles: ['project_netlist.json', 'project_contract.json', 'contracts/net_contract.mjs', 'engine/cells.mjs', 'engine/connectivity_qc.mjs'],
+		inspectFiles: ['project_netlist_report.json', 'full_model.json', 'project_contract.json', 'contracts/net_contract.mjs'],
 		nextCommand: 'npm.cmd run fast && npm.cmd run contract:netlist',
 		repairHint: 'Make structured electrical intent explicit in project_netlist.json and ensure generated pins resolve to the required named nets.',
 	}],
