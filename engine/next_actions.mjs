@@ -30,6 +30,10 @@ function ruleMatches(finding, pattern) {
 	return pattern.test(finding?.rule || '');
 }
 
+function hasActionArea(actions, area) {
+	return actions.some(action => action.area === area);
+}
+
 function normalizePath(path) {
 	return String(path || '').replace(/\\/g, '/');
 }
@@ -341,6 +345,33 @@ if (checks.gsdPlan.status !== 'pass') {
 			editFiles: ['contracts/drawing_rule_registry.mjs', 'harness/rule_registry.mjs', 'project_contract.json', 'circuit_packs/<pack>/cell_manifest.json'],
 			nextCommand: 'node bin/easyeda-gsd.mjs plan project_spec.json',
 		});
+	} else if (ruleMatches(finding, /^GP6|^PC12/)) {
+		pushAction(actions, {
+			area: 'module-contract-bootstrap',
+			action: 'Fill the module contract from the user intent before drawing. Each module needs concrete requiredParts, requiredNets, drawingRules, visualEvidence, and matching structured netlist endpoints.',
+			evidence: ['gsd_plan_report.json', 'project_spec.json', 'project_contract.json', 'project_netlist.json'],
+			observed: finding,
+			editFiles: ['project_spec.json', 'project_contract.json', 'project_netlist.json'],
+			nextCommand: 'node bin/easyeda-gsd.mjs plan project_spec.json',
+		});
+	} else if (ruleMatches(finding, /^GP8|^GP1[5-7]/)) {
+		pushAction(actions, {
+			area: 'cell-builder-bootstrap',
+			action: 'Map the contract module to an executable deterministic cell. project_assembly.json must declare cell, refs, anchor, netArgs/nets, and the active pack must declare and implement that cell.',
+			evidence: ['gsd_plan_report.json', 'project_assembly.json', 'circuit_packs/<pack>/cell_manifest.json', 'circuit_packs/<pack>/pack.mjs'],
+			observed: finding,
+			editFiles: ['project_assembly.json', 'circuit_packs/<pack>/cell_manifest.json', 'circuit_packs/<pack>/pack.mjs'],
+			nextCommand: 'node bin/easyeda-gsd.mjs plan project_spec.json',
+		});
+	} else if (ruleMatches(finding, /^CM1[6-9]|^CM20|^CB1[4-8]/)) {
+		pushAction(actions, {
+			area: 'cell-port-layout',
+			action: 'Make port label placement executable. cell_manifest.json portLayout must define each port side/kind/label and the builder must emit real netflags with alignMode=6 on left ports or alignMode=8 on right ports.',
+			evidence: ['gsd_plan_report.json', 'cell_manifest_report.json', 'circuit_packs/<pack>/cell_manifest.json', 'circuit_packs/<pack>/pack.mjs'],
+			observed: finding,
+			editFiles: ['circuit_packs/<pack>/cell_manifest.json', 'circuit_packs/<pack>/pack.mjs', 'project_assembly.json'],
+			nextCommand: 'node bin/easyeda-gsd.mjs plan project_spec.json',
+		});
 	} else if (ruleMatches(finding, /^CB/)) {
 		pushAction(actions, {
 			area: 'cell-builder-output',
@@ -356,6 +387,29 @@ if (checks.gsdPlan.status !== 'pass') {
 			action: 'Fix spec-to-contract realization before generation. gsd_plan_report.json must prove project_spec.json is covered by project_contract.json, project_netlist.json, project_assembly.json, and a registered circuit pack.',
 			evidence: ['project_spec.json', 'project_contract.json', 'project_netlist.json', 'project_assembly.json', 'gsd_plan_report.json'],
 			observed: finding || checks.gsdPlan,
+		});
+	}
+	const planFindings = Array.isArray(gsdPlan?.findings) ? gsdPlan.findings : [];
+	const cellBootstrapFinding = planFindings.find(f => ruleMatches(f, /^GP8|^GP1[5-7]/));
+	if (cellBootstrapFinding && !hasActionArea(actions, 'cell-builder-bootstrap')) {
+		pushAction(actions, {
+			area: 'cell-builder-bootstrap',
+			action: 'Map the contract module to an executable deterministic cell. project_assembly.json must declare cell, refs, anchor, netArgs/nets, and the active pack must declare and implement that cell.',
+			evidence: ['gsd_plan_report.json', 'project_assembly.json', 'circuit_packs/<pack>/cell_manifest.json', 'circuit_packs/<pack>/pack.mjs'],
+			observed: cellBootstrapFinding,
+			editFiles: ['project_assembly.json', 'circuit_packs/<pack>/cell_manifest.json', 'circuit_packs/<pack>/pack.mjs'],
+			nextCommand: 'node bin/easyeda-gsd.mjs plan project_spec.json',
+		});
+	}
+	const portLayoutFinding = planFindings.find(f => ruleMatches(f, /^CM1[6-9]|^CM20|^CB1[4-8]/));
+	if (portLayoutFinding && !hasActionArea(actions, 'cell-port-layout')) {
+		pushAction(actions, {
+			area: 'cell-port-layout',
+			action: 'Make port label placement executable. cell_manifest.json portLayout must define each port side/kind/label and the builder must emit real netflags with alignMode=6 on left ports or alignMode=8 on right ports.',
+			evidence: ['gsd_plan_report.json', 'cell_manifest_report.json', 'circuit_packs/<pack>/cell_manifest.json', 'circuit_packs/<pack>/pack.mjs'],
+			observed: portLayoutFinding,
+			editFiles: ['circuit_packs/<pack>/cell_manifest.json', 'circuit_packs/<pack>/pack.mjs', 'project_assembly.json'],
+			nextCommand: 'node bin/easyeda-gsd.mjs plan project_spec.json',
 		});
 	}
 }

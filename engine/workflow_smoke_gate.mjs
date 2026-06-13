@@ -1826,18 +1826,24 @@ export const pack = { id: '${NO_WRITER_PACK}', fallbackAnchors, cellBuilders, no
 		generatedAt: new Date().toISOString(),
 		pass: false,
 		packId: CUSTOM_PACK,
-		severity: { hard: 1, soft: 0, info: 0 },
-		findings: [{ rule: 'CM11-builder-exists', severity: 'hard', msg: 'cell builder missing in custom pack' }],
+		severity: { hard: 2, soft: 0, info: 0 },
+		findings: [
+			{ rule: 'CM11-builder-exists', severity: 'hard', msg: 'cell builder missing in custom pack' },
+			{ rule: 'CM16-port-layout', severity: 'hard', msg: 'cell port layout missing in custom pack', where: { cell: 'sensorCell' } },
+		],
 	}, null, 2), 'utf8');
 	writeFileSync(`${repairContextDir}/gsd_plan_report.json`, JSON.stringify({
 		generatedAt: new Date().toISOString(),
 		pass: false,
 		spec: '_tmp_workflow_smoke/custom_project/project_spec.json',
 		circuitPack: CUSTOM_PACK,
-		severity: { hard: 2, soft: 0, info: 0 },
+		severity: { hard: 5, soft: 0, info: 0 },
 		findings: [
+			{ rule: 'GP6-contract-parts', severity: 'hard', msg: 'module contract parts missing smoke', where: { module: 'sensor_frontend' } },
+			{ rule: 'GP8-assembly-executable-module', severity: 'hard', msg: 'assembly executable module missing smoke', where: { module: 'sensor_frontend', key: 'cell' } },
 			{ rule: 'GP-DR1-drawing-rule-known', severity: 'hard', msg: 'unknown drawing rule smoke', where: { drawingRule: 'pretty-but-not-executable' } },
 			{ rule: 'CB8-wire-orthogonal', severity: 'hard', msg: 'cell builder diagonal wire smoke', where: { module: 'sensor_frontend', cell: 'sensorCell' } },
+			{ rule: 'CB14-port-flag-required', severity: 'hard', msg: 'cell builder real netflag missing smoke', where: { module: 'sensor_frontend', cell: 'sensorCell', port: 'sigOut' } },
 		],
 	}, null, 2), 'utf8');
 	writeFileSync(`${repairContextDir}/project_rule_report.json`, JSON.stringify({
@@ -1896,6 +1902,9 @@ export const pack = { id: '${NO_WRITER_PACK}', fallbackAnchors, cellBuilders, no
 		hasPackPlaceholder: customRepairText.includes('<pack>'),
 		hasConcretePackPath: customRepairText.includes(`circuit_packs/${CUSTOM_PACK}/pack.mjs`),
 		areas: (customRepairReport?.actions || []).map(a => a.area),
+		hasModuleBootstrapAction: (customRepairReport?.actions || []).some(a => a.area === 'module-contract-bootstrap' && (a.editFiles || []).includes('project_contract.json') && (a.editFiles || []).includes('project_netlist.json')),
+		hasCellBootstrapAction: (customRepairReport?.actions || []).some(a => a.area === 'cell-builder-bootstrap' && (a.editFiles || []).includes(`circuit_packs/${CUSTOM_PACK}/cell_manifest.json`)),
+		hasPortLayoutAction: (customRepairReport?.actions || []).some(a => a.area === 'cell-port-layout' && (a.editFiles || []).includes(`circuit_packs/${CUSTOM_PACK}/cell_manifest.json`) && /alignMode=6/.test(a.repairHint || '')),
 		hasDrawingRuleAction: (customRepairReport?.actions || []).some(a => a.area === 'drawing-rule-bindings' && (a.editFiles || []).includes('contracts/drawing_rule_registry.mjs')),
 		hasCellBuilderAction: (customRepairReport?.actions || []).some(a => a.area === 'cell-builder-output' && (a.editFiles || []).includes(`circuit_packs/${CUSTOM_PACK}/pack.mjs`)),
 		hasApplyWriterAction: (customRepairReport?.actions || []).some(a => a.area === 'apply-writer' && (a.editFiles || []).includes(`circuit_packs/${CUSTOM_PACK}/pack.mjs`) && /apply --gated --context-only/.test(a.nextCommand || '')),
@@ -1931,9 +1940,12 @@ export const pack = { id: '${NO_WRITER_PACK}', fallbackAnchors, cellBuilders, no
 		findings,
 		checks.customRepairContext.hasDrawingRuleAction
 			&& checks.customRepairContext.hasCellBuilderAction
+			&& checks.customRepairContext.hasModuleBootstrapAction
+			&& checks.customRepairContext.hasCellBootstrapAction
+			&& checks.customRepairContext.hasPortLayoutAction
 			&& checks.customRepairContext.hasApplyWriterAction,
 		'WS50-repair-actions-cover-executable-failure-classes',
-		'repair actions must map drawing-rule, cell-builder, and apply-writer failures to concrete deterministic source files and context-aware rerun commands',
+		'repair actions must map scaffold bootstrap, drawing-rule, cell-builder, port-layout, and apply-writer failures to concrete deterministic source files and context-aware rerun commands',
 		checks.customRepairContext,
 	);
 
@@ -1957,6 +1969,9 @@ export const pack = { id: '${NO_WRITER_PACK}', fallbackAnchors, cellBuilders, no
 		hasPackPlaceholder: customNextText.includes('<pack>'),
 		hasConcretePackPath: customNextText.includes(`circuit_packs/${CUSTOM_PACK}/pack.mjs`),
 		areas: (customNextReport?.actions || []).map(a => a.area),
+		hasModuleBootstrapAction: (customNextReport?.actions || []).some(a => a.area === 'module-contract-bootstrap' && (a.suggestedFix?.files || []).includes('project_contract.json') && (a.suggestedFix?.files || []).includes('project_netlist.json')),
+		hasCellBootstrapAction: (customNextReport?.actions || []).some(a => a.area === 'cell-builder-bootstrap' && (a.suggestedFix?.files || []).includes(`circuit_packs/${CUSTOM_PACK}/cell_manifest.json`)),
+		hasPortLayoutAction: (customNextReport?.actions || []).some(a => a.area === 'cell-port-layout' && (a.suggestedFix?.files || []).includes(`circuit_packs/${CUSTOM_PACK}/cell_manifest.json`) && /alignMode=6/.test(a.action || a.title || '')),
 		hasDrawingRuleAction: (customNextReport?.actions || []).some(a => a.area === 'drawing-rule-bindings' && (a.suggestedFix?.files || []).includes('contracts/drawing_rule_registry.mjs')),
 		hasApplyWriterAction: (customNextReport?.actions || []).some(a => a.area === 'apply-writer' && /apply --gated --context-only/.test(a.nextCommand || a.suggestedFix?.command || '')),
 	};
@@ -1978,9 +1993,12 @@ export const pack = { id: '${NO_WRITER_PACK}', fallbackAnchors, cellBuilders, no
 	assertFinding(
 		findings,
 		checks.customNextActionsPackTargets.hasDrawingRuleAction
+			&& checks.customNextActionsPackTargets.hasModuleBootstrapAction
+			&& checks.customNextActionsPackTargets.hasCellBootstrapAction
+			&& checks.customNextActionsPackTargets.hasPortLayoutAction
 			&& checks.customNextActionsPackTargets.hasApplyWriterAction,
 		'WS51-next-actions-cover-executable-failure-classes',
-		'next actions must expose drawing-rule and apply-writer repair targets directly to agents instead of hiding them behind generic acceptance failure',
+		'next actions must expose scaffold bootstrap, drawing-rule, port-layout, and apply-writer repair targets directly to agents instead of hiding them behind generic acceptance failure',
 		checks.customNextActionsPackTargets,
 	);
 

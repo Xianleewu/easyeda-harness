@@ -154,6 +154,13 @@ const RULE_PLANS = [
 		nextCommand: 'npm.cmd run spec',
 		repairHint: 'Update user-intent modules, nets, interfaces, or contract coverage before touching schematic geometry.',
 	}],
+	[/^PC12|^GP6/, {
+		area: 'module-contract-bootstrap',
+		editFiles: ['project_spec.json', 'project_contract.json', 'project_netlist.json'],
+		inspectFiles: ['project_spec.json', 'project_contract.json', 'project_contract_report.json', 'gsd_plan_report.json'],
+		nextCommand: 'node bin/easyeda-gsd.mjs plan project_spec.json',
+		repairHint: 'Bootstrap the module contract from the user intent: every module needs concrete requiredParts, requiredNets, drawingRules, visualEvidence, and matching structured netlist endpoints before any cell geometry is edited.',
+	}],
 	[/^PC/, {
 		area: 'project-contract',
 		editFiles: ['project_contract.json', 'contracts/module_contract.mjs'],
@@ -203,6 +210,13 @@ const RULE_PLANS = [
 		nextCommand: 'npm.cmd run contract:library',
 		repairHint: 'Bind every contract requiredPart to approved EasyEDA library Symbol, Device, Footprint, name/value, and BOM/PCB state before generation or write-back.',
 	}],
+	[/^CM1[6-9]|^CM20|^CB1[4-8]/, {
+		area: 'cell-port-layout',
+		editFiles: ['circuit_packs/<pack>/cell_manifest.json', 'circuit_packs/<pack>/pack.mjs', 'project_assembly.json'],
+		inspectFiles: ['cell_manifest_report.json', 'gsd_plan_report.json', 'circuit_packs/<pack>/cell_manifest.json'],
+		nextCommand: 'node bin/easyeda-gsd.mjs plan project_spec.json',
+		repairHint: 'Make port layout executable: manifest portLayout must declare each port side/kind/label, and builders must emit real netflags on those ports with left-bottom alignMode=6 or right-bottom alignMode=8 instead of fake text or floating labels.',
+	}],
 	[/^CM/, {
 		area: 'cell-manifest',
 		editFiles: ['circuit_packs/<pack>/cell_manifest.json', 'circuit_packs/<pack>/pack.mjs', 'project_assembly.json'],
@@ -210,12 +224,12 @@ const RULE_PLANS = [
 		nextCommand: 'npm.cmd run contract:cells',
 		repairHint: 'Declare deterministic cell capabilities in the selected circuit-pack manifest and keep implemented builders plus project_assembly.json mappings in sync.',
 	}],
-	[/^GP1[5-7]/, {
-		area: 'gsd-plan',
+	[/^GP8|^GP1[5-7]/, {
+		area: 'cell-builder-bootstrap',
 		editFiles: ['project_assembly.json', 'circuit_packs/<pack>/cell_manifest.json', 'circuit_packs/<pack>/pack.mjs'],
 		inspectFiles: ['gsd_plan_report.json', 'project_assembly.json', 'cell_manifest_report.json'],
 		nextCommand: 'node bin/easyeda-gsd.mjs plan project_spec.json',
-		repairHint: 'Make every assembly cell declared in the selected manifest and implemented by the selected circuit pack before generation runs.',
+		repairHint: 'Bootstrap executable cell mappings: every assembly module needs cell, refs, anchor, netArgs/nets, and a selected manifest cell implemented by the active circuit pack before generation runs.',
 	}],
 	[/^CB/, {
 		area: 'cell-builder-output',
