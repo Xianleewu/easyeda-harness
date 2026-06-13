@@ -38,7 +38,7 @@ node bin/easyeda-gsd.mjs help
 可以直接给 Agent 这句话：
 
 ```text
-请按 AGENTS.md 接手这个仓库。不要在 EasyEDA 中自由画图；先维护 project_spec.json、project_contract.json、project_netlist.json、approved_library_manifest.json、project_assembly.json 和 circuit pack。运行本地门禁；最终写回前必须通过 live-check、真实 EasyEDA 截图和 DRC 0/0/0。只允许通过 node bin/easyeda-gsd.mjs apply --gated 写回。
+请按 AGENTS.md 接手这个仓库。不要在 EasyEDA 中自由画图；先维护 project_spec.json、project_contract.json、project_netlist.json、approved_library_manifest.json、project_assembly.json 和 circuit pack。运行本地门禁；最终写回前必须通过 live-check、真实 EasyEDA 截图和 DRC 0/0/0。只允许通过 node bin/easyeda-gsd.mjs apply --gated project_spec.json 写回。
 ```
 
 Agent 常用入口：
@@ -49,7 +49,7 @@ node bin/easyeda-gsd.mjs generate project_spec.json
 node bin/easyeda-gsd.mjs accept project_spec.json
 node bin/easyeda-gsd.mjs repair
 node bin/easyeda-gsd.mjs live-check project_spec.json
-node bin/easyeda-gsd.mjs apply --gated
+node bin/easyeda-gsd.mjs apply --gated project_spec.json
 ```
 
 更完整的 Agent 约束见 `docs/agent-runner-guide.md`。对应 npm 门禁包括 `contract:pack`、`action:schema` 和 `apply:gated`；公开入口推荐使用 `node bin/easyeda-gsd.mjs ...`，底层 npm scripts 主要用于 CI、调试和细分 gate。
@@ -67,7 +67,7 @@ node bin/easyeda-gsd.mjs apply --gated
 7. 运行 `node bin/easyeda-gsd.mjs generate <project-dir>/project_spec.json`，直到 `gsd_generate_report.json` 通过。
 8. 运行 `node bin/easyeda-gsd.mjs accept <project-dir>/project_spec.json`，直到本地门禁 `HARD=0 SOFT=0 INFO=0`。
 9. 最终交付前运行 `node bin/easyeda-gsd.mjs live-check <project-dir>/project_spec.json`。
-10. 只通过 `node bin/easyeda-gsd.mjs apply --gated` 写回。
+10. 只通过 `node bin/easyeda-gsd.mjs apply --gated <project-dir>/project_spec.json` 写回。
 
 ## 主要门禁
 

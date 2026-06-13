@@ -15,9 +15,9 @@ Use this repository as an executable schematic workflow, not as permission to dr
 9. Run `npm.cmd run workflow:smoke` and keep `workflow_smoke_report.json` passing so reusable workflow regressions stay blocked.
 10. Implement deterministic cells and rules only after those contracts exist.
 11. Run `node bin/easyeda-gsd.mjs generate <project-dir>/project_spec.json` and keep `gsd_generate_report.json` passing.
-12. Run `node bin/easyeda-gsd.mjs accept`.
-13. Run `node bin/easyeda-gsd.mjs live-check` before final delivery.
-14. Write back only with `node bin/easyeda-gsd.mjs apply --gated`.
+12. Run `node bin/easyeda-gsd.mjs accept <project-dir>/project_spec.json`.
+13. Run `node bin/easyeda-gsd.mjs live-check <project-dir>/project_spec.json` before final delivery.
+14. Write back only with `node bin/easyeda-gsd.mjs apply --gated <project-dir>/project_spec.json`.
 
 ## Constraints
 
@@ -45,7 +45,7 @@ npm.cmd run workflow:smoke
 node bin/easyeda-gsd.mjs accept
 node bin/easyeda-gsd.mjs repair --max-iterations 3
 node bin/easyeda-gsd.mjs live-check
-node bin/easyeda-gsd.mjs apply --gated
+node bin/easyeda-gsd.mjs apply --gated project_spec.json
 node bin/easyeda-gsd.mjs report
 ```
 

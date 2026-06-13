@@ -106,7 +106,7 @@ If the report points to fixed rendered-area screenshots, run `npm run live:diagn
 Only after local gates pass, live snapshot/DRC checks pass, and the EasyEDA bridge is connected may the agent write back:
 
 ```powershell
-node bin/easyeda-gsd.mjs apply --gated
+node bin/easyeda-gsd.mjs apply --gated project_spec.json
 ```
 
 Do not run `engine/apply_full.mjs` directly unless debugging the low-level writer. `apply:gated` is the fail-closed entry point.
@@ -157,6 +157,6 @@ When adapting this repository to a different schematic:
 8. Add/adjust rules so the project-specific contract is enforced by `project_rule_report.json`, `project_netlist_report.json`, `project_assembly_report.json`, `project_layout_report.json`, `report.json`, `project_model_report.json`, `project_visual_report.json`, live DRC, and visual evidence.
 9. Iterate from `next_actions.json`; do not bypass failed findings with manual EasyEDA edits.
    Use `node bin/easyeda-gsd.mjs repair` when you need the grouped repair plan and rerun commands.
-10. Write back only through `node bin/easyeda-gsd.mjs apply --gated`, then validate using live snapshot, real canvas image, DRC, and live shots.
+10. Write back only through `node bin/easyeda-gsd.mjs apply --gated <project-dir>/project_spec.json`, then validate using live snapshot, real canvas image, DRC, and live shots.
 
 Do not claim completion from offline preview images alone.

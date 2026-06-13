@@ -37,7 +37,7 @@ Commands:
   generate [spec]              Plan-gated deterministic generation without write-back.
   accept [spec]                Run local acceptance gates for the selected spec context.
   live-check [spec]            Run live EasyEDA snapshot, image, DRC, and live shot checks.
-  apply --gated                Write back through the fail-closed gated entrypoint.
+  apply --gated [spec]         Write back through the fail-closed gated entrypoint for the selected spec context.
   repair [--max-iterations N]  Write repair_loop_report.json from next_actions/repair_actions.
   report                       Summarize latest acceptance and repair artifacts.
 
@@ -225,7 +225,7 @@ switch (cmd) {
 			console.error('apply requires --gated');
 			process.exit(2);
 		}
-		runNode(['engine/apply_gated.mjs']);
+		runNode(['engine/apply_gated.mjs', ...args.filter(arg => arg !== '--gated')]);
 		break;
 	case 'repair':
 		process.exit(repair(args));

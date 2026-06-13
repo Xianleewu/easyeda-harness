@@ -13,6 +13,7 @@ import { auditSeverityPolicy, auditReportSeverityZero } from './severity_policy.
 import { auditDocumentStyleFromSnapshot } from './document_style_gate.mjs';
 import { auditPageComposition } from './page_composition.mjs';
 import { acquireRunLock } from '../workflows/run_lock.mjs';
+import { generateContext } from '../workflows/gsd_generate.mjs';
 
 const DIR = (process.env.EASYEDA_WORKDIR || process.cwd()).replace(/\\/g, '/') + '/';
 let LOCK;
@@ -23,11 +24,22 @@ try {
 	process.exit(1);
 }
 let TARGET_WINDOW_ID = process.env.EASYEDA_WINDOW_ID || '';
+const SPEC_PATH = process.argv.slice(2).find(arg => !arg.startsWith('-')) || process.env.EASYEDA_PROJECT_SPEC || 'project_spec.json';
+const CONTEXT = generateContext(DIR.replace(/\/$/, ''), SPEC_PATH);
+const STEP_ENV = {
+	...process.env,
+	EASYEDA_GSD_LOCK_TOKEN: LOCK.token,
+	EASYEDA_PROJECT_SPEC: CONTEXT.specAbs,
+	EASYEDA_PROJECT_CONTRACT: CONTEXT.contractPath,
+	EASYEDA_PROJECT_NETLIST: CONTEXT.netlistPath,
+	EASYEDA_PROJECT_ASSEMBLY: CONTEXT.assemblyPath,
+	EASYEDA_APPROVED_LIBRARY_MANIFEST: CONTEXT.libraryManifestPath,
+};
 const LIVE_SNAP = process.env.EASYEDA_LIVE_SNAP || DIR + 'live.json';
 const APPLY_REPORT = process.env.EASYEDA_APPLY_REPORT || DIR + 'apply_report.json';
 const LIVE_HARNESS_REPORT = process.env.EASYEDA_LIVE_HARNESS_REPORT || DIR + 'harness_live_report.json';
 const TARGET_CONTEXT_FILE = process.env.EASYEDA_TARGET_CONTEXT || DIR + 'target_context_apply_gate.json';
-const APPROVED_LIBRARY_MANIFEST = process.env.EASYEDA_APPROVED_LIBRARY_MANIFEST || DIR + 'approved_library_manifest.json';
+const APPROVED_LIBRARY_MANIFEST = STEP_ENV.EASYEDA_APPROVED_LIBRARY_MANIFEST || DIR + 'approved_library_manifest.json';
 
 process.on('exit', () => LOCK.release());
 process.on('SIGINT', () => {
@@ -92,7 +104,19 @@ async function runBridgeBestEffort(jsFile) {
 }
 
 function saveApplyReport(report) {
-	writeFileSync(APPLY_REPORT, JSON.stringify({ generatedAt: new Date().toISOString(), ...report }, null, 2));
+	writeFileSync(APPLY_REPORT, JSON.stringify({
+		generatedAt: new Date().toISOString(),
+		context: {
+			spec: SPEC_PATH,
+			specAbs: CONTEXT.specAbs,
+			specDir: CONTEXT.specDir,
+			contractPath: CONTEXT.contractPath,
+			netlistPath: CONTEXT.netlistPath,
+			assemblyPath: CONTEXT.assemblyPath,
+			libraryManifestPath: CONTEXT.libraryManifestPath,
+		},
+		...report,
+	}, null, 2));
 	console.log(`apply_report -> ${APPLY_REPORT}`);
 }
 
@@ -111,10 +135,33 @@ function runHarness(snapPath, reportPath, label) {
 	}
 }
 
+function runRequiredNode(args, label, env = STEP_ENV) {
+	const child = spawnSync(process.execPath, args, {
+		cwd: DIR,
+		stdio: 'inherit',
+		shell: false,
+		env,
+	});
+	if (child.error) throw child.error;
+	if (child.status !== 0) throw new Error(`${label} failed`);
+	return child;
+}
+
+if (process.env.EASYEDA_APPLY_CONTEXT_ONLY === '1' || process.argv.includes('--context-only')) {
+	saveApplyReport({
+		pass: true,
+		mode: 'context-only',
+		writeBack: false,
+		severity: { hard: 0, soft: 0, info: 0 },
+		findings: [],
+	});
+	process.exit(0);
+}
+
 try {
-	const pipeline = process.env.EASYEDA_LAYOUT_SEARCH === '1' ? 'node engine/pipeline.mjs' : 'node engine/pipeline_fast.mjs';
-	execSync(pipeline, { cwd: DIR, stdio: 'inherit' });
-	execSync('node engine/acceptance_run.mjs', { cwd: DIR, stdio: 'inherit' });
+	const pipeline = process.env.EASYEDA_LAYOUT_SEARCH === '1' ? 'engine/pipeline.mjs' : 'engine/pipeline_fast.mjs';
+	runRequiredNode([pipeline], 'local pipeline');
+	runRequiredNode(['engine/acceptance_run.mjs', SPEC_PATH], 'local acceptance');
 } catch {
 	console.error('ABORT: local acceptance gate failed, write-back blocked');
 	process.exit(1);
@@ -163,14 +210,14 @@ if (!process.exitCode) {
 	execSync('node engine/apply_full.mjs', {
 		cwd: DIR,
 		stdio: 'inherit',
-		env: { ...process.env, EASYEDA_APPLY_FULL_AUTHORIZED: '1' },
+		env: { ...STEP_ENV, EASYEDA_APPLY_FULL_AUTHORIZED: '1' },
 	});
 	const applyArgs = ['engine/apply_run.mjs', '--force'];
 	if (TARGET_WINDOW_ID) applyArgs.push('--window-id', TARGET_WINDOW_ID);
 	const applyPs = spawnSync('node', applyArgs, {
 		cwd: DIR,
 		stdio: 'inherit',
-		env: { ...process.env, EASYEDA_APPLY_RUN_AUTHORIZED: '1' },
+		env: { ...STEP_ENV, EASYEDA_APPLY_RUN_AUTHORIZED: '1' },
 	});
 	if (applyPs.status !== 0) throw new Error('apply_run.mjs failed');
 	const postProcess = {
@@ -215,10 +262,10 @@ if (!process.exitCode) {
 		console.error(`ABORT: live verification failed, hard=${hard}`);
 		process.exitCode = 1;
 	} else {
-		const liveAcceptance = spawnSync('node', ['engine/acceptance_run.mjs', '--live'], {
+		const liveAcceptance = spawnSync('node', ['engine/acceptance_run.mjs', '--live', SPEC_PATH], {
 			cwd: DIR,
 			stdio: 'inherit',
-			env: { ...process.env, EASYEDA_GSD_LOCK_TOKEN: LOCK.token, EASYEDA_WINDOW_ID: TARGET_WINDOW_ID },
+			env: { ...STEP_ENV, EASYEDA_WINDOW_ID: TARGET_WINDOW_ID },
 		});
 		if (liveAcceptance.status !== 0) {
 			console.error('ABORT: live acceptance gate failed after write-back');
@@ -227,7 +274,7 @@ if (!process.exitCode) {
 			const finalEvidence = spawnSync('node', ['engine/final_evidence_gate.mjs', '--live'], {
 				cwd: DIR,
 				stdio: 'inherit',
-				env: { ...process.env, EASYEDA_GSD_LOCK_TOKEN: LOCK.token },
+				env: STEP_ENV,
 			});
 			if (finalEvidence.status !== 0) {
 				console.error('ABORT: final evidence gate failed after write-back');

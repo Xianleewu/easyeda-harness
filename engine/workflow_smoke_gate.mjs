@@ -315,6 +315,27 @@ try {
 		pass: customPlanCliReport?.pass ?? null,
 		rules: (customPlanCliReport?.findings || []).map(f => f.rule),
 	};
+	const applyContextReportPath = `${TMP_DIR}/apply_context_report.json`;
+	const customApplyContext = spawnSync(process.execPath, ['bin/easyeda-gsd.mjs', 'apply', '--gated', '--context-only', '_tmp_workflow_smoke/custom_project/project_spec.json'], {
+		cwd: ROOT,
+		stdio: 'pipe',
+		shell: false,
+		env: {
+			...process.env,
+			EASYEDA_GSD_LOCK_TOKEN: LOCK.token,
+			EASYEDA_APPLY_CONTEXT_ONLY: '1',
+			EASYEDA_APPLY_REPORT: applyContextReportPath,
+		},
+		encoding: 'utf8',
+	});
+	const customApplyContextReport = existsSync(applyContextReportPath) ? readJson(applyContextReportPath) : null;
+	checks.customApplyContext = {
+		status: customApplyContext.status,
+		pass: customApplyContextReport?.pass ?? null,
+		mode: customApplyContextReport?.mode || null,
+		spec: customApplyContextReport?.context?.spec || null,
+		assemblyPath: customApplyContextReport?.context?.assemblyPath || null,
+	};
 	assertFinding(findings, existsSync(`${CUSTOM_PACK_DIR}/pack.mjs`) && existsSync(`${CUSTOM_PACK_DIR}/cell_manifest.json`), 'WS11-custom-pack-files', 'init workflow must be able to create a custom circuit pack scaffold', {
 		packDir: CUSTOM_PACK_DIR,
 	});
@@ -329,6 +350,21 @@ try {
 		observedRules: checks.customPackCliPlan.rules,
 		status: customPlanCli.status,
 	});
+	assertFinding(
+		findings,
+		customApplyContext.status === 0
+			&& customApplyContextReport?.mode === 'context-only'
+			&& customApplyContextReport?.context?.assemblyPath === `${TMP_DIR}/custom_project/project_assembly.json`,
+		'WS18-apply-context-bound',
+		'CLI apply --gated must pass the selected spec context into the fail-closed apply gate instead of falling back to root project_assembly.json',
+		{
+			status: customApplyContext.status,
+			stdout: customApplyContext.stdout,
+			stderr: customApplyContext.stderr,
+			report: checks.customApplyContext,
+			expectedAssemblyPath: `${TMP_DIR}/custom_project/project_assembly.json`,
+		},
+	);
 
 	const restoreGenerate = runGsdGenerate({ root: ROOT, specPath: 'project_spec.json', command: ['engine/pipeline_fast.mjs'] });
 	checks.restoreGenerate = {

@@ -147,7 +147,7 @@ export function buildGsdPlan({ spec, contract, netlist, assembly, libraryManifes
 		interfaces: asArray(spec?.interfaces).length,
 		requiredLocalGate: 'node bin/easyeda-gsd.mjs accept',
 		requiredFinalGate: 'node bin/easyeda-gsd.mjs live-check',
-		finalApply: 'node bin/easyeda-gsd.mjs apply --gated',
+		finalApply: `node bin/easyeda-gsd.mjs apply --gated ${specPath}`,
 		severity: { hard: findings.length, soft: 0, info: 0 },
 		findings,
 	};
