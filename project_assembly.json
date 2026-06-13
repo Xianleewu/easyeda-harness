@@ -6,7 +6,7 @@
   "layoutProfile": "reference_columns_v2",
   "agentPolicy": {
     "freeDrawAllowed": false,
-    "authoritativeEditPath": "project_spec.json -> project_contract.json -> project_assembly.json -> engine/cells.mjs -> gates -> apply:gated"
+    "authoritativeEditPath": "project_spec.json -> project_contract.json -> project_assembly.json -> circuit_packs/<pack>/pack.mjs + cell_manifest.json -> gates -> apply:gated"
   },
   "anchors": {
     "usb": { "x": 640, "y": 1020 },

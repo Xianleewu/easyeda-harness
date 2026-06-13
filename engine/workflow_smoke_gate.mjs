@@ -81,6 +81,39 @@ try {
 	const netlist = readJson(`${ROOT}/project_netlist.json`);
 	const assembly = readJson(`${ROOT}/project_assembly.json`);
 	const libraryManifest = readJson(`${ROOT}/approved_library_manifest.json`);
+	const assembleSource = readFileSync(`${ROOT}/engine/assemble.mjs`, 'utf8');
+	const repairSource = readFileSync(`${ROOT}/engine/repair_actions.mjs`, 'utf8');
+	const nextActionsSource = readFileSync(`${ROOT}/engine/next_actions.mjs`, 'utf8');
+
+	checks.noGlobalCellBuildersExport = {
+		assembleExportsGlobalCellBuilders: /export\s+const\s+CELL_BUILDERS\b/.test(assembleSource),
+		assembleBindsAihwdebuggerBuilders: /getCircuitPack\(['"]aihwdebugger['"]\)\.cellBuilders/.test(assembleSource),
+	};
+	assertFinding(
+		findings,
+		!checks.noGlobalCellBuildersExport.assembleExportsGlobalCellBuilders
+			&& !checks.noGlobalCellBuildersExport.assembleBindsAihwdebuggerBuilders,
+		'WS24-no-global-cell-builders-export',
+		'generic assemble.mjs must not export AIHWDEBUGGER cell builders; selected pack builders must come from project_assembly.json',
+		checks.noGlobalCellBuildersExport,
+	);
+
+	checks.packAwareRepairTargets = {
+		repairActionsRootCellTargets: (repairSource.match(/['"]engine\/cells\.mjs['"]/g) || []).length,
+		nextActionsRootCellTargets: (nextActionsSource.match(/['"]engine\/cells\.mjs['"]/g) || []).length,
+		repairActionsPackTargets: (repairSource.match(/circuit_packs\/<pack>\/pack\.mjs/g) || []).length,
+		nextActionsPackTargets: (nextActionsSource.match(/circuit_packs\/<pack>\/pack\.mjs/g) || []).length,
+	};
+	assertFinding(
+		findings,
+		checks.packAwareRepairTargets.repairActionsRootCellTargets === 0
+			&& checks.packAwareRepairTargets.nextActionsRootCellTargets === 0
+			&& checks.packAwareRepairTargets.repairActionsPackTargets > 0
+			&& checks.packAwareRepairTargets.nextActionsPackTargets > 0,
+		'WS25-pack-aware-repair-targets',
+		'repair and next-action guidance must point agents at the selected circuit pack instead of the bundled root engine/cells.mjs example',
+		checks.packAwareRepairTargets,
+	);
 
 	const rootPlan = buildPlanForFiles({
 		spec,

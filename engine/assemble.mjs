@@ -8,8 +8,6 @@ import { getCircuitPack } from '../circuit_packs/registry.mjs';
 const DIR = (process.env.EASYEDA_WORKDIR || process.cwd()).replace(/\\/g, '/') + '/';
 const PROJECT_ASSEMBLY = process.env.EASYEDA_PROJECT_ASSEMBLY || DIR + 'project_assembly.json';
 
-export const CELL_BUILDERS = getCircuitPack('aihwdebugger').cellBuilders;
-
 let cachedAssemblyPath = null;
 let cachedAssembly = null;
 

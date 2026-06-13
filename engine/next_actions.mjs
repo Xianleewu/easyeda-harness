@@ -340,7 +340,7 @@ if (checks.projectPack.status !== 'pass') {
 	pushAction(actions, {
 		area: 'project-pack',
 		action: 'Fix the selected circuit pack before trusting generation. project_assembly.json must reference a registered pack with builders, fallback anchors, library normalization, and matching cell manifest.',
-		evidence: ['project_assembly.json', 'circuit_packs/registry.mjs', 'circuit_packs/aihwdebugger/pack.mjs', 'project_pack_report.json'],
+		evidence: ['project_assembly.json', 'circuit_packs/registry.mjs', 'circuit_packs/<pack>/pack.mjs', 'project_pack_report.json'],
 		observed: checks.projectPack.firstFinding || checks.projectPack,
 	});
 }
@@ -356,7 +356,7 @@ if (checks.cellManifest.status !== 'pass') {
 	pushAction(actions, {
 		area: 'cell-manifest',
 		action: 'Make the selected circuit-pack cell manifest declare every deterministic cell used by project_assembly.json and match the implemented builders before trusting assembly generation.',
-		evidence: ['circuit_packs/aihwdebugger/cell_manifest.json', 'project_assembly.json', 'engine/cells.mjs', 'engine/assemble.mjs', 'cell_manifest_report.json'],
+		evidence: ['circuit_packs/<pack>/cell_manifest.json', 'circuit_packs/<pack>/pack.mjs', 'project_assembly.json', 'cell_manifest_report.json'],
 		observed: checks.cellManifest.firstFinding || checks.cellManifest,
 	});
 }
@@ -364,7 +364,7 @@ if (checks.projectAssembly.status !== 'pass') {
 	pushAction(actions, {
 		area: 'project-assembly',
 		action: 'Make project_assembly.json map every project_contract.json module to a deterministic cell, anchor, refs, and nets before generation. This is the bridge from user intent to executable schematic layout.',
-		evidence: ['project_spec.json', 'project_contract.json', 'project_assembly.json', 'engine/cells.mjs', 'engine/assemble.mjs', 'project_assembly_report.json'],
+		evidence: ['project_spec.json', 'project_contract.json', 'project_assembly.json', 'circuit_packs/<pack>/cell_manifest.json', 'circuit_packs/<pack>/pack.mjs', 'project_assembly_report.json'],
 		observed: checks.projectAssembly.firstFinding || checks.projectAssembly,
 	});
 }

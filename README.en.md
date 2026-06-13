@@ -22,7 +22,7 @@ A PASS on the current model only proves the current model. It does not validate 
 
 ## Capabilities
 
-- Deterministic schematic assembly: functional cells live in `engine/cells.mjs`, and whole-sheet composition lives in `engine/assemble.mjs`.
+- Deterministic schematic assembly: the selected `circuit_packs/<pack>/pack.mjs` exposes functional cell builders, `circuit_packs/<pack>/cell_manifest.json` declares their contracts, and `engine/assemble.mjs` composes the active `project_assembly.json`.
 - Project spec gate: `project_spec.json` defines user-level modules, nets, interfaces, and quality policy.
 - Spec schema gate: `spec:schema` validates `project_spec.json` as the first-layer user-intent contract.
 - Project contract gate: `project_contract.json` defines modules, key nets, interfaces, visual evidence regions, and the no-free-draw policy.
