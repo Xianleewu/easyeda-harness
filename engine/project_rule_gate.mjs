@@ -99,7 +99,7 @@ if (!findings.length) {
 	try { assembly = readJson(ASSEMBLY); } catch (e) { hard(findings, 'PR0-assembly-parse', 'project_assembly.json must parse as JSON', { error: e.message }); }
 }
 if (assembly) {
-	manifestPath = resolveCellManifestPath(assembly);
+	manifestPath = resolveCellManifestPath(assembly, ASSEMBLY);
 	if (!existsSync(manifestPath)) hard(findings, 'PR0-cell-manifest-file', 'project_assembly.json must point to an existing cell manifest', { manifestPath });
 	else {
 		try { manifest = loadCellManifest(manifestPath); } catch (e) { hard(findings, 'PR0-cell-manifest-parse', 'cell manifest must parse as JSON', { manifestPath, error: e.message }); }

@@ -96,7 +96,7 @@ if (!findings.length) {
 	try { assembly = readJson(ASSEMBLY); } catch (e) { hard(findings, 'CM0-assembly-parse', 'project_assembly.json must parse as JSON', { error: e.message }); }
 }
 if (assembly) {
-	manifestPath = resolveCellManifestPath(assembly);
+	manifestPath = resolveCellManifestPath(assembly, ASSEMBLY);
 	try { pack = getCircuitPack(assembly.circuitPack || 'aihwdebugger'); } catch (e) { hard(findings, 'CM0-pack-known', 'project_assembly.json must select a known circuit pack', { circuitPack: assembly.circuitPack, error: e.message }); }
 	if (!existsSync(manifestPath)) hard(findings, 'CM0-manifest-file', 'selected cell manifest is missing', { path: manifestPath });
 	else {

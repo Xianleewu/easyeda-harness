@@ -62,10 +62,10 @@ function hasRule(report, rule) {
 	return (report?.findings || []).some(f => f.rule === rule);
 }
 
-function buildPlanForFiles({ spec, contract, netlist, assembly, libraryManifest, specPath }) {
+function buildPlanForFiles({ spec, contract, netlist, assembly, libraryManifest, specPath, assemblyPath = '' }) {
 	const modelPath = `${ROOT}/full_model.json`;
 	const model = existsSync(modelPath) ? readJson(modelPath) : null;
-	return buildGsdPlan({ spec, contract, netlist, assembly, libraryManifest, model, specPath });
+	return buildGsdPlan({ spec, contract, netlist, assembly, libraryManifest, model, specPath, assemblyPath });
 }
 
 const findings = [];
@@ -304,6 +304,7 @@ try {
 		libraryManifest: scaffoldLibrary,
 		model: null,
 		specPath: '_tmp_workflow_smoke/scaffold/project_spec.json',
+		assemblyPath: `${SCAFFOLD_DIR}/project_assembly.json`,
 	});
 	checks.scaffold = {
 		pass: scaffoldReport.pass === true,
@@ -457,6 +458,7 @@ try {
 		libraryManifest: readJson(`${customDir}/approved_library_manifest.json`),
 		model: null,
 		specPath: '_tmp_workflow_smoke/custom_project/project_spec.json',
+		assemblyPath: `${customDir}/project_assembly.json`,
 	});
 	checks.customPackScaffold = {
 		packFiles: customPackReport.files,
@@ -541,6 +543,82 @@ try {
 			stderr: orphanPlanCli.stderr,
 			report: checks.externalSpecRequiresCompanions,
 		},
+	);
+
+	const relativeManifestDir = `${TMP_DIR}/relative_manifest_project`;
+	mkdirSync(`${relativeManifestDir}/local_pack`, { recursive: true });
+	const relativeManifestAssembly = {
+		...genericAssembly,
+		cellManifest: 'local_pack/cell_manifest.json',
+		layoutPolicy: {
+			...genericAssembly.layoutPolicy,
+			xProfiles: [{ sensorX: 300 }],
+		},
+	};
+	const relativeManifest = {
+		schemaVersion: 1,
+		packId: 'aihwdebugger',
+		requiredQualityRules: ['orthogonal-wiring', 'real-net-labels'],
+		cells: [{
+			id: 'localOnlyCell',
+			moduleType: 'sensor_frontend',
+			refs: ['U', 'R'],
+			netArgs: [],
+			ports: ['SENSE_OUT', 'GND'],
+			layoutIntent: 'relative manifest path smoke',
+			qualityRules: ['orthogonal-wiring', 'real-net-labels'],
+		}],
+	};
+	writeFileSync(`${relativeManifestDir}/project_assembly.json`, JSON.stringify(relativeManifestAssembly, null, 2) + '\n', 'utf8');
+	writeFileSync(`${relativeManifestDir}/local_pack/cell_manifest.json`, JSON.stringify(relativeManifest, null, 2) + '\n', 'utf8');
+	const relativeManifestContract = clone(genericContract);
+	if (relativeManifestContract.modules?.[0]) {
+		relativeManifestContract.modules[0].drawingRules = [
+			'orthogonal-wiring',
+			'real-net-labels',
+			'text-clearance',
+			'module-box-isolation',
+			'no-fake-net-text',
+			'no-unnecessary-net-ports',
+		];
+	}
+	const genericSpecForRelativeManifest = {
+		schemaVersion: 1,
+		projectId: genericContract.projectId,
+		intent: 'Relative cell manifest path smoke.',
+		circuitPack: 'aihwdebugger',
+		modules: [{ id: 'sensor_frontend', title: 'Sensor Frontend', requiredNets: ['SENSE_OUT', 'GND'] }],
+		interfaces: [],
+	};
+	const relativeManifestPlan = buildGsdPlan({
+		spec: genericSpecForRelativeManifest,
+		contract: relativeManifestContract,
+		netlist: { schemaVersion: 1, projectId: genericContract.projectId, nets: [{ name: 'SENSE_OUT', requiredPins: [] }, { name: 'GND', requiredPins: [] }] },
+		assembly: relativeManifestAssembly,
+		libraryManifest: {
+			generatedFrom: 'workflow smoke',
+			purpose: 'Relative manifest path smoke library bindings.',
+			parts: {
+				U99: { Symbol: 'S', Device: 'D', Footprint: 'F', name: 'U99', value: 'IC', addIntoBom: true, addIntoPcb: true },
+				R99: { Symbol: 'S', Device: 'D', Footprint: 'F', name: 'R99', value: '10k', addIntoBom: true, addIntoPcb: true },
+			},
+		},
+		model: null,
+		specPath: '_tmp_workflow_smoke/relative_manifest_project/project_spec.json',
+		assemblyPath: `${relativeManifestDir}/project_assembly.json`,
+	});
+	checks.relativeCellManifestUsesAssemblyDir = {
+		pass: relativeManifestPlan.pass,
+		rules: (relativeManifestPlan.findings || []).map(f => f.rule),
+		firstFinding: relativeManifestPlan.findings?.[0] || null,
+	};
+	assertFinding(
+		findings,
+		hasRule(relativeManifestPlan, 'GP16-assembly-cell-declared')
+			&& (relativeManifestPlan.findings || []).some(f => f.where?.manifestPath === `${relativeManifestDir}/local_pack/cell_manifest.json`),
+		'WS27-relative-cell-manifest-uses-assembly-dir',
+		'relative cellManifest paths in external project_assembly.json must resolve beside that assembly file instead of the repository root',
+		checks.relativeCellManifestUsesAssemblyDir,
 	);
 	assertFinding(
 		findings,

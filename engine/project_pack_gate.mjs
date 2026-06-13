@@ -25,7 +25,7 @@ if (!existsSync(ASSEMBLY)) {
 if (assembly) {
 	const packId = assembly.circuitPack || 'aihwdebugger';
 	try { pack = getCircuitPack(packId); } catch (e) { hard(findings, 'PP1-pack-known', 'assembly circuitPack must be registered', { circuitPack: packId, registeredPacks: circuitPackIds(), error: e.message }); }
-	manifestPath = resolveCellManifestPath(assembly);
+	manifestPath = resolveCellManifestPath(assembly, ASSEMBLY);
 	if (!existsSync(manifestPath)) hard(findings, 'PP2-manifest-file', 'assembly cell manifest must exist', { manifestPath });
 	else {
 		try { manifest = loadCellManifest(manifestPath); } catch (e) { hard(findings, 'PP2-manifest-parse', 'cell manifest must parse as JSON', { manifestPath, error: e.message }); }

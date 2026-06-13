@@ -108,13 +108,13 @@ function validateSpecRealization(spec, contract, netlist, assembly, model = null
 	return findings;
 }
 
-function validateExecutableCells(assembly, pack) {
+function validateExecutableCells(assembly, pack, assemblyPath = '') {
 	const findings = [];
 	if (!assembly || !pack) return findings;
 	let manifest = null;
 	let manifestPath = null;
 	try {
-		manifestPath = resolveCellManifestPath(assembly);
+		manifestPath = resolveCellManifestPath(assembly, assemblyPath);
 		manifest = loadCellManifest(manifestPath);
 	} catch (e) {
 		hard(findings, 'GP15-cell-manifest-load', 'project_assembly.json must point to a readable cell manifest before generation', {
@@ -147,7 +147,7 @@ function validateExecutableCells(assembly, pack) {
 	return findings;
 }
 
-export function buildGsdPlan({ spec, contract, netlist, assembly, libraryManifest = null, model = null, specPath = 'project_spec.json', inputFindings = [] }) {
+export function buildGsdPlan({ spec, contract, netlist, assembly, libraryManifest = null, model = null, specPath = 'project_spec.json', assemblyPath = '', inputFindings = [] }) {
 	const findings = [...asArray(inputFindings)];
 	findings.push(...validateSpecSchema(spec));
 	if (contract) findings.push(...validateModuleContract(contract).map(f => ({ ...f, category: 'gsd-plan' })));
@@ -171,7 +171,7 @@ export function buildGsdPlan({ spec, contract, netlist, assembly, libraryManifes
 	} catch (e) {
 		hard(findings, 'GP13-pack-registered', 'spec/assembly circuitPack must be registered', { circuitPack: packId, registeredPacks: circuitPackIds(), error: e.message });
 	}
-	if (assembly && pack) findings.push(...validateExecutableCells(assembly, pack));
+	if (assembly && pack) findings.push(...validateExecutableCells(assembly, pack, assemblyPath));
 
 	if (contract && netlist && assembly) findings.push(...validateSpecRealization(spec, contract, netlist, assembly, model));
 
