@@ -34,6 +34,7 @@ const STEP_ENV = {
 	EASYEDA_PROJECT_NETLIST: CONTEXT.netlistPath,
 	EASYEDA_PROJECT_ASSEMBLY: CONTEXT.assemblyPath,
 	EASYEDA_APPROVED_LIBRARY_MANIFEST: CONTEXT.libraryManifestPath,
+	EASYEDA_PART_LIB: CONTEXT.partLibPath,
 };
 const LIVE_SNAP = process.env.EASYEDA_LIVE_SNAP || DIR + 'live.json';
 const APPLY_REPORT = process.env.EASYEDA_APPLY_REPORT || DIR + 'apply_report.json';
@@ -114,6 +115,7 @@ function saveApplyReport(report) {
 			netlistPath: CONTEXT.netlistPath,
 			assemblyPath: CONTEXT.assemblyPath,
 			libraryManifestPath: CONTEXT.libraryManifestPath,
+			partLibPath: CONTEXT.partLibPath,
 		},
 		...report,
 	}, null, 2));

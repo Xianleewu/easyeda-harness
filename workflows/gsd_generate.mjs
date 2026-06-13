@@ -35,6 +35,7 @@ export function generateContext(root, specPath = 'project_spec.json') {
 		netlistPath: companion('project_netlist.json'),
 		assemblyPath: companion('project_assembly.json'),
 		libraryManifestPath: companion('approved_library_manifest.json'),
+		partLibPath: isRootSpec ? `${rootDir}/snap2.json` : companion('project_library_snapshot.json'),
 	};
 }
 
@@ -63,8 +64,9 @@ export function buildGeneratePlan(root, specPath = 'project_spec.json') {
 	const netlist = readOptionalJson(root, context.netlistPath, 'project_netlist', inputFindings);
 	const assembly = readOptionalJson(root, context.assemblyPath, 'project_assembly', inputFindings);
 	const libraryManifest = readOptionalJson(root, context.libraryManifestPath, 'approved_library_manifest', inputFindings);
+	const partLibSnapshot = readOptionalJson(root, context.partLibPath, 'project_library_snapshot', inputFindings);
 	const model = existsSync(`${root}/full_model.json`) ? readJson(root, 'full_model.json') : null;
-	return buildGsdPlan({ spec, contract, netlist, assembly, libraryManifest, model, specPath, assemblyPath: context.assemblyPath, inputFindings });
+	return buildGsdPlan({ spec, contract, netlist, assembly, libraryManifest, partLibSnapshot, model, specPath, assemblyPath: context.assemblyPath, partLibPath: context.partLibPath, inputFindings });
 }
 
 export function runGsdGenerate({ root, specPath = 'project_spec.json', command = ['engine/pipeline.mjs'], draft = false } = {}) {
@@ -100,6 +102,7 @@ export function runGsdGenerate({ root, specPath = 'project_spec.json', command =
 				EASYEDA_PROJECT_CONTRACT: context.contractPath,
 				EASYEDA_PROJECT_NETLIST: context.netlistPath,
 				EASYEDA_APPROVED_LIBRARY_MANIFEST: context.libraryManifestPath,
+				EASYEDA_PART_LIB: context.partLibPath,
 			},
 		});
 		const reportJson = existsSync(`${root}/report.json`) ? readJson(root, 'report.json') : null;
@@ -125,6 +128,7 @@ export function runGsdGenerate({ root, specPath = 'project_spec.json', command =
 				contractPath: context.contractPath,
 				netlistPath: context.netlistPath,
 				libraryManifestPath: context.libraryManifestPath,
+				partLibPath: context.partLibPath,
 			},
 			plan: { pass: plan.pass, severity: plan.severity },
 			generated,

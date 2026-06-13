@@ -134,6 +134,7 @@ if (acceptanceContext) {
 		['netlistPath', CONTEXT.netlistPath],
 		['assemblyPath', CONTEXT.assemblyPath],
 		['libraryManifestPath', CONTEXT.libraryManifestPath],
+		['partLibPath', CONTEXT.partLibPath],
 	]) {
 		if (normalizePath(acceptanceContext[key]) !== normalizePath(expected)) {
 			hard(findings, 'FE9-acceptance-context-match', 'acceptance_report.json context must match the current project spec context', {
@@ -173,6 +174,7 @@ const report = {
 		netlistPath: CONTEXT.netlistPath,
 		assemblyPath: CONTEXT.assemblyPath,
 		libraryManifestPath: CONTEXT.libraryManifestPath,
+		partLibPath: CONTEXT.partLibPath,
 	},
 	maxAgeMs: MAX_AGE_MS,
 	severity: { hard: findings.length, soft: 0, info: 0 },

@@ -65,7 +65,9 @@ function hasRule(report, rule) {
 function buildPlanForFiles({ spec, contract, netlist, assembly, libraryManifest, specPath, assemblyPath = '' }) {
 	const modelPath = `${ROOT}/full_model.json`;
 	const model = existsSync(modelPath) ? readJson(modelPath) : null;
-	return buildGsdPlan({ spec, contract, netlist, assembly, libraryManifest, model, specPath, assemblyPath });
+	const partLibPath = `${ROOT}/snap2.json`;
+	const partLibSnapshot = existsSync(partLibPath) ? readJson(partLibPath) : null;
+	return buildGsdPlan({ spec, contract, netlist, assembly, libraryManifest, partLibSnapshot, model, specPath, assemblyPath, partLibPath });
 }
 
 const findings = [];
@@ -288,6 +290,7 @@ try {
 		'project_netlist.json',
 		'project_assembly.json',
 		'approved_library_manifest.json',
+		'project_library_snapshot.json',
 		'gsd_scaffold_report.json',
 	];
 	const missingScaffoldFiles = scaffoldFiles.filter(name => !existsSync(`${SCAFFOLD_DIR}/${name}`));
@@ -296,15 +299,18 @@ try {
 	const scaffoldNetlist = readJson(`${SCAFFOLD_DIR}/project_netlist.json`);
 	const scaffoldAssembly = readJson(`${SCAFFOLD_DIR}/project_assembly.json`);
 	const scaffoldLibrary = readJson(`${SCAFFOLD_DIR}/approved_library_manifest.json`);
+	const scaffoldLibrarySnapshot = readJson(`${SCAFFOLD_DIR}/project_library_snapshot.json`);
 	const scaffoldPlan = buildGsdPlan({
 		spec: scaffoldSpec,
 		contract: scaffoldContract,
 		netlist: scaffoldNetlist,
 		assembly: scaffoldAssembly,
 		libraryManifest: scaffoldLibrary,
+		partLibSnapshot: scaffoldLibrarySnapshot,
 		model: null,
 		specPath: '_tmp_workflow_smoke/scaffold/project_spec.json',
 		assemblyPath: `${SCAFFOLD_DIR}/project_assembly.json`,
+		partLibPath: `${SCAFFOLD_DIR}/project_library_snapshot.json`,
 	});
 	checks.scaffold = {
 		pass: scaffoldReport.pass === true,
@@ -456,9 +462,11 @@ try {
 		netlist: readJson(`${customDir}/project_netlist.json`),
 		assembly: readJson(`${customDir}/project_assembly.json`),
 		libraryManifest: readJson(`${customDir}/approved_library_manifest.json`),
+		partLibSnapshot: readJson(`${customDir}/project_library_snapshot.json`),
 		model: null,
 		specPath: '_tmp_workflow_smoke/custom_project/project_spec.json',
 		assemblyPath: `${customDir}/project_assembly.json`,
+		partLibPath: `${customDir}/project_library_snapshot.json`,
 	});
 	checks.customPackScaffold = {
 		packFiles: customPackReport.files,
@@ -515,6 +523,56 @@ try {
 		status: customPlanCli.status,
 	});
 
+	const completeGenericContract = clone(genericContract);
+	if (completeGenericContract.modules?.[0]) {
+		completeGenericContract.modules[0].drawingRules = [
+			'orthogonal-wiring',
+			'real-net-labels',
+			'text-clearance',
+			'module-box-isolation',
+			'no-fake-net-text',
+			'no-unnecessary-net-ports',
+		];
+	}
+	const missingPartSnapshotPlan = buildGsdPlan({
+		spec: {
+			schemaVersion: 1,
+			projectId: genericContract.projectId,
+			intent: 'Part library snapshot coverage smoke.',
+			circuitPack: 'aihwdebugger',
+			modules: [{ id: 'sensor_frontend', title: 'Sensor Frontend', requiredNets: ['SENSE_OUT', 'GND'] }],
+			interfaces: [],
+		},
+		contract: completeGenericContract,
+		netlist: { schemaVersion: 1, projectId: genericContract.projectId, nets: [{ name: 'SENSE_OUT', requiredPins: [] }, { name: 'GND', requiredPins: [] }] },
+		assembly: {
+			...genericAssembly,
+			modules: [{ ...genericAssembly.modules[0], cell: 'usbCell' }],
+			layoutPolicy: {
+				...genericAssembly.layoutPolicy,
+				xProfiles: [{ sensorX: 300 }],
+			},
+		},
+		libraryManifest: { purpose: 'Part library snapshot coverage smoke.', parts: { U99: { Symbol: 'S', Device: 'D', Footprint: 'F', name: 'U99', value: 'IC', addIntoBom: true, addIntoPcb: true }, R99: { Symbol: 'S', Device: 'D', Footprint: 'F', name: 'R99', value: '10k', addIntoBom: true, addIntoPcb: true } } },
+		partLibSnapshot: { project: genericContract.projectId, components: [{ designator: 'U99' }] },
+		model: null,
+		specPath: '_tmp_workflow_smoke/missing_part_snapshot/project_spec.json',
+		assemblyPath: `${GENERIC_RULE_DIR}/project_assembly.json`,
+		partLibPath: '_tmp_workflow_smoke/missing_part_snapshot/project_library_snapshot.json',
+	});
+	checks.partLibrarySnapshotRequiredParts = {
+		pass: missingPartSnapshotPlan.pass,
+		rules: (missingPartSnapshotPlan.findings || []).map(f => f.rule),
+		firstFinding: missingPartSnapshotPlan.findings?.[0] || null,
+	};
+	assertFinding(
+		findings,
+		hasRule(missingPartSnapshotPlan, 'GP18-part-lib-required-part'),
+		'WS30-part-library-snapshot-covers-required-parts',
+		'GSD plan must reject projects whose active library snapshot does not contain every contract requiredPart used for deterministic generation',
+		checks.partLibrarySnapshotRequiredParts,
+	);
+
 	const orphanSpecDir = `${TMP_DIR}/orphan_spec`;
 	mkdirSync(orphanSpecDir, { recursive: true });
 	writeFileSync(`${orphanSpecDir}/project_spec.json`, JSON.stringify(customSpec, null, 2) + '\n', 'utf8');
@@ -534,7 +592,7 @@ try {
 	assertFinding(
 		findings,
 		orphanPlanCli.status !== 0
-			&& ['GP0-project_contract-file', 'GP0-project_netlist-file', 'GP0-project_assembly-file', 'GP0-approved_library_manifest-file'].every(rule => hasRule(orphanPlanReport, rule)),
+			&& ['GP0-project_contract-file', 'GP0-project_netlist-file', 'GP0-project_assembly-file', 'GP0-approved_library_manifest-file', 'GP0-project_library_snapshot-file'].every(rule => hasRule(orphanPlanReport, rule)),
 		'WS26-external-spec-requires-companions',
 		'external project specs must not fall back to root project contracts; missing companion files must be explicit plan failures',
 		{
@@ -603,9 +661,14 @@ try {
 				R99: { Symbol: 'S', Device: 'D', Footprint: 'F', name: 'R99', value: '10k', addIntoBom: true, addIntoPcb: true },
 			},
 		},
+		partLibSnapshot: {
+			project: genericContract.projectId,
+			components: [{ designator: 'U99' }, { designator: 'R99' }],
+		},
 		model: null,
 		specPath: '_tmp_workflow_smoke/relative_manifest_project/project_spec.json',
 		assemblyPath: `${relativeManifestDir}/project_assembly.json`,
+		partLibPath: `${relativeManifestDir}/project_library_snapshot.json`,
 	});
 	checks.relativeCellManifestUsesAssemblyDir = {
 		pass: relativeManifestPlan.pass,

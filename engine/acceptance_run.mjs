@@ -23,6 +23,7 @@ const STEP_ENV = {
 	EASYEDA_PROJECT_NETLIST: CONTEXT.netlistPath,
 	EASYEDA_PROJECT_ASSEMBLY: CONTEXT.assemblyPath,
 	EASYEDA_APPROVED_LIBRARY_MANIFEST: CONTEXT.libraryManifestPath,
+	EASYEDA_PART_LIB: CONTEXT.partLibPath,
 };
 
 process.on('exit', () => LOCK.release());
@@ -129,6 +130,7 @@ const acceptance = {
 		netlistPath: CONTEXT.netlistPath,
 		assemblyPath: CONTEXT.assemblyPath,
 		libraryManifestPath: CONTEXT.libraryManifestPath,
+		partLibPath: CONTEXT.partLibPath,
 	},
 	pass: requiredFailed.length === 0,
 	severity: { hard: requiredFailed.length, soft: 0, info: 0 },
@@ -168,7 +170,7 @@ const acceptance = {
 		report: artifacts.report ? { pass: artifacts.report.pass, severity: artifacts.report.severity, score: artifacts.report.score } : null,
 		agentInstructions: artifacts.agentInstructions ? { pass: artifacts.agentInstructions.pass, severity: artifacts.agentInstructions.severity, filesChecked: artifacts.agentInstructions.filesChecked } : null,
 		workflowSmoke: artifacts.workflowSmoke ? { pass: artifacts.workflowSmoke.pass, severity: artifacts.workflowSmoke.severity, checks: artifacts.workflowSmoke.checks } : null,
-		gsdPlan: artifacts.gsdPlan ? { pass: artifacts.gsdPlan.pass, severity: artifacts.gsdPlan.severity, projectId: artifacts.gsdPlan.projectId, circuitPack: artifacts.gsdPlan.circuitPack, modules: artifacts.gsdPlan.modules } : null,
+		gsdPlan: artifacts.gsdPlan ? { pass: artifacts.gsdPlan.pass, severity: artifacts.gsdPlan.severity, projectId: artifacts.gsdPlan.projectId, circuitPack: artifacts.gsdPlan.circuitPack, modules: artifacts.gsdPlan.modules, partLib: artifacts.gsdPlan.partLib || null } : null,
 		gsdGenerate: artifacts.gsdGenerate ? { pass: artifacts.gsdGenerate.pass, severity: artifacts.gsdGenerate.severity, projectId: artifacts.gsdGenerate.projectId, circuitPack: artifacts.gsdGenerate.circuitPack, generationContext: artifacts.gsdGenerate.generationContext || null, generated: artifacts.gsdGenerate.generated } : null,
 		specSchema: artifacts.specSchema ? { pass: artifacts.specSchema.pass, severity: artifacts.specSchema.severity, projectId: artifacts.specSchema.projectId, modules: artifacts.specSchema.modules, interfaces: artifacts.specSchema.interfaces } : null,
 		projectSpec: artifacts.projectSpec ? { pass: artifacts.projectSpec.pass, severity: artifacts.projectSpec.severity, projectId: artifacts.projectSpec.projectId, modules: artifacts.projectSpec.modules, interfaces: artifacts.projectSpec.interfaces } : null,

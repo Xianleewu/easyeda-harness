@@ -147,7 +147,23 @@ function validateExecutableCells(assembly, pack, assemblyPath = '') {
 	return findings;
 }
 
-export function buildGsdPlan({ spec, contract, netlist, assembly, libraryManifest = null, model = null, specPath = 'project_spec.json', assemblyPath = '', inputFindings = [] }) {
+function validatePartLibrarySnapshot(contract, partLibSnapshot, partLibPath = '') {
+	const findings = [];
+	if (!contract || !partLibSnapshot) return findings;
+	const requiredParts = new Set(asArray(contract.modules).flatMap(mod => asArray(mod.requiredParts)));
+	const availableParts = new Set(asArray(partLibSnapshot.components).map(part => part.designator).filter(Boolean));
+	for (const ref of requiredParts) {
+		if (!availableParts.has(ref)) {
+			hard(findings, 'GP18-part-lib-required-part', `${ref} required by project_contract.json is missing from the active project library snapshot`, {
+				designator: ref,
+				partLibPath,
+			});
+		}
+	}
+	return findings;
+}
+
+export function buildGsdPlan({ spec, contract, netlist, assembly, libraryManifest = null, partLibSnapshot = null, model = null, specPath = 'project_spec.json', assemblyPath = '', partLibPath = '', inputFindings = [] }) {
 	const findings = [...asArray(inputFindings)];
 	findings.push(...validateSpecSchema(spec));
 	if (contract) findings.push(...validateModuleContract(contract).map(f => ({ ...f, category: 'gsd-plan' })));
@@ -172,6 +188,7 @@ export function buildGsdPlan({ spec, contract, netlist, assembly, libraryManifes
 		hard(findings, 'GP13-pack-registered', 'spec/assembly circuitPack must be registered', { circuitPack: packId, registeredPacks: circuitPackIds(), error: e.message });
 	}
 	if (assembly && pack) findings.push(...validateExecutableCells(assembly, pack, assemblyPath));
+	findings.push(...validatePartLibrarySnapshot(contract, partLibSnapshot, partLibPath));
 
 	if (contract && netlist && assembly) findings.push(...validateSpecRealization(spec, contract, netlist, assembly, model));
 
@@ -184,6 +201,7 @@ export function buildGsdPlan({ spec, contract, netlist, assembly, libraryManifes
 		registeredPacks: circuitPackIds(),
 		cellManifest: assembly?.cellManifest || null,
 		libraryManifest: 'approved_library_manifest.json',
+		partLib: partLibPath || null,
 		modules: asArray(spec?.modules).map(mod => mod.id),
 		interfaces: asArray(spec?.interfaces).length,
 		requiredLocalGate: 'node bin/easyeda-gsd.mjs accept',

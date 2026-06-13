@@ -77,6 +77,14 @@ export function buildScaffold(spec, { pack = 'aihwdebugger' } = {}) {
 		bindingKeys: ['Symbol', 'Device', 'Footprint'],
 		parts: {},
 	};
+	const librarySnapshot = {
+		project: contract.projectId,
+		source: 'project_library_snapshot.json scaffold',
+		components: [],
+		netflags: [],
+		wires: [],
+		texts: [],
+	};
 
 	const anchors = Object.fromEntries(modules.map((mod, index) => [mod.id, { x: 300 + index * 240, y: 600 }]));
 	const anchorVariants = [
@@ -137,19 +145,20 @@ export function buildScaffold(spec, { pack = 'aihwdebugger' } = {}) {
 		})),
 	};
 
-	return { contract, netlist, assembly, libraryManifest };
+	return { contract, netlist, assembly, libraryManifest, librarySnapshot };
 }
 
 export function writeScaffold({ outDir, spec, pack = 'aihwdebugger' }) {
 	mkdirSync(outDir, { recursive: true });
 	const normalizedSpec = { ...spec, circuitPack: spec.circuitPack || pack };
-	const { contract, netlist, assembly, libraryManifest } = buildScaffold(normalizedSpec, { pack });
+	const { contract, netlist, assembly, libraryManifest, librarySnapshot } = buildScaffold(normalizedSpec, { pack });
 	const files = {
 		'project_spec.json': normalizedSpec,
 		'project_contract.json': contract,
 		'project_netlist.json': netlist,
 		'project_assembly.json': assembly,
 		'approved_library_manifest.json': libraryManifest,
+		'project_library_snapshot.json': librarySnapshot,
 	};
 	for (const [name, data] of Object.entries(files)) {
 		writeFileSync(`${outDir}/${name}`, JSON.stringify(data, null, 2) + '\n', 'utf8');
