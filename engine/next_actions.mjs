@@ -34,6 +34,7 @@ const spec = readJson('project_spec_report.json');
 const contract = readJson('project_contract_report.json');
 const projectRules = readJson('project_rule_report.json');
 const projectPack = readJson('project_pack_report.json');
+const projectLibrary = readJson('project_library_report.json');
 const cellManifest = readJson('cell_manifest_report.json');
 const projectAssembly = readJson('project_assembly_report.json');
 const projectLayout = readJson('project_layout_report.json');
@@ -119,6 +120,14 @@ const checks = {
 		registeredPacks: projectPack?.registeredPacks || null,
 		firstFinding: projectPack?.findings?.[0] || null,
 		evidence: 'project_pack_report.json',
+	},
+	projectLibrary: {
+		status: status(projectLibrary?.pass),
+		severity: projectLibrary?.severity || null,
+		projectId: projectLibrary?.projectId || null,
+		stats: projectLibrary?.stats || null,
+		firstFinding: projectLibrary?.findings?.[0] || null,
+		evidence: 'project_library_report.json',
 	},
 	cellManifest: {
 		status: status(cellManifest?.pass),
@@ -315,6 +324,14 @@ if (checks.projectPack.status !== 'pass') {
 		action: 'Fix the selected circuit pack before trusting generation. project_assembly.json must reference a registered pack with builders, fallback anchors, library normalization, and matching cell manifest.',
 		evidence: ['project_assembly.json', 'circuit_packs/registry.mjs', 'circuit_packs/aihwdebugger/pack.mjs', 'project_pack_report.json'],
 		observed: checks.projectPack.firstFinding || checks.projectPack,
+	});
+}
+if (checks.projectLibrary.status !== 'pass') {
+	pushAction(actions, {
+		area: 'project-library',
+		action: 'Fix approved_library_manifest.json or project_contract.json so every required part has approved Symbol/Device/Footprint bindings before generation or write-back.',
+		evidence: ['approved_library_manifest.json', 'project_contract.json', 'project_library_report.json'],
+		observed: checks.projectLibrary.firstFinding || checks.projectLibrary,
 	});
 }
 if (checks.cellManifest.status !== 'pass') {

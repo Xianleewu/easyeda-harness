@@ -19,6 +19,7 @@
     "spec": "node engine/project_spec_gate.mjs",
     "contract": "node engine/project_contract_gate.mjs",
     "contract:pack": "node engine/project_pack_gate.mjs",
+    "contract:library": "node engine/project_library_gate.mjs",
     "contract:cells": "node engine/project_cell_manifest_gate.mjs",
     "contract:assembly": "node engine/project_assembly_gate.mjs",
     "contract:layout": "node engine/project_layout_gate.mjs",

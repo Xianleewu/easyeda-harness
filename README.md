@@ -28,6 +28,7 @@ EasyEDA Harness 是一套给 Codex、Claude Code 等编程 Agent 使用的原理
 - 项目合同门禁：`project_contract.json` 定义模块、关键网络、接口、视觉证据区域和禁止自由绘图策略。
 - 项目网表门禁：`project_netlist.json` 定义关键网络必连引脚，并证明生成模型实际连接这些端点。
 - Circuit pack 门禁：`contract:pack` 验证所选 `pack.mjs` 已注册且暴露必要生成 hook。
+- 库合同门禁：`contract:library` 验证每个 required part 都有批准的 Symbol、Device、Footprint、name/value 和 BOM/PCB 状态。
 - Cell manifest 门禁：`circuit_packs/*/cell_manifest.json` 在装配前声明电路包 cell 的 ref role、netArg、端口和布局意图。
 - 规则覆盖检查：`contract:rules` 会确认模块注册、必备零件、接口合同和核心规则覆盖了项目合同。
 - 装配覆盖检查：`contract:assembly` 会确认每个合同模块都映射到了确定性 cell、anchor、refs 和 nets。
@@ -81,7 +82,7 @@ node bin/easyeda-gsd.mjs apply --gated
 ```
 
 新项目的第一步不是画图，而是让 Agent 修改 `project_spec.json`，再把它落实到 `project_contract.json`，用 `project_netlist.json` 定义必连端点，选择或声明 `circuit_packs/*/cell_manifest.json`，随后用 `project_assembly.json` 定义可执行装配映射和布局策略；通过这些门禁后再实现项目自己的 deterministic cells 和规则覆盖。
-对于新项目目录，`node bin/easyeda-gsd.mjs init --pack <pack> --out <project-dir>` 会写出这四类 scaffold 文件和 `gsd_scaffold_report.json`；scaffold 故意是不完整的，必须补齐到 `plan` 通过后才能进入生成。
+对于新项目目录，`node bin/easyeda-gsd.mjs init --pack <pack> --out <project-dir>` 会写出这些 scaffold 文件、`approved_library_manifest.json` 和 `gsd_scaffold_report.json`；scaffold 故意是不完整的，必须补齐到 `plan` 通过后才能进入生成。
 
 ## 写回 EasyEDA
 
@@ -126,6 +127,7 @@ Agent 会通过 `apply:gated` 写回 EasyEDA。这个入口会先运行检查；
 - `action_schema_report.json` 证明 `next_actions.json` 符合稳定 action schema
 - `gsd_plan_report.json` 证明当前 spec 已由 contract、netlist、assembly 和 circuit pack 兑现
 - `gsd_generate_report.json` 证明确定性生成经过 plan 门禁
+- `project_library_report.json` 证明每个 required part 都有批准的库绑定
 - `repair_actions.json` 无逐条 finding 修复项
 - `repair_loop_report.json` 无分组修复项
 - `final_evidence_report.json` 证明所需 local/live 证据存在、足够新并通过
@@ -156,6 +158,7 @@ Agent 会通过 `apply:gated` 写回 EasyEDA。这个入口会先运行检查；
 - `workflows/gsd_plan.mjs`：spec-to-contract 兑现计划器，写出 `gsd_plan_report.json`。
 - `workflows/gsd_generate.mjs`：plan-gated 的确定性生成包装器，写出 `gsd_generate_report.json`。
 - `workflows/gsd_scaffold.mjs`：新项目 scaffold 写入器，生成 spec、contract、netlist、assembly 和 `gsd_scaffold_report.json`。
+- `contracts/library_contract.mjs`：required parts 的批准库绑定校验器。
 - `workflows/repair_loop.mjs`：只读修复循环计划器，把 `next_actions.json` 和 `repair_actions.json` 分组成修复类型、文件、证据和复跑命令，并写出 `repair_loop_report.json`。
 - `engine/final_evidence_gate.mjs`：fail-closed 的 local/live 证据门禁，检查新鲜度、DRC 归零、live model 证明和空修复项。
 - `circuit_packs/*/cell_manifest.json`：电路包确定性 cell 能力合同。

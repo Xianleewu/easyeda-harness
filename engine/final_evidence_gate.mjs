@@ -60,6 +60,7 @@ const local = {
 	repairActions: requireReportPass(findings, 'repair_actions.json', 'repair actions report', data => data?.pass === true && (data?.actions || []).length === 0),
 	actionSchema: requireReportPass(findings, 'action_schema_report.json', 'action schema report'),
 	projectContract: requireReportPass(findings, 'project_contract_report.json', 'project contract report'),
+	projectLibrary: requireReportPass(findings, 'project_library_report.json', 'project library report'),
 	projectNetlist: requireReportPass(findings, 'project_netlist_report.json', 'project netlist report'),
 	projectLayout: requireReportPass(findings, 'project_layout_report.json', 'project layout report'),
 	projectVisual: requireReportPass(findings, 'project_visual_report.json', 'project visual report'),

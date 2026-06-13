@@ -12,6 +12,7 @@ const REPORTS = [
 	{ gate: 'project-contract', file: 'project_contract_report.json', rerun: 'npm.cmd run contract' },
 	{ gate: 'project-rules', file: 'project_rule_report.json', rerun: 'npm.cmd run contract:rules' },
 	{ gate: 'project-pack', file: 'project_pack_report.json', rerun: 'npm.cmd run contract:pack' },
+	{ gate: 'project-library', file: 'project_library_report.json', rerun: 'npm.cmd run contract:library' },
 	{ gate: 'cell-manifest', file: 'cell_manifest_report.json', rerun: 'npm.cmd run contract:cells' },
 	{ gate: 'project-assembly', file: 'project_assembly_report.json', rerun: 'npm.cmd run contract:assembly' },
 	{ gate: 'template', file: 'report.json', rerun: 'npm.cmd run fast' },
@@ -119,6 +120,13 @@ const RULE_PLANS = [
 		inspectFiles: ['project_pack_report.json', 'circuit_packs/aihwdebugger/cell_manifest.json'],
 		nextCommand: 'npm.cmd run contract:pack',
 		repairHint: 'Keep the selected circuit pack registered and ensure it exposes id, cellBuilders, fallbackAnchors, library normalization, and matching cell manifest packId.',
+	}],
+	[/^LC|^GP-LC|^LIB-MANIFEST/, {
+		area: 'project-library',
+		editFiles: ['approved_library_manifest.json', 'project_contract.json'],
+		inspectFiles: ['project_library_report.json', 'approved_library_manifest.json', 'project_contract.json'],
+		nextCommand: 'npm.cmd run contract:library',
+		repairHint: 'Bind every contract requiredPart to approved EasyEDA library Symbol, Device, Footprint, name/value, and BOM/PCB state before generation or write-back.',
 	}],
 	[/^CM/, {
 		area: 'cell-manifest',

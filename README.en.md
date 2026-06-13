@@ -28,6 +28,7 @@ A PASS on the current model only proves the current model. It does not validate 
 - Project contract gate: `project_contract.json` defines modules, key nets, interfaces, visual evidence regions, and the no-free-draw policy.
 - Project netlist gate: `project_netlist.json` defines required pins for key nets and proves the generated model connects them.
 - Circuit pack gate: `contract:pack` verifies the selected `pack.mjs` is registered and exposes required generation hooks.
+- Library contract gate: `contract:library` verifies every required part has approved Symbol, Device, Footprint, name/value, and BOM/PCB state.
 - Cell manifest gate: `circuit_packs/*/cell_manifest.json` declares circuit-pack cell roles, required refs, net args, ports, and layout intent before assembly can use those cells.
 - Rule coverage check: `contract:rules` proves module registry, required parts, interface contracts, and core rules cover the project contract.
 - Assembly coverage check: `contract:assembly` proves every contract module is mapped to a deterministic cell, anchor, refs, and nets before generation.
@@ -82,7 +83,7 @@ node bin/easyeda-gsd.mjs apply --gated
 ```
 
 For a new project, the first implementation step is updating `project_spec.json`, realizing it in `project_contract.json`, defining required endpoints in `project_netlist.json`, declaring/choosing a circuit-pack `cell_manifest.json`, then mapping the contract and layout policy in `project_assembly.json`. Only then should the agent implement project-specific deterministic cells and rules.
-For a new project directory, `node bin/easyeda-gsd.mjs init --pack <pack> --out <project-dir>` writes scaffold versions of those four files plus `gsd_scaffold_report.json`; the scaffold is intentionally incomplete and must not be treated as ready for generation until `plan` passes.
+For a new project directory, `node bin/easyeda-gsd.mjs init --pack <pack> --out <project-dir>` writes scaffold versions of those files plus `approved_library_manifest.json` and `gsd_scaffold_report.json`; the scaffold is intentionally incomplete and must not be treated as ready for generation until `plan` passes.
 
 ## Write Back To EasyEDA
 
@@ -127,6 +128,7 @@ For handoff, review the global sheet and local crops for USB, LDO, RESET, BOOT, 
 - `action_schema_report.json` proves `next_actions.json` follows the stable action schema
 - `gsd_plan_report.json` proves the current spec is realized by contract, netlist, assembly, and circuit pack
 - `gsd_generate_report.json` proves deterministic generation was plan-gated
+- `project_library_report.json` proves every required part has approved library bindings
 - `repair_actions.json` has no finding-level repair actions
 - `repair_loop_report.json` has no grouped repair actions
 - `final_evidence_report.json` proves required local/live evidence is present, fresh, and passing
@@ -158,6 +160,7 @@ For handoff, review the global sheet and local crops for USB, LDO, RESET, BOOT, 
 - `workflows/gsd_plan.mjs`: spec-to-contract realization planner that emits `gsd_plan_report.json`.
 - `workflows/gsd_generate.mjs`: plan-gated deterministic generation wrapper that emits `gsd_generate_report.json`.
 - `workflows/gsd_scaffold.mjs`: new-project scaffold writer for spec, contract, netlist, assembly, and `gsd_scaffold_report.json`.
+- `contracts/library_contract.mjs`: approved library binding validator for required parts.
 - `engine/final_evidence_gate.mjs`: fail-closed local/live evidence gate for freshness, zero DRC, live model proof, and empty repair actions.
 - `circuit_packs/*/cell_manifest.json`: circuit-pack deterministic cell capability contracts.
 - `circuit_packs/*/pack.mjs`: circuit-pack generation hooks and library normalization.

@@ -2,6 +2,7 @@ import { circuitPackIds, getCircuitPack } from '../circuit_packs/registry.mjs';
 import { asArray, validateSpecSchema } from '../contracts/spec_schema.mjs';
 import { validateModuleContract } from '../contracts/module_contract.mjs';
 import { validateNetContract } from '../contracts/net_contract.mjs';
+import { validateLibraryContract } from '../contracts/library_contract.mjs';
 
 function hard(findings, rule, msg, where = {}) {
 	findings.push({ rule, severity: 'hard', category: 'gsd-plan', msg, where });
@@ -104,13 +105,19 @@ function validateSpecRealization(spec, contract, netlist, assembly, model = null
 	return findings;
 }
 
-export function buildGsdPlan({ spec, contract, netlist, assembly, model = null, specPath = 'project_spec.json' }) {
+export function buildGsdPlan({ spec, contract, netlist, assembly, libraryManifest = null, model = null, specPath = 'project_spec.json' }) {
 	const findings = [];
 	findings.push(...validateSpecSchema(spec));
 	if (contract) findings.push(...validateModuleContract(contract).map(f => ({ ...f, category: 'gsd-plan' })));
 	else hard(findings, 'GP0-contract-present', 'project_contract.json is required for planning');
 	if (!netlist) hard(findings, 'GP0-netlist-present', 'project_netlist.json is required for planning');
 	if (!assembly) hard(findings, 'GP0-assembly-present', 'project_assembly.json is required for planning');
+	if (contract && libraryManifest) {
+		const libraryResult = validateLibraryContract(contract, libraryManifest);
+		for (const finding of libraryResult.findings) hard(findings, `GP-${finding.rule}`, finding.msg, finding.where);
+	} else if (!libraryManifest) {
+		hard(findings, 'GP0-library-manifest-present', 'approved_library_manifest.json is required for planning approved library bindings');
+	}
 
 	let pack = null;
 	const packId = spec?.circuitPack || assembly?.circuitPack || 'aihwdebugger';
@@ -130,6 +137,7 @@ export function buildGsdPlan({ spec, contract, netlist, assembly, model = null, 
 		circuitPack: pack?.id || packId,
 		registeredPacks: circuitPackIds(),
 		cellManifest: assembly?.cellManifest || null,
+		libraryManifest: 'approved_library_manifest.json',
 		modules: asArray(spec?.modules).map(mod => mod.id),
 		interfaces: asArray(spec?.interfaces).length,
 		requiredLocalGate: 'node bin/easyeda-gsd.mjs accept',
@@ -140,4 +148,3 @@ export function buildGsdPlan({ spec, contract, netlist, assembly, model = null, 
 	};
 	return report;
 }
-

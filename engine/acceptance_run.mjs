@@ -34,6 +34,7 @@ steps.push(runStep('spec', 'node', ['engine/project_spec_gate.mjs']));
 steps.push(runStep('contract', 'node', ['engine/project_contract_gate.mjs']));
 steps.push(runStep('contract:rules', 'node', ['engine/project_rule_gate.mjs']));
 steps.push(runStep('contract:pack', 'node', ['engine/project_pack_gate.mjs']));
+steps.push(runStep('contract:library', 'node', ['engine/project_library_gate.mjs']));
 steps.push(runStep('contract:cells', 'node', ['engine/project_cell_manifest_gate.mjs']));
 steps.push(runStep('contract:assembly', 'node', ['engine/project_assembly_gate.mjs']));
 steps.push(runStep('fast', 'node', ['engine/pipeline_fast.mjs']));
@@ -65,6 +66,7 @@ for (const [key, path] of Object.entries({
 	projectContract: DIR + 'project_contract_report.json',
 	projectRules: DIR + 'project_rule_report.json',
 	projectPack: DIR + 'project_pack_report.json',
+	projectLibrary: DIR + 'project_library_report.json',
 	cellManifest: DIR + 'cell_manifest_report.json',
 	projectAssembly: DIR + 'project_assembly_report.json',
 	projectLayout: DIR + 'project_layout_report.json',
@@ -100,6 +102,7 @@ const acceptance = {
 			contract: steps.find(s => s.name === 'contract')?.pass === true,
 			projectRules: steps.find(s => s.name === 'contract:rules')?.pass === true,
 			projectPack: steps.find(s => s.name === 'contract:pack')?.pass === true,
+			projectLibrary: steps.find(s => s.name === 'contract:library')?.pass === true,
 			cellManifest: steps.find(s => s.name === 'contract:cells')?.pass === true,
 			projectAssembly: steps.find(s => s.name === 'contract:assembly')?.pass === true,
 			fast: steps.find(s => s.name === 'fast')?.pass === true,
@@ -129,6 +132,7 @@ const acceptance = {
 		projectContract: artifacts.projectContract ? { pass: artifacts.projectContract.pass, severity: artifacts.projectContract.severity, projectId: artifacts.projectContract.projectId, modules: artifacts.projectContract.modules, interfaces: artifacts.projectContract.interfaces } : null,
 		projectRules: artifacts.projectRules ? { pass: artifacts.projectRules.pass, severity: artifacts.projectRules.severity, projectId: artifacts.projectRules.projectId, registeredRules: artifacts.projectRules.registeredRules, registeredModules: artifacts.projectRules.registeredModules, registeredInterfaces: artifacts.projectRules.registeredInterfaces } : null,
 		projectPack: artifacts.projectPack ? { pass: artifacts.projectPack.pass, severity: artifacts.projectPack.severity, circuitPack: artifacts.projectPack.circuitPack, registeredPacks: artifacts.projectPack.registeredPacks } : null,
+		projectLibrary: artifacts.projectLibrary ? { pass: artifacts.projectLibrary.pass, severity: artifacts.projectLibrary.severity, stats: artifacts.projectLibrary.stats } : null,
 		cellManifest: artifacts.cellManifest ? { pass: artifacts.cellManifest.pass, severity: artifacts.cellManifest.severity, packId: artifacts.cellManifest.packId, cellCount: artifacts.cellManifest.cellCount, assemblyCells: artifacts.cellManifest.assemblyCells } : null,
 		projectAssembly: artifacts.projectAssembly ? { pass: artifacts.projectAssembly.pass, severity: artifacts.projectAssembly.severity, projectId: artifacts.projectAssembly.projectId, modules: artifacts.projectAssembly.modules, anchors: artifacts.projectAssembly.anchors, cellTypes: artifacts.projectAssembly.cellTypes } : null,
 		projectLayout: artifacts.projectLayout ? { pass: artifacts.projectLayout.pass, severity: artifacts.projectLayout.severity, projectId: artifacts.projectLayout.projectId, candidateSource: artifacts.projectLayout.candidateSource, totalCandidates: artifacts.projectLayout.totalCandidates, minModuleGap: artifacts.projectLayout.minModuleGap, moduleWireIntrusions: artifacts.projectLayout.moduleWireIntrusions, laneInterlocks: artifacts.projectLayout.laneInterlocks } : null,

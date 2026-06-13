@@ -69,6 +69,12 @@ export function buildScaffold(spec, { pack = 'aihwdebugger' } = {}) {
 		})),
 		allowedAnonymousNets: [],
 	};
+	const libraryManifest = {
+		generatedFrom: 'gsd scaffold',
+		purpose: 'Approved EasyEDA library bindings for this project. Fill every contract requiredPart before generation.',
+		bindingKeys: ['Symbol', 'Device', 'Footprint'],
+		parts: {},
+	};
 
 	const anchors = Object.fromEntries(modules.map((mod, index) => [mod.id, { x: 300 + index * 240, y: 600 }]));
 	const assembly = {
@@ -104,18 +110,19 @@ export function buildScaffold(spec, { pack = 'aihwdebugger' } = {}) {
 		})),
 	};
 
-	return { contract, netlist, assembly };
+	return { contract, netlist, assembly, libraryManifest };
 }
 
 export function writeScaffold({ outDir, spec, pack = 'aihwdebugger' }) {
 	mkdirSync(outDir, { recursive: true });
 	const normalizedSpec = { ...spec, circuitPack: spec.circuitPack || pack };
-	const { contract, netlist, assembly } = buildScaffold(normalizedSpec, { pack });
+	const { contract, netlist, assembly, libraryManifest } = buildScaffold(normalizedSpec, { pack });
 	const files = {
 		'project_spec.json': normalizedSpec,
 		'project_contract.json': contract,
 		'project_netlist.json': netlist,
 		'project_assembly.json': assembly,
+		'approved_library_manifest.json': libraryManifest,
 	};
 	for (const [name, data] of Object.entries(files)) {
 		writeFileSync(`${outDir}/${name}`, JSON.stringify(data, null, 2) + '\n', 'utf8');
@@ -128,9 +135,8 @@ export function writeScaffold({ outDir, spec, pack = 'aihwdebugger' }) {
 		circuitPack: normalizedSpec.circuitPack,
 		files: Object.keys(files),
 		readyForGenerate: false,
-		nextStep: 'Fill requiredParts, requiredPins, deterministic cell mappings, refs, registryModule, netArgs, anchors, and layoutPolicy until node bin/easyeda-gsd.mjs plan <outDir>/project_spec.json passes.',
+		nextStep: 'Fill requiredParts, approved library bindings, requiredPins, deterministic cell mappings, refs, registryModule, netArgs, anchors, and layoutPolicy until node bin/easyeda-gsd.mjs plan <outDir>/project_spec.json passes.',
 	};
 	writeFileSync(`${outDir}/gsd_scaffold_report.json`, JSON.stringify(report, null, 2) + '\n', 'utf8');
 	return report;
 }
-

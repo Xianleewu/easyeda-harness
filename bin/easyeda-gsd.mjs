@@ -104,8 +104,9 @@ function plan(args) {
 	const assembly = readJson(companionPath(specPath, 'project_assembly.json'));
 	const contract = readJson(companionPath(specPath, 'project_contract.json'));
 	const netlist = readJson(companionPath(specPath, 'project_netlist.json'));
+	const libraryManifest = readJson(companionPath(specPath, 'approved_library_manifest.json'));
 	const model = existsSync(`${ROOT}/full_model.json`) ? readJson('full_model.json') : null;
-	const report = buildGsdPlan({ spec: specDoc, contract, netlist, assembly, model, specPath: spec });
+	const report = buildGsdPlan({ spec: specDoc, contract, netlist, assembly, libraryManifest, model, specPath: spec });
 	writeFileSync(`${ROOT}/gsd_plan_report.json`, JSON.stringify(report, null, 2), 'utf8');
 	log(JSON.stringify(report, null, 2));
 	log('report -> gsd_plan_report.json');

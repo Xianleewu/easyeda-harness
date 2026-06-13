@@ -23,8 +23,9 @@ export function buildGeneratePlan(root, specPath = 'project_spec.json') {
 	const contract = readJson(root, companion('project_contract.json'));
 	const netlist = readJson(root, companion('project_netlist.json'));
 	const assembly = readJson(root, companion('project_assembly.json'));
+	const libraryManifest = readJson(root, companion('approved_library_manifest.json'));
 	const model = existsSync(`${root}/full_model.json`) ? readJson(root, 'full_model.json') : null;
-	return buildGsdPlan({ spec, contract, netlist, assembly, model, specPath });
+	return buildGsdPlan({ spec, contract, netlist, assembly, libraryManifest, model, specPath });
 }
 
 export function runGsdGenerate({ root, specPath = 'project_spec.json', command = ['engine/pipeline_fast.mjs'] }) {
