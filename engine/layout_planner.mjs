@@ -11,7 +11,7 @@ import { renderSheetOutput } from './sheet_renderer.mjs';
 import { auditSheetOutput } from './sheet_output_gate.mjs';
 import { computeStructureMetricsFromSnapshot } from './structure_metrics.mjs';
 import { loadProjectAssembly } from './assemble.mjs';
-import { MODULES } from '../harness/module_registry.mjs';
+import { loadProjectModuleRegistry } from '../harness/module_registry.mjs';
 
 const DIR = (process.env.EASYEDA_WORKDIR || process.cwd()).replace(/\\/g, '/') + '/';
 const PART_LIB = process.env.EASYEDA_PART_LIB || DIR + 'snap2.json';
@@ -266,7 +266,8 @@ function boxArea(b) {
 function moduleInternalPacking(model) {
 	const byRef = new Map((model.components || []).map(c => [c.designator, c]));
 	const modules = [];
-	for (const mod of MODULES) {
+	const registry = loadProjectModuleRegistry();
+	for (const mod of registry.modules) {
 		const boxes = mod.refs.map(ref => byRef.get(ref)?.bbox).filter(Boolean);
 		if (!boxes.length) continue;
 		const outer = {
@@ -287,7 +288,7 @@ function moduleInternalPacking(model) {
 	const minRatio = modules.length ? Number(Math.min(...modules.map(m => m.ratio)).toFixed(6)) : null;
 	const outputModules = modules.filter(m => ['pmos', 'relay1', 'relay2'].includes(m.name));
 	const minOutputRatio = outputModules.length ? Number(Math.min(...outputModules.map(m => m.ratio)).toFixed(6)) : null;
-	return { modules, minRatio, minOutputRatio };
+	return { modules, minRatio, minOutputRatio, moduleRegistry: { source: registry.source, modules: registry.modules.length } };
 }
 
 export function evaluateLayout(model, snap, opts = {}) {

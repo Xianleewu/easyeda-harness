@@ -7,6 +7,7 @@ import { writeScaffold } from '../workflows/gsd_scaffold.mjs';
 import { buildMinimalSpec, syncPackRegistry, writePackScaffold } from '../workflows/pack_scaffold.mjs';
 import { validateLibraryContract } from '../contracts/library_contract.mjs';
 import { buildAnchorFamily } from './layout_planner.mjs';
+import { computeStructureMetricsFromSnapshot } from './structure_metrics.mjs';
 import { acquireRunLock } from '../workflows/run_lock.mjs';
 
 const ROOT = (process.env.EASYEDA_WORKDIR || process.cwd()).replace(/\\/g, '/');
@@ -261,6 +262,46 @@ try {
 	assertFinding(findings, duplicateRefGate.status !== 0 && (duplicateRefReport?.findings || []).some(f => f.rule === 'PA21-ref-owned-once'), 'WS36-assembly-refs-owned-once', 'project assembly gate must reject refs that map the same physical designator into more than one module', {
 		report: checks.assemblyRefsOwnedOnce,
 	});
+
+	const externalStructureAssemblyPath = `${TMP_DIR}/external_structure_assembly.json`;
+	writeFileSync(externalStructureAssemblyPath, JSON.stringify({
+		projectId: 'workflow-smoke-external-structure',
+		modules: [{
+			id: 'sensor_frontend',
+			registryModule: 'sensor_frontend',
+			refs: { U: 'U99', R: 'R99' },
+		}],
+		layoutPolicy: {
+			columns: [{ id: 'input', modules: ['sensor_frontend'] }],
+		},
+	}, null, 2) + '\n', 'utf8');
+	const oldProjectAssembly = process.env.EASYEDA_PROJECT_ASSEMBLY;
+	process.env.EASYEDA_PROJECT_ASSEMBLY = externalStructureAssemblyPath;
+	const externalStructure = computeStructureMetricsFromSnapshot({
+		project: 'workflow-smoke-external-structure',
+		components: [
+			{ designator: 'U99', bbox: { minX: 100, minY: 100, maxX: 140, maxY: 140 }, pins: [] },
+			{ designator: 'R99', bbox: { minX: 170, minY: 105, maxX: 190, maxY: 135 }, pins: [] },
+		],
+		wires: [],
+		netflags: [],
+	});
+	if (oldProjectAssembly === undefined) delete process.env.EASYEDA_PROJECT_ASSEMBLY;
+	else process.env.EASYEDA_PROJECT_ASSEMBLY = oldProjectAssembly;
+	checks.structureUsesProjectAssemblyModules = {
+		source: externalStructure.moduleRegistry?.source || null,
+		modules: externalStructure.moduleRegistry?.modules ?? null,
+		moduleNames: (externalStructure.modules || []).map(mod => mod.name),
+	};
+	assertFinding(
+		findings,
+		checks.structureUsesProjectAssemblyModules.source === externalStructureAssemblyPath
+			&& checks.structureUsesProjectAssemblyModules.modules === 1
+			&& checks.structureUsesProjectAssemblyModules.moduleNames.includes('sensor_frontend'),
+		'WS37-structure-uses-project-assembly-modules',
+		'structure metrics must derive module regions from the active project_assembly.json instead of the bundled AIHWDEBUGER module registry',
+		checks.structureUsesProjectAssemblyModules,
+	);
 
 	const noDrawingRulesContract = clone(contract);
 	if (noDrawingRulesContract.modules?.[0]) delete noDrawingRulesContract.modules[0].drawingRules;

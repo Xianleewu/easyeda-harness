@@ -1,6 +1,6 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import { buildModel } from '../harness/model.mjs';
-import { MODULES, REPEATED_GROUPS } from '../harness/module_registry.mjs';
+import { loadProjectModuleRegistry } from '../harness/module_registry.mjs';
 import { rectsGap, round2, segIntersectsRect, shrinkRect } from '../harness/model.mjs';
 import { CONFIG } from '../harness/config.mjs';
 import { rawWireStats } from '../harness/raw_wire_quality.mjs';
@@ -69,10 +69,13 @@ function segKey(s) {
 
 export function computeStructureMetricsFromSnapshot(snap) {
 const model = buildModel(snap);
+const registry = loadProjectModuleRegistry();
+const activeModules = registry.modules;
+const activeRepeatedGroups = registry.repeatedGroups;
 const POWER_NETS = new Set(['GND', 'SYS_3V3', 'SYS_5V', 'VIN_12_19V', 'VOUT_SW']);
 const rawWire = rawWireStats(model.rawWires || []);
 const parts = new Map(model.parts.map(p => [p.designator, p]));
-const modules = MODULES.map(mod => {
+const modules = activeModules.map(mod => {
 	const box = boxOf(parts, mod.refs, 12);
 	const laneBox = boxOf(parts, mod.refs, CONFIG.module?.interlockMargin ?? 0);
 	if (!box) return null;
@@ -154,7 +157,7 @@ for (let i = 0; i < modules.length; i++) {
 }
 
 const repeated = [];
-for (const group of REPEATED_GROUPS) {
+for (const group of activeRepeatedGroups) {
 	const namedModules = Object.fromEntries(modules.map(m => [m.name, m]));
 	const [aModuleName, bModuleName] = group.modules || [];
 	const aModule = namedModules[aModuleName];
@@ -233,7 +236,7 @@ const moduleWireIntrusions = [];
 const segmentModules = new Map();
 for (const g of model.groups || []) {
 	const owners = new Set((g.pins || []).map(pin => {
-		const mod = MODULES.find(m => m.refs.includes(pin.designator));
+		const mod = activeModules.find(m => m.refs.includes(pin.designator));
 		return mod?.name;
 	}).filter(Boolean));
 	for (const s of g.segs || []) segmentModules.set(segKey(s), owners);
@@ -432,6 +435,11 @@ for (const f of findings) bySev[f.severity] = (bySev[f.severity] || 0) + 1;
 const report = {
 	generatedAt: new Date().toISOString(),
 	project: model.project,
+	moduleRegistry: {
+		source: registry.source,
+		modules: activeModules.length,
+		repeatedGroups: activeRepeatedGroups.length,
+	},
 	stats: {
 		parts: model.parts.length,
 		segments: normalizedSegments.length,
