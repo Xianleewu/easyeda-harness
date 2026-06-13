@@ -9,6 +9,7 @@
     "harness": "node harness/harness.mjs full_model.json harness_model_report.json",
     "gsd": "node bin/easyeda-gsd.mjs",
     "gsd:plan": "node bin/easyeda-gsd.mjs plan",
+    "gsd:generate": "node bin/easyeda-gsd.mjs generate",
     "gsd:accept": "node bin/easyeda-gsd.mjs accept",
     "gsd:live": "node bin/easyeda-gsd.mjs live-check",
     "apply:gated": "node engine/apply_gated.mjs",

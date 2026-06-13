@@ -5,6 +5,7 @@ import { dirname, resolve } from 'node:path';
 import { validateSpecSchema } from '../contracts/spec_schema.mjs';
 import { loadRepairLoopPlan } from '../workflows/repair_loop.mjs';
 import { buildGsdPlan } from '../workflows/gsd_plan.mjs';
+import { runGsdGenerate } from '../workflows/gsd_generate.mjs';
 
 const ROOT = resolve(new URL('..', import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1')).replace(/\\/g, '/');
 
@@ -29,7 +30,7 @@ Commands:
   init --pack aihwdebugger --out <file>
                                Write a minimal spec scaffold for the bundled pack.
   plan [spec]                  Validate current project contracts and print selected pack data.
-  generate [spec]              Run deterministic local generation checks without write-back.
+  generate [spec]              Plan-gated deterministic generation without write-back.
   accept                       Run local acceptance gates.
   live-check                   Run live EasyEDA snapshot, image, DRC, and live shot checks.
   apply --gated                Write back through the fail-closed gated entrypoint.
@@ -141,6 +142,14 @@ function repair(args) {
 	process.exit(plan.pass ? 0 : 1);
 }
 
+function generate(args) {
+	const spec = args.find(a => !a.startsWith('-')) || 'project_spec.json';
+	const { report, status } = runGsdGenerate({ root: ROOT, specPath: spec });
+	log(JSON.stringify(report, null, 2));
+	log('report -> gsd_generate_report.json');
+	process.exit(status);
+}
+
 const [cmd = 'help', ...args] = process.argv.slice(2);
 
 switch (cmd) {
@@ -156,7 +165,7 @@ switch (cmd) {
 		plan(args);
 		break;
 	case 'generate':
-		runNode(['engine/pipeline_fast.mjs']);
+		generate(args);
 		break;
 	case 'accept':
 		runNode(['engine/acceptance_run.mjs']);

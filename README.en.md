@@ -14,7 +14,7 @@ This repository is an executable workflow, not a prompt pack for free-form drawi
 
 A PASS on the current model only proves the current model. It does not validate another project, another schematic, or manual EasyEDA edits.
 
-`project_spec.json` is the machine-readable user-intent input. `node bin/easyeda-gsd.mjs plan` writes `gsd_plan_report.json`, proving that the spec is realized by the current contract, netlist, assembly, and circuit pack. `project_contract.json` is the design contract derived from that spec. `npm run spec` checks that the contract covers the spec, and `npm run contract` / `npm run accept` continue checking the contract and generated model.
+`project_spec.json` is the machine-readable user-intent input. `node bin/easyeda-gsd.mjs plan` writes `gsd_plan_report.json`, proving that the spec is realized by the current contract, netlist, assembly, and circuit pack. `node bin/easyeda-gsd.mjs generate` writes `gsd_generate_report.json` and refuses to generate if the plan fails. `project_contract.json` is the design contract derived from that spec. `npm run spec` checks that the contract covers the spec, and `npm run contract` / `npm run accept` continue checking the contract and generated model.
 `npm run spec:schema` validates the spec shape before contract coverage is checked.
 
 `project_contract.json` is the first machine-readable file an agent must update for a new project. `project_netlist.json` records the required electrical endpoints. `circuit_packs/*/cell_manifest.json` declares deterministic cell capabilities for the selected circuit pack, and `project_assembly.json` maps each contract module to those cells, refs, anchors, nets, and layout policy. `npm run contract`, `npm run contract:netlist`, `npm run contract:cells`, `npm run contract:assembly`, `npm run contract:layout`, and `npm run accept` check them; if they fail, the agent should not edit write-back scripts, apply to EasyEDA, or claim completion.
@@ -125,6 +125,7 @@ For handoff, review the global sheet and local crops for USB, LDO, RESET, BOOT, 
 - `next_actions.json` has no open handoff summary actions
 - `action_schema_report.json` proves `next_actions.json` follows the stable action schema
 - `gsd_plan_report.json` proves the current spec is realized by contract, netlist, assembly, and circuit pack
+- `gsd_generate_report.json` proves deterministic generation was plan-gated
 - `repair_actions.json` has no finding-level repair actions
 - `repair_loop_report.json` has no grouped repair actions
 - `final_evidence_report.json` proves required local/live evidence is present, fresh, and passing
@@ -154,6 +155,7 @@ For handoff, review the global sheet and local crops for USB, LDO, RESET, BOOT, 
 - `contracts/module_contract.mjs` / `contracts/net_contract.mjs` / `contracts/layout_contract.mjs`: reusable validators for functional modules, electrical endpoint intent, and project-driven layout policy.
 - `workflows/repair_loop.mjs`: read-only repair loop planner that groups `next_actions.json` and `repair_actions.json` into fix kinds, files, evidence, and rerun commands, then emits `repair_loop_report.json`.
 - `workflows/gsd_plan.mjs`: spec-to-contract realization planner that emits `gsd_plan_report.json`.
+- `workflows/gsd_generate.mjs`: plan-gated deterministic generation wrapper that emits `gsd_generate_report.json`.
 - `engine/final_evidence_gate.mjs`: fail-closed local/live evidence gate for freshness, zero DRC, live model proof, and empty repair actions.
 - `circuit_packs/*/cell_manifest.json`: circuit-pack deterministic cell capability contracts.
 - `circuit_packs/*/pack.mjs`: circuit-pack generation hooks and library normalization.

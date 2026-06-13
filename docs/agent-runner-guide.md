@@ -11,9 +11,10 @@ Use this repository as an executable schematic workflow, not as permission to dr
 5. Select or declare the circuit-pack `pack.mjs` and `cell_manifest.json`.
 6. Map modules, refs, anchors, nets, and layout policy in `project_assembly.json`.
 7. Implement deterministic cells and rules only after those contracts exist.
-8. Run `node bin/easyeda-gsd.mjs accept`.
-9. Run `node bin/easyeda-gsd.mjs live-check` before final delivery.
-10. Write back only with `node bin/easyeda-gsd.mjs apply --gated`.
+8. Run `node bin/easyeda-gsd.mjs generate` and keep `gsd_generate_report.json` passing.
+9. Run `node bin/easyeda-gsd.mjs accept`.
+10. Run `node bin/easyeda-gsd.mjs live-check` before final delivery.
+11. Write back only with `node bin/easyeda-gsd.mjs apply --gated`.
 
 ## Constraints
 

@@ -8,6 +8,12 @@ Generated reports are ignored by Git, but their shapes are part of the workflow 
 
 It must pass before generation work is trusted. It proves that `project_spec.json` is covered by `project_contract.json`, `project_netlist.json`, `project_assembly.json`, and a registered circuit pack, preventing a new spec from accidentally reusing the bundled reference schematic contracts.
 
+## `gsd_generate_report.json`
+
+`gsd_generate_report.json` is written by `node bin/easyeda-gsd.mjs generate`.
+
+It must pass before local acceptance is trusted. It proves that deterministic generation ran only after a passing `gsd_plan_report.json` and produced `full_model.json` plus `report.json`.
+
 ## `next_actions.json`
 
 `next_actions.json` follows `schemaVersion: 1` and is validated by `npm run action:schema`.

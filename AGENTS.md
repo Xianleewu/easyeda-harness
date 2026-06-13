@@ -17,7 +17,7 @@ For a new schematic project, do not draw directly in EasyEDA and then hope the g
 
 A PASS on the bundled model only proves that the bundled model passes. It does not validate another project, another schematic, or hand-drawn EasyEDA edits.
 
-`project_spec.json` is the first user-intent input. `node bin/easyeda-gsd.mjs plan` writes `gsd_plan_report.json` and proves that the current spec is actually realized by `project_contract.json`, `project_netlist.json`, `project_assembly.json`, and a registered circuit pack. `spec:schema` validates that input before any contract is trusted. `project_contract.json` is the required machine contract derived from it. `project_netlist.json` records required electrical endpoints. `circuit_packs/*/pack.mjs` owns circuit-family generation behavior, `circuit_packs/*/cell_manifest.json` declares deterministic cell capabilities for the selected circuit pack, and `project_assembly.json` maps each contract module to those cells, refs, anchors, nets, and layout policy. Update all of them before changing cells for a new project, then run `npm.cmd run gsd:plan`, `npm.cmd run spec:schema`, `npm.cmd run spec`, `npm.cmd run contract`, `npm.cmd run contract:netlist`, `npm.cmd run contract:pack`, `npm.cmd run contract:cells`, `npm.cmd run contract:assembly`, and `npm.cmd run accept`. A failing plan, spec schema, spec coverage, contract, netlist, circuit-pack, cell-manifest, assembly, or layout gate blocks all write-back and delivery claims.
+`project_spec.json` is the first user-intent input. `node bin/easyeda-gsd.mjs plan` writes `gsd_plan_report.json` and proves that the current spec is actually realized by `project_contract.json`, `project_netlist.json`, `project_assembly.json`, and a registered circuit pack. `node bin/easyeda-gsd.mjs generate` then writes `gsd_generate_report.json` and refuses to run deterministic generation unless that plan passes. `spec:schema` validates that input before any contract is trusted. `project_contract.json` is the required machine contract derived from it. `project_netlist.json` records required electrical endpoints. `circuit_packs/*/pack.mjs` owns circuit-family generation behavior, `circuit_packs/*/cell_manifest.json` declares deterministic cell capabilities for the selected circuit pack, and `project_assembly.json` maps each contract module to those cells, refs, anchors, nets, and layout policy. Update all of them before changing cells for a new project, then run `npm.cmd run gsd:plan`, `npm.cmd run gsd:generate`, `npm.cmd run spec:schema`, `npm.cmd run spec`, `npm.cmd run contract`, `npm.cmd run contract:netlist`, `npm.cmd run contract:pack`, `npm.cmd run contract:cells`, `npm.cmd run contract:assembly`, and `npm.cmd run accept`. A failing plan, generate, spec schema, spec coverage, contract, netlist, circuit-pack, cell-manifest, assembly, or layout gate blocks all write-back and delivery claims.
 
 ## Required External Skill
 
@@ -62,6 +62,7 @@ Use `node bin/easyeda-gsd.mjs repair` for the read-only grouped repair plan; it 
 Acceptance requires all local gates to pass:
 
 - `gsd:plan`: `project_spec.json` is realized by the current contract, netlist, assembly, and circuit pack
+- `gsd:generate`: a passing GSD plan produced `full_model.json` and `report.json` through deterministic generation
 - `spec`: `project_contract.json` covers `project_spec.json`
 - `spec:schema`: `project_spec.json` is a valid first-layer user-intent contract
 - `contract`: `HARD=0 SOFT=0 INFO=0`
@@ -128,6 +129,7 @@ Before claiming completion, produce or inspect:
 - `repair_actions.json` with no finding-level repair actions before final delivery
 - `repair_loop_report.json` with no grouped repair actions before final delivery
 - `final_evidence_report.json` proving required local/live evidence is present, fresh, and passing
+- `gsd_generate_report.json` proving deterministic generation was plan-gated
 - Local module crops for USB, LDO, RESET, BOOT, MCU left/right, PMOS, RELAY1, RELAY2, and title/template area
 
 If a visual or DRC issue appears, update the deterministic template/rules first, then rerun the gates.

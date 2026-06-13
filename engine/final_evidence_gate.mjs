@@ -55,6 +55,7 @@ const findings = [];
 const local = {
 	acceptance: requireReportPass(findings, 'acceptance_report.json', 'local acceptance report', data => data?.pass === true),
 	gsdPlan: requireReportPass(findings, 'gsd_plan_report.json', 'GSD plan report'),
+	gsdGenerate: requireReportPass(findings, 'gsd_generate_report.json', 'GSD generate report'),
 	nextActions: requireReportPass(findings, 'next_actions.json', 'next actions report', data => data?.pass === true && (data?.actions || []).length === 0),
 	repairActions: requireReportPass(findings, 'repair_actions.json', 'repair actions report', data => data?.pass === true && (data?.actions || []).length === 0),
 	actionSchema: requireReportPass(findings, 'action_schema_report.json', 'action schema report'),

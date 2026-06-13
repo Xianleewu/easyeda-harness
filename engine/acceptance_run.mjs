@@ -28,6 +28,7 @@ const steps = [];
 steps.push(runStep('entrypoints', 'node', ['engine/entrypoint_audit.mjs']));
 steps.push(runStep('agent:instructions', 'node', ['engine/agent_instruction_gate.mjs']));
 steps.push(runStep('gsd:plan', 'node', ['bin/easyeda-gsd.mjs', 'plan']));
+steps.push(runStep('gsd:generate', 'node', ['bin/easyeda-gsd.mjs', 'generate']));
 steps.push(runStep('spec:schema', 'node', ['engine/spec_schema_gate.mjs']));
 steps.push(runStep('spec', 'node', ['engine/project_spec_gate.mjs']));
 steps.push(runStep('contract', 'node', ['engine/project_contract_gate.mjs']));
@@ -58,6 +59,7 @@ for (const [key, path] of Object.entries({
 	report: DIR + 'report.json',
 	agentInstructions: DIR + 'agent_instruction_report.json',
 	gsdPlan: DIR + 'gsd_plan_report.json',
+	gsdGenerate: DIR + 'gsd_generate_report.json',
 	specSchema: DIR + 'spec_schema_report.json',
 	projectSpec: DIR + 'project_spec_report.json',
 	projectContract: DIR + 'project_contract_report.json',
@@ -92,6 +94,7 @@ const acceptance = {
 		local: {
 			agentInstructions: steps.find(s => s.name === 'agent:instructions')?.pass === true,
 			gsdPlan: steps.find(s => s.name === 'gsd:plan')?.pass === true,
+			gsdGenerate: steps.find(s => s.name === 'gsd:generate')?.pass === true,
 			specSchema: steps.find(s => s.name === 'spec:schema')?.pass === true,
 			spec: steps.find(s => s.name === 'spec')?.pass === true,
 			contract: steps.find(s => s.name === 'contract')?.pass === true,
@@ -120,6 +123,7 @@ const acceptance = {
 		report: artifacts.report ? { pass: artifacts.report.pass, severity: artifacts.report.severity, score: artifacts.report.score } : null,
 		agentInstructions: artifacts.agentInstructions ? { pass: artifacts.agentInstructions.pass, severity: artifacts.agentInstructions.severity, filesChecked: artifacts.agentInstructions.filesChecked } : null,
 		gsdPlan: artifacts.gsdPlan ? { pass: artifacts.gsdPlan.pass, severity: artifacts.gsdPlan.severity, projectId: artifacts.gsdPlan.projectId, circuitPack: artifacts.gsdPlan.circuitPack, modules: artifacts.gsdPlan.modules } : null,
+		gsdGenerate: artifacts.gsdGenerate ? { pass: artifacts.gsdGenerate.pass, severity: artifacts.gsdGenerate.severity, projectId: artifacts.gsdGenerate.projectId, circuitPack: artifacts.gsdGenerate.circuitPack, generated: artifacts.gsdGenerate.generated } : null,
 		specSchema: artifacts.specSchema ? { pass: artifacts.specSchema.pass, severity: artifacts.specSchema.severity, projectId: artifacts.specSchema.projectId, modules: artifacts.specSchema.modules, interfaces: artifacts.specSchema.interfaces } : null,
 		projectSpec: artifacts.projectSpec ? { pass: artifacts.projectSpec.pass, severity: artifacts.projectSpec.severity, projectId: artifacts.projectSpec.projectId, modules: artifacts.projectSpec.modules, interfaces: artifacts.projectSpec.interfaces } : null,
 		projectContract: artifacts.projectContract ? { pass: artifacts.projectContract.pass, severity: artifacts.projectContract.severity, projectId: artifacts.projectContract.projectId, modules: artifacts.projectContract.modules, interfaces: artifacts.projectContract.interfaces } : null,

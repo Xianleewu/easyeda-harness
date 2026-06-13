@@ -28,6 +28,7 @@ function pushAction(actions, item) {
 const acceptance = readJson('acceptance_report.json');
 const agentInstructions = readJson('agent_instruction_report.json');
 const gsdPlan = readJson('gsd_plan_report.json');
+const gsdGenerate = readJson('gsd_generate_report.json');
 const specSchema = readJson('spec_schema_report.json');
 const spec = readJson('project_spec_report.json');
 const contract = readJson('project_contract_report.json');
@@ -64,6 +65,14 @@ const checks = {
 		modules: gsdPlan?.modules || null,
 		firstFinding: gsdPlan?.findings?.[0] || null,
 		evidence: 'gsd_plan_report.json',
+	},
+	gsdGenerate: {
+		status: status(gsdGenerate?.pass),
+		severity: gsdGenerate?.severity || null,
+		projectId: gsdGenerate?.projectId || null,
+		circuitPack: gsdGenerate?.circuitPack || null,
+		firstFinding: gsdGenerate?.findings?.[0] || null,
+		evidence: 'gsd_generate_report.json',
 	},
 	specSchema: {
 		status: status(specSchema?.pass),
@@ -258,6 +267,14 @@ if (checks.gsdPlan.status !== 'pass') {
 		action: 'Fix spec-to-contract realization before generation. gsd_plan_report.json must prove project_spec.json is covered by project_contract.json, project_netlist.json, project_assembly.json, and a registered circuit pack.',
 		evidence: ['project_spec.json', 'project_contract.json', 'project_netlist.json', 'project_assembly.json', 'gsd_plan_report.json'],
 		observed: checks.gsdPlan.firstFinding || checks.gsdPlan,
+	});
+}
+if (checks.gsdGenerate.status !== 'pass') {
+	pushAction(actions, {
+		area: 'gsd-generate',
+		action: 'Run generation only through the plan-gated workflow. gsd_generate_report.json must prove a passing GSD plan produced full_model.json and report.json from the deterministic generator.',
+		evidence: ['gsd_generate_report.json', 'gsd_plan_report.json', 'full_model.json', 'report.json'],
+		observed: checks.gsdGenerate.firstFinding || checks.gsdGenerate,
 	});
 }
 if (checks.specSchema.status !== 'pass') {

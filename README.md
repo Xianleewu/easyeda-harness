@@ -14,7 +14,7 @@ EasyEDA Harness 是一套给 Codex、Claude Code 等编程 Agent 使用的原理
 
 当前模型 PASS 只证明当前模型 PASS，不能证明其它项目、其它原理图或手工绘制结果符合规则。
 
-`project_spec.json` 是用户电路需求的机器输入；`node bin/easyeda-gsd.mjs plan` 会写出 `gsd_plan_report.json`，证明 spec 已经被当前合同、网表、装配和电路包兑现；`project_contract.json` 是 Agent 从 spec 落下来的设计合同；`project_assembly.json` 把每个合同模块映射到确定性 cell、refs、anchors、nets 和布局策略。`npm run spec` 会检查 spec 已被 contract 覆盖，`npm run contract:assembly`、`npm run contract:layout` 和 `npm run accept` 会继续检查合同、装配清单、布局策略与模型。
+`project_spec.json` 是用户电路需求的机器输入；`node bin/easyeda-gsd.mjs plan` 会写出 `gsd_plan_report.json`，证明 spec 已经被当前合同、网表、装配和电路包兑现；`node bin/easyeda-gsd.mjs generate` 会写出 `gsd_generate_report.json`，并在 plan 失败时拒绝生成；`project_contract.json` 是 Agent 从 spec 落下来的设计合同；`project_assembly.json` 把每个合同模块映射到确定性 cell、refs、anchors、nets 和布局策略。`npm run spec` 会检查 spec 已被 contract 覆盖，`npm run contract:assembly`、`npm run contract:layout` 和 `npm run accept` 会继续检查合同、装配清单、布局策略与模型。
 `npm run spec:schema` 会先验证 spec 自身结构，再进入合同覆盖检查。
 
 `project_contract.json` 是 Agent 接手新项目时必须先修改的机器合同，`project_netlist.json` 记录关键网络的必连端点，`circuit_packs/*/cell_manifest.json` 声明所选电路包的确定性 cell 能力，`project_assembly.json` 是随后必须补齐的可执行装配映射和布局策略。`npm run contract`、`npm run contract:netlist`、`npm run contract:cells`、`npm run contract:assembly`、`npm run contract:layout` 和 `npm run accept` 会检查这些文件；未通过时，不应继续写回或声称已完成。
@@ -124,6 +124,7 @@ Agent 会通过 `apply:gated` 写回 EasyEDA。这个入口会先运行检查；
 - `next_actions.json` 无开放接手摘要项
 - `action_schema_report.json` 证明 `next_actions.json` 符合稳定 action schema
 - `gsd_plan_report.json` 证明当前 spec 已由 contract、netlist、assembly 和 circuit pack 兑现
+- `gsd_generate_report.json` 证明确定性生成经过 plan 门禁
 - `repair_actions.json` 无逐条 finding 修复项
 - `repair_loop_report.json` 无分组修复项
 - `final_evidence_report.json` 证明所需 local/live 证据存在、足够新并通过
@@ -152,6 +153,7 @@ Agent 会通过 `apply:gated` 写回 EasyEDA。这个入口会先运行检查；
 - `contracts/spec_schema.mjs`：第一层用户意图输入的可复用 schema 校验。
 - `contracts/module_contract.mjs` / `contracts/net_contract.mjs` / `contracts/layout_contract.mjs`：功能模块、电气端点意图和项目驱动布局策略的可复用校验器。
 - `workflows/gsd_plan.mjs`：spec-to-contract 兑现计划器，写出 `gsd_plan_report.json`。
+- `workflows/gsd_generate.mjs`：plan-gated 的确定性生成包装器，写出 `gsd_generate_report.json`。
 - `workflows/repair_loop.mjs`：只读修复循环计划器，把 `next_actions.json` 和 `repair_actions.json` 分组成修复类型、文件、证据和复跑命令，并写出 `repair_loop_report.json`。
 - `engine/final_evidence_gate.mjs`：fail-closed 的 local/live 证据门禁，检查新鲜度、DRC 归零、live model 证明和空修复项。
 - `circuit_packs/*/cell_manifest.json`：电路包确定性 cell 能力合同。
