@@ -14,6 +14,8 @@ import { auditDocumentStyleFromSnapshot } from './document_style_gate.mjs';
 import { auditPageComposition } from './page_composition.mjs';
 import { acquireRunLock } from '../workflows/run_lock.mjs';
 import { generateContext } from '../workflows/gsd_generate.mjs';
+import { resolveApplyWriter } from '../contracts/apply_writer_contract.mjs';
+import { getCircuitPack } from '../circuit_packs/registry.mjs';
 
 const DIR = (process.env.EASYEDA_WORKDIR || process.cwd()).replace(/\\/g, '/') + '/';
 let LOCK;
@@ -26,6 +28,9 @@ try {
 let TARGET_WINDOW_ID = process.env.EASYEDA_WINDOW_ID || '';
 const SPEC_PATH = process.argv.slice(2).find(arg => !arg.startsWith('-')) || process.env.EASYEDA_PROJECT_SPEC || 'project_spec.json';
 const CONTEXT = generateContext(DIR.replace(/\/$/, ''), SPEC_PATH);
+const APPLY_ASSEMBLY = JSON.parse(readFileSync(CONTEXT.assemblyPath, 'utf8').replace(/^\uFEFF/, ''));
+const APPLY_PACK = getCircuitPack(APPLY_ASSEMBLY.circuitPack || 'aihwdebugger');
+const APPLY_WRITER = resolveApplyWriter({ assembly: APPLY_ASSEMBLY, pack: APPLY_PACK, root: DIR.replace(/\/$/, '') });
 const STEP_ENV = {
 	...process.env,
 	EASYEDA_GSD_LOCK_TOKEN: LOCK.token,
@@ -154,10 +159,24 @@ if (process.env.EASYEDA_APPLY_CONTEXT_ONLY === '1' || process.argv.includes('--c
 		pass: true,
 		mode: 'context-only',
 		writeBack: false,
+		applyWriter: APPLY_WRITER,
 		severity: { hard: 0, soft: 0, info: 0 },
 		findings: [],
 	});
 	process.exit(0);
+}
+
+if (!APPLY_WRITER.pass) {
+	saveApplyReport({
+		pass: false,
+		mode: 'preflight',
+		writeBack: false,
+		applyWriter: APPLY_WRITER,
+		severity: APPLY_WRITER.severity,
+		findings: APPLY_WRITER.findings,
+	});
+	console.error('ABORT: apply writer gate failed, write-back blocked');
+	process.exit(1);
 }
 
 try {
@@ -239,6 +258,7 @@ if (!process.exitCode) {
 	const hard = liveResult.findings.filter(f => f.severity === 'hard').length;
 	const applyReport = {
 		template: { pass: rep.pass, score: rep.score, severity: rep.severity },
+		applyWriter: APPLY_WRITER,
 		target: targetGate,
 		postProcess,
 		modelNetContract,

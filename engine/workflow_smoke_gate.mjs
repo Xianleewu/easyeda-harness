@@ -38,6 +38,8 @@ const CUSTOM_PACK = 'workflow_smoke_pack';
 const CUSTOM_PACK_DIR = `${ROOT}/circuit_packs/${CUSTOM_PACK}`;
 const BAD_BUILDER_PACK = 'workflow_bad_builder_pack';
 const BAD_BUILDER_PACK_DIR = `${ROOT}/circuit_packs/${BAD_BUILDER_PACK}`;
+const NO_WRITER_PACK = 'workflow_no_writer_pack';
+const NO_WRITER_PACK_DIR = `${ROOT}/circuit_packs/${NO_WRITER_PACK}`;
 
 process.on('exit', () => LOCK.release());
 process.on('SIGINT', () => {
@@ -1238,7 +1240,129 @@ export const pack = { id: '${badBuilderPackId}', fallbackAnchors, cellBuilders, 
 		mode: customApplyContextReport?.mode || null,
 		spec: customApplyContextReport?.context?.spec || null,
 		assemblyPath: customApplyContextReport?.context?.assemblyPath || null,
+		applyWriterPass: customApplyContextReport?.applyWriter?.pass ?? null,
 	};
+	mkdirSync(NO_WRITER_PACK_DIR, { recursive: true });
+	writeFileSync(`${NO_WRITER_PACK_DIR}/pack.mjs`, `export const fallbackAnchors = {};
+export const cellBuilders = {
+\tsensorCell() {
+\t\treturn {
+\t\t\tplace: { U99: { x: 100, y: 100, rot: 0, mirror: false } },
+\t\t\twires: [{ net: 'SENSE_OUT', line: [100, 100, 140, 100] }],
+\t\t\tflags: [{ kind: 'sig', net: 'SENSE_OUT', x: 140, y: 100, textX: 140, textY: 100, rot: 0, alignMode: 8 }],
+\t\t};
+\t},
+};
+export function normalizeLibrarySnapshot(snap) { return snap; }
+export const pack = { id: '${NO_WRITER_PACK}', fallbackAnchors, cellBuilders, normalizeLibrarySnapshot };
+`, 'utf8');
+	writeFileSync(`${NO_WRITER_PACK_DIR}/cell_manifest.json`, JSON.stringify({
+		schemaVersion: 1,
+		packId: NO_WRITER_PACK,
+		purpose: 'No writer pack smoke manifest.',
+		requiredQualityRules: [
+			'orthogonal-wiring',
+			'real-net-labels',
+			'text-clearance',
+			'module-box-isolation',
+			'no-fake-net-text',
+			'no-unnecessary-net-ports',
+		],
+		cells: [{
+			id: 'sensorCell',
+			moduleType: 'sensor_frontend',
+			refs: ['U'],
+			netArgs: [],
+			ports: ['SENSE_OUT'],
+			layoutIntent: 'valid tiny deterministic sensor cell without apply writer',
+			qualityRules: [
+				'orthogonal-wiring',
+				'real-net-labels',
+				'text-clearance',
+				'module-box-isolation',
+				'no-fake-net-text',
+				'no-unnecessary-net-ports',
+			],
+		}],
+	}, null, 2) + '\n', 'utf8');
+	syncPackRegistry(ROOT);
+	const noWriterDir = `${TMP_DIR}/no_writer_project`;
+	mkdirSync(noWriterDir, { recursive: true });
+	const noWriterSpec = {
+		schemaVersion: 1,
+		projectId: 'workflow-no-writer',
+		intent: 'No writer apply gate smoke.',
+		circuitPack: NO_WRITER_PACK,
+		modules: [{ id: 'sensor_frontend', title: 'Sensor Frontend', requiredNets: ['SENSE_OUT'] }],
+		interfaces: [],
+	};
+	const noWriterContract = {
+		...genericContract,
+		projectId: noWriterSpec.projectId,
+		modules: [{
+			...genericContract.modules[0],
+			requiredParts: ['U99'],
+			requiredNets: ['SENSE_OUT'],
+		}],
+		qualityPolicy: { ...genericContract.qualityPolicy },
+	};
+	const noWriterAssembly = {
+		...genericAssembly,
+		projectId: noWriterSpec.projectId,
+		circuitPack: NO_WRITER_PACK,
+		cellManifest: `../../circuit_packs/${NO_WRITER_PACK}/cell_manifest.json`,
+		layoutPolicy: {
+			...genericAssembly.layoutPolicy,
+			xProfiles: [{ sensorX: 300 }],
+		},
+		modules: [{
+			...genericAssembly.modules[0],
+			cell: 'sensorCell',
+			refs: { U: 'U99' },
+			nets: ['SENSE_OUT'],
+		}],
+	};
+	writeFileSync(`${noWriterDir}/project_spec.json`, JSON.stringify(noWriterSpec, null, 2) + '\n', 'utf8');
+	writeFileSync(`${noWriterDir}/project_contract.json`, JSON.stringify(noWriterContract, null, 2) + '\n', 'utf8');
+	writeFileSync(`${noWriterDir}/project_netlist.json`, JSON.stringify({ schemaVersion: 1, projectId: noWriterSpec.projectId, nets: [{ name: 'SENSE_OUT', requiredPins: [] }] }, null, 2) + '\n', 'utf8');
+	writeFileSync(`${noWriterDir}/project_assembly.json`, JSON.stringify(noWriterAssembly, null, 2) + '\n', 'utf8');
+	writeFileSync(`${noWriterDir}/approved_library_manifest.json`, JSON.stringify({ purpose: 'No writer smoke library.', parts: { U99: { Symbol: 'S', Device: 'D', Footprint: 'F', name: 'U99', value: 'IC', addIntoBom: true, addIntoPcb: true } } }, null, 2) + '\n', 'utf8');
+	writeFileSync(`${noWriterDir}/project_library_snapshot.json`, JSON.stringify({ project: noWriterSpec.projectId, components: [{ designator: 'U99', x: 0, y: 0, rotation: 0, mirror: false, bbox: { minX: -5, minY: -5, maxX: 5, maxY: 5 }, pins: [] }] }, null, 2) + '\n', 'utf8');
+	const noWriterApplyReportPath = `${TMP_DIR}/no_writer_apply_report.json`;
+	const noWriterApply = spawnSync(process.execPath, ['bin/easyeda-gsd.mjs', 'apply', '--gated', '_tmp_workflow_smoke/no_writer_project/project_spec.json'], {
+		cwd: ROOT,
+		stdio: 'pipe',
+		shell: false,
+		env: {
+			...process.env,
+			EASYEDA_GSD_LOCK_TOKEN: LOCK.token,
+			EASYEDA_APPLY_REPORT: noWriterApplyReportPath,
+		},
+		encoding: 'utf8',
+	});
+	const noWriterApplyReport = existsSync(noWriterApplyReportPath) ? readJson(noWriterApplyReportPath) : null;
+	checks.noWriterApplyBlocked = {
+		status: noWriterApply.status,
+		pass: noWriterApplyReport?.pass ?? null,
+		mode: noWriterApplyReport?.mode || null,
+		rules: (noWriterApplyReport?.findings || []).map(f => f.rule),
+		writerPass: noWriterApplyReport?.applyWriter?.pass ?? null,
+	};
+	assertFinding(
+		findings,
+		noWriterApply.status !== 0
+			&& noWriterApplyReport?.mode === 'preflight'
+			&& noWriterApplyReport?.applyWriter?.pass === false
+			&& (noWriterApplyReport?.findings || []).some(f => f.rule === 'AW1-pack-writer-declared'),
+		'WS49-external-apply-requires-pack-writer',
+		'apply:gated must fail closed for external circuit packs that do not explicitly declare a write-back writer instead of reusing the bundled AIHWDEBUGER writer',
+		{
+			status: noWriterApply.status,
+			stdout: noWriterApply.stdout,
+			stderr: noWriterApply.stderr,
+			report: checks.noWriterApplyBlocked,
+		},
+	);
 	assertFinding(findings, existsSync(`${CUSTOM_PACK_DIR}/pack.mjs`) && existsSync(`${CUSTOM_PACK_DIR}/cell_manifest.json`), 'WS11-custom-pack-files', 'init workflow must be able to create a custom circuit pack scaffold', {
 		packDir: CUSTOM_PACK_DIR,
 	});
@@ -1720,6 +1844,7 @@ export const pack = { id: '${badBuilderPackId}', fallbackAnchors, cellBuilders, 
 	rmSync(TMP_DIR, { recursive: true, force: true });
 	rmSync(CUSTOM_PACK_DIR, { recursive: true, force: true });
 	rmSync(BAD_BUILDER_PACK_DIR, { recursive: true, force: true });
+	rmSync(NO_WRITER_PACK_DIR, { recursive: true, force: true });
 	try { syncPackRegistry(ROOT); } catch {}
 }
 
