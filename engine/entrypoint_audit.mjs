@@ -12,6 +12,14 @@ function existsRel(rel) {
 	return existsSync(join(DIR, rel.replace(/\\/g, '/')));
 }
 
+function shouldCheckSourceRef(rel) {
+	if (!rel) return false;
+	if (rel.startsWith('./') || rel.startsWith('../')) return false;
+	if (rel.includes('${')) return false;
+	if (/^af_.*\.js$/.test(rel)) return false;
+	return true;
+}
+
 function collectPackageNodeEntrypoints(findings) {
 	const pkg = JSON.parse(readText('package.json'));
 	for (const [name, command] of Object.entries(pkg.scripts || {})) {
@@ -32,7 +40,9 @@ function collectPackageNodeEntrypoints(findings) {
 }
 
 function collectSourceEntrypoints(findings) {
-	const files = ['engine/apply_gated.mjs', 'engine/acceptance_run.mjs'];
+	const files = readdirSync(join(DIR, 'engine'))
+		.filter(name => name.endsWith('.mjs'))
+		.map(name => `engine/${name}`);
 	for (const file of files) {
 		const text = readText(file);
 		const refs = new Set();
@@ -43,7 +53,7 @@ function collectSourceEntrypoints(findings) {
 			let m;
 			while ((m = re.exec(text))) {
 				const rel = (m[2] || m[1] || '').replace(/^node\s+/, '').replace(/\\/g, '/');
-				if (!rel || rel.startsWith('./') || rel.startsWith('../')) continue;
+				if (!shouldCheckSourceRef(rel)) continue;
 				refs.add(rel);
 			}
 		}

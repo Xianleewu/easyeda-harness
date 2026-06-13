@@ -25,6 +25,7 @@ function pushAction(actions, item) {
 }
 
 const acceptance = readJson('acceptance_report.json');
+const contract = readJson('project_contract_report.json');
 const template = readJson('report.json');
 const preview = readJson('visual_review_report.json');
 const drc = readJson('drc_report.json');
@@ -32,6 +33,16 @@ const liveShots = readJson('live_shots_report.json');
 const liveDiagnose = readJson('live_diagnose_report.json');
 
 const checks = {
+	contract: {
+		status: status(contract?.pass),
+		severity: contract?.severity || null,
+		projectId: contract?.projectId || null,
+		modules: contract?.modules ?? null,
+		interfaces: contract?.interfaces ?? null,
+		visualEvidenceRegions: contract?.visualEvidenceRegions ?? null,
+		firstFinding: contract?.findings?.[0] || null,
+		evidence: 'project_contract_report.json',
+	},
 	template: {
 		status: status(template?.pass),
 		severity: template?.severity || null,
@@ -86,6 +97,14 @@ const checks = {
 };
 
 const actions = [];
+if (checks.contract.status !== 'pass') {
+	pushAction(actions, {
+		area: 'project-contract',
+		action: 'Create or fix project_contract.json before editing schematic cells or writing back. The contract must define modules, required parts/nets, interfaces, visual evidence regions, and no-free-draw policy.',
+		evidence: ['project_contract.json', 'project_contract_report.json'],
+		observed: checks.contract.firstFinding || checks.contract,
+	});
+}
 if (checks.template.status !== 'pass') {
 	pushAction(actions, {
 		area: 'template',

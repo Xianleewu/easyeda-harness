@@ -12,9 +12,12 @@ This repository is an executable workflow, not a prompt pack for free-form drawi
 
 A PASS on the current model only proves the current model. It does not validate another project, another schematic, or manual EasyEDA edits.
 
+`project_contract.json` is the first machine-readable file an agent must update for a new project. `npm run contract` and `npm run accept` check it; if the contract fails, the agent should not edit write-back scripts, apply to EasyEDA, or claim completion.
+
 ## Capabilities
 
 - Deterministic schematic assembly: functional cells live in `engine/cells.mjs`, and whole-sheet composition lives in `engine/assemble.mjs`.
+- Project contract gate: `project_contract.json` defines modules, key nets, interfaces, visual evidence regions, and the no-free-draw policy.
 - Fast offline check: validates the schematic model on local CPU and is intended for daily coordinate and rule iteration.
 - Full layout check: `npm run pipeline` runs layout search, structure checks, visual rhythm checks, text clearance, and system-intent audits.
 - Real EasyEDA loop: write back through the WebSocket bridge, then pull a live schematic snapshot with `snapshot2.js`.
@@ -50,6 +53,8 @@ Follow AGENTS.md for this repository. For a new project, create the project cont
 
 The agent runs the local checks, generates preview evidence, and writes `acceptance_report.json` plus `next_actions.json`. If a check fails, `next_actions.json` is the handoff list for the next repair step.
 
+For a new project, the first implementation step is updating `project_contract.json` and passing the contract gate. Only then should the agent implement project-specific deterministic cells, assembly, and rules.
+
 ## Write Back To EasyEDA
 
 The agent writes back through `apply:gated`. That entry point runs the checks first and refuses to apply a failing schematic. Low-level write-back scripts are for agent debugging, not for normal user operation.
@@ -69,6 +74,7 @@ For handoff, review the global sheet and local crops for USB, LDO, RESET, BOOT, 
 
 ## Check List
 
+- Project contract check: `project_contract_report.json` has `HARD=0 SOFT=0 INFO=0`
 - Fast local check: `HARD=0 SOFT=0 INFO=0`
 - Full layout check: `HARD=0 SOFT=0 INFO=0`
 - Offline preview: at least 10 global/local screenshots generated and visual audit passes
