@@ -303,9 +303,9 @@ try {
 	};
 	assertFinding(
 		findings,
-		genericAnchorFamily.policyStats?.mode === 'generic-anchor-variants' && genericAnchorFamily.candidates.length > 1,
+		genericAnchorFamily.policyStats?.mode === 'generic-anchor-variants' && genericAnchorFamily.candidates.length >= 10,
 		'WS10-generic-layout-variants',
-		'layout planner must support generic anchorVariants for new project scaffolds instead of only AIHWDEBUGER-specific coordinate fields',
+		'layout planner must support enough generic anchorVariants for new project scaffolds instead of only AIHWDEBUGER-specific coordinate fields',
 		checks.genericLayoutCandidates,
 	);
 

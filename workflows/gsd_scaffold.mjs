@@ -79,6 +79,24 @@ export function buildScaffold(spec, { pack = 'aihwdebugger' } = {}) {
 	};
 
 	const anchors = Object.fromEntries(modules.map((mod, index) => [mod.id, { x: 300 + index * 240, y: 600 }]));
+	const anchorVariants = [
+		{ id: 'base', dxStep: 0, dy: 0 },
+		{ id: 'compact-right', dxStep: 20, dy: 0 },
+		{ id: 'wide-right', dxStep: 60, dy: 0 },
+		{ id: 'raise-row', dxStep: 0, dy: -80 },
+		{ id: 'lower-row', dxStep: 0, dy: 80 },
+		{ id: 'wide-lower', dxStep: 60, dy: 80 },
+		{ id: 'wide-raise', dxStep: 60, dy: -80 },
+		{ id: 'compact-lower', dxStep: 20, dy: 80 },
+		{ id: 'compact-raise', dxStep: 20, dy: -80 },
+		{ id: 'staggered', dxStep: 40, dy: 0, stagger: 50 },
+	].map(variant => ({
+		id: variant.id,
+		anchors: Object.fromEntries(modules.map((mod, index) => [mod.id, {
+			dx: index * variant.dxStep,
+			dy: variant.dy + (variant.stagger && index % 2 ? variant.stagger : 0),
+		}])),
+	}));
 	const assembly = {
 		schemaVersion: 1,
 		projectId: contract.projectId,
@@ -102,16 +120,7 @@ export function buildScaffold(spec, { pack = 'aihwdebugger' } = {}) {
 			maxModuleWireIntrusions: 0,
 			requireNoLaneInterlocks: true,
 			baseAnchors: anchors,
-			anchorVariants: [
-				{
-					id: 'compact-right',
-					anchors: Object.fromEntries(modules.map((mod, index) => [mod.id, { dx: index * 20, dy: 0 }])),
-				},
-				{
-					id: 'lower-row',
-					anchors: Object.fromEntries(modules.map(mod => [mod.id, { dx: 0, dy: 80 }])),
-				},
-			],
+			anchorVariants,
 			inputRows: [{ y: 600 }],
 			outputRows: [{ y: 600 }],
 			xProfiles: [{ scaffold: true }],
