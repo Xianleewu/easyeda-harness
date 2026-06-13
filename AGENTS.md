@@ -57,6 +57,7 @@ node bin/easyeda-gsd.mjs accept
 
 `accept` runs the local gates in order and writes `acceptance_report.json`.
 It also writes `next_actions.json` and `repair_actions.json`. Inspect `next_actions.json` first for the handoff summary, then `repair_actions.json` for finding-level edit targets, inspection files, and rerun commands.
+Use `node bin/easyeda-gsd.mjs repair` for the read-only grouped repair plan; it is backed by `workflows/repair_loop.mjs`, writes `repair_loop_report.json`, and must not write source files unless a future allowlisted repair mode is explicitly implemented.
 `next_actions.json` is a stable `schemaVersion=1` action contract validated by `npm.cmd run action:schema`; see `reports/README.md`.
 Acceptance requires all local gates to pass:
 
@@ -123,6 +124,7 @@ Before claiming completion, produce or inspect:
 - `live_shots_report.json` with `pass=true`, `screenshots>=10`, and distinct module-level live evidence
 - `next_actions.json` with no open actions before final delivery
 - `repair_actions.json` with no finding-level repair actions before final delivery
+- `repair_loop_report.json` with no grouped repair actions before final delivery
 - Local module crops for USB, LDO, RESET, BOOT, MCU left/right, PMOS, RELAY1, RELAY2, and title/template area
 
 If a visual or DRC issue appears, update the deterministic template/rules first, then rerun the gates.
@@ -138,6 +140,7 @@ When adapting this repository to a different schematic:
 5. Implement or update deterministic cells for that assembly mapping.
 6. Add/adjust rules so the project-specific contract is enforced by `project_rule_report.json`, `project_netlist_report.json`, `project_assembly_report.json`, `project_layout_report.json`, `report.json`, `project_model_report.json`, `project_visual_report.json`, live DRC, and visual evidence.
 7. Iterate from `next_actions.json`; do not bypass failed findings with manual EasyEDA edits.
+   Use `node bin/easyeda-gsd.mjs repair` when you need the grouped repair plan and rerun commands.
 8. Write back only through `node bin/easyeda-gsd.mjs apply --gated`, then validate using live snapshot, real canvas image, DRC, and live shots.
 
 Do not claim completion from offline preview images alone.

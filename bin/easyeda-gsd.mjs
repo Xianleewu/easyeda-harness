@@ -3,6 +3,7 @@ import { spawnSync } from 'node:child_process';
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { validateSpecSchema } from '../contracts/spec_schema.mjs';
+import { loadRepairLoopPlan } from '../workflows/repair_loop.mjs';
 
 const ROOT = resolve(new URL('..', import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1')).replace(/\\/g, '/');
 
@@ -31,7 +32,7 @@ Commands:
   accept                       Run local acceptance gates.
   live-check                   Run live EasyEDA snapshot, image, DRC, and live shot checks.
   apply --gated                Write back through the fail-closed gated entrypoint.
-  repair [--max-iterations N]  Read next_actions/repair_actions; no writes are performed.
+  repair [--max-iterations N]  Write repair_loop_report.json from next_actions/repair_actions.
   report                       Summarize latest acceptance and repair artifacts.
 
 Notes:
@@ -142,17 +143,11 @@ function repair(args) {
 	}
 	const repairFile = `${ROOT}/repair_actions.json`;
 	if (!existsSync(repairFile)) runNode(['engine/repair_actions.mjs']);
-	const actions = readJson('repair_actions.json');
-	log(JSON.stringify({
-		mode: 'read-only',
-		maxIterations,
-		pass: actions.pass,
-		actionCount: actions.actionCount || 0,
-		areas: actions.areas || [],
-		firstActions: (actions.actions || []).slice(0, 5),
-		nextStep: actions.pass ? 'no repair actions open' : 'edit listed deterministic sources, then run node bin/easyeda-gsd.mjs accept',
-	}, null, 2));
-	process.exit(actions.pass ? 0 : 1);
+	const plan = loadRepairLoopPlan(ROOT, { maxIterations });
+	writeFileSync(`${ROOT}/repair_loop_report.json`, JSON.stringify(plan, null, 2), 'utf8');
+	log(JSON.stringify(plan, null, 2));
+	log('report -> repair_loop_report.json');
+	process.exit(plan.pass ? 0 : 1);
 }
 
 const [cmd = 'help', ...args] = process.argv.slice(2);

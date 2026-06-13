@@ -21,6 +21,7 @@ Use this repository as an executable schematic workflow, not as permission to dr
 - Do not use low-level writer scripts for final delivery.
 - Inspect `next_actions.json` first when a gate fails.
 - Use `repair_actions.json` to find the owning files and rerun command for each finding.
+- Use `node bin/easyeda-gsd.mjs repair` for the read-only grouped repair plan.
 - Final delivery requires real EasyEDA live evidence and DRC `0 error / 0 warning / 0 info`.
 
 ## Commands
@@ -37,3 +38,4 @@ node bin/easyeda-gsd.mjs report
 ```
 
 `repair` is read-only by default. Automatic write repair is intentionally disabled until allowlisted repair operations are implemented.
+The command builds its plan through `workflows/repair_loop.mjs`, combining `next_actions.json` and `repair_actions.json` into grouped fix kinds, files to inspect, evidence, and rerun commands, then writes `repair_loop_report.json`.

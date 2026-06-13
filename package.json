@@ -30,6 +30,7 @@
     "next:actions": "node engine/next_actions.mjs",
     "action:schema": "node engine/action_schema_gate.mjs",
     "repair:actions": "node engine/repair_actions.mjs",
+    "repair": "node bin/easyeda-gsd.mjs repair",
     "crops": "node engine/visual_crops.mjs",
     "visual": "node engine/visual_crops.mjs",
     "preview": "node engine/visual_crops.mjs",

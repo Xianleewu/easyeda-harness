@@ -67,13 +67,14 @@ EasyEDA Harness 是一套给 Codex、Claude Code 等编程 Agent 使用的原理
 请按 AGENTS.md 接手这个仓库；如果是新项目，先建立项目合同、模块模板和规则覆盖，不要直接在 EasyEDA 里自由画。确认 easyeda-api-skill/Bridge，运行本地门禁；写回前必须拉取 EasyEDA live snapshot/截图/DRC 复核，只有全部 PASS 后才写回 EasyEDA。
 ```
 
-Agent 会自动运行本地检查、生成预览图，并写出 `acceptance_report.json`、`next_actions.json` 和 `repair_actions.json`。如果检查未通过，`next_actions.json` 是接手摘要，`repair_actions.json` 会把每条 finding 映射到编辑目标、检查文件和下一条复跑命令。
+Agent 会自动运行本地检查、生成预览图，并写出 `acceptance_report.json`、`next_actions.json` 和 `repair_actions.json`。如果检查未通过，`next_actions.json` 是接手摘要，`repair_actions.json` 会把每条 finding 映射到编辑目标、检查文件和下一条复跑命令。`node bin/easyeda-gsd.mjs repair` 会通过 `workflows/repair_loop.mjs` 生成只读的分组修复计划，并写出 `repair_loop_report.json`。
 `next_actions.json` 是经过校验的 `schemaVersion=1` action contract；`npm run action:schema` 会检查 action id、标准化检查状态、target、evidence，以及 pass/actions 一致性。
 
 推荐给 Agent 的入口：
 
 ```bash
 node bin/easyeda-gsd.mjs accept
+node bin/easyeda-gsd.mjs repair
 node bin/easyeda-gsd.mjs live-check
 node bin/easyeda-gsd.mjs apply --gated
 ```
@@ -89,7 +90,7 @@ Agent 会通过 `apply:gated` 写回 EasyEDA。这个入口会先运行检查；
 离线预览图由 harness renderer 生成，用于快速检查结构、模块区域和明显重叠。它不是 EasyEDA 真实画布截图，不能单独作为最终复核证据。
 
 它会运行本地检查、live snapshot、真实画布图、EasyEDA DRC、模块级 live shots，并在需要时自动运行 live diagnose，最后写出 `acceptance_report.json`。
-如果仍有检查未通过，先看 `next_actions.json`；它是给下一个 agent 的机器可读接手清单。随后看 `repair_actions.json`，它给出逐条 finding 的修复目标和复跑命令。
+如果仍有检查未通过，先看 `next_actions.json`；它是给下一个 agent 的机器可读接手清单。随后看 `repair_actions.json`，它给出逐条 finding 的修复目标和复跑命令；也可以运行 `node bin/easyeda-gsd.mjs repair` 生成 `repair_loop_report.json`。
 
 在 live 模式下，`contract:live:model` 会把真实 EasyEDA 画布拉取到的 `live.json` 与 `project_contract.json` 对照检查；最终验收不能只相信 `full_model.json`。
 
@@ -122,6 +123,7 @@ Agent 会通过 `apply:gated` 写回 EasyEDA。这个入口会先运行检查；
 - `next_actions.json` 无开放接手摘要项
 - `action_schema_report.json` 证明 `next_actions.json` 符合稳定 action schema
 - `repair_actions.json` 无逐条 finding 修复项
+- `repair_loop_report.json` 无分组修复项
 - 无普通文本伪装网络标签
 - 单页图纸不使用无必要的 NET PORT
 - wire `Name` 锚点可读：左侧标签使用左下角，右侧标签使用右下角
@@ -146,6 +148,7 @@ Agent 会通过 `apply:gated` 写回 EasyEDA。这个入口会先运行检查；
 - `project_spec.json` / `project_contract.json` / `project_netlist.json` / `project_assembly.json`：用户意图、设计合同、结构化电气端点、可执行装配映射和布局策略。
 - `contracts/spec_schema.mjs`：第一层用户意图输入的可复用 schema 校验。
 - `contracts/module_contract.mjs` / `contracts/net_contract.mjs` / `contracts/layout_contract.mjs`：功能模块、电气端点意图和项目驱动布局策略的可复用校验器。
+- `workflows/repair_loop.mjs`：只读修复循环计划器，把 `next_actions.json` 和 `repair_actions.json` 分组成修复类型、文件、证据和复跑命令，并写出 `repair_loop_report.json`。
 - `circuit_packs/*/cell_manifest.json`：电路包确定性 cell 能力合同。
 - `circuit_packs/*/pack.mjs`：电路包生成 hook 和器件库归一化。
 - `snap2.json`：器件快照输入。

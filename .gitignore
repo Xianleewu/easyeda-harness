@@ -18,6 +18,7 @@ apply_report.json
 acceptance_report.json
 next_actions.json
 repair_actions.json
+repair_loop_report.json
 entrypoint_audit_report.json
 agent_instruction_report.json
 action_schema_report.json

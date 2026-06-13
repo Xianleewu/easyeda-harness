@@ -12,8 +12,9 @@ In short:
 5. Prefer `node bin/easyeda-gsd.mjs accept`; it wraps the safe local gate path. For targeted debugging, run `npm.cmd run spec:schema`, `npm.cmd run spec`, `npm.cmd run contract`, `npm.cmd run contract:netlist`, `npm.cmd run contract:pack`, `npm.cmd run contract:cells`, `npm.cmd run contract:assembly`, `npm.cmd run contract:layout`, then `npm.cmd run accept`.
 6. Treat preview images as offline harness-renderer evidence, not real EasyEDA screenshots or final acceptance.
 7. Inspect `next_actions.json` first, then `repair_actions.json`, when any gate fails.
-8. Keep `next_actions.json` on the `action:schema` contract; see `reports/README.md`.
-9. Pull EasyEDA live evidence with `node bin/easyeda-gsd.mjs live-check` before final delivery.
-10. Write back with `node bin/easyeda-gsd.mjs apply --gated` only after all gates pass.
-11. `live-check` wraps `accept:live`; `apply --gated` wraps `apply:gated`.
-12. Never bypass the fail-closed gate with low-level writer scripts for delivery.
+8. Use `node bin/easyeda-gsd.mjs repair` for the read-only grouped repair plan from `workflows/repair_loop.mjs`.
+9. Keep `next_actions.json` on the `action:schema` contract; see `reports/README.md`.
+10. Pull EasyEDA live evidence with `node bin/easyeda-gsd.mjs live-check` before final delivery.
+11. Write back with `node bin/easyeda-gsd.mjs apply --gated` only after all gates pass.
+12. `live-check` wraps `accept:live`; `apply --gated` wraps `apply:gated`.
+13. Never bypass the fail-closed gate with low-level writer scripts for delivery.
