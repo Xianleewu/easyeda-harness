@@ -26,6 +26,7 @@
     "accept": "node engine/acceptance_run.mjs",
     "accept:live": "node engine/acceptance_run.mjs --live",
     "next:actions": "node engine/next_actions.mjs",
+    "action:schema": "node engine/action_schema_gate.mjs",
     "repair:actions": "node engine/repair_actions.mjs",
     "crops": "node engine/visual_crops.mjs",
     "visual": "node engine/visual_crops.mjs",

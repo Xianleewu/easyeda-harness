@@ -6,6 +6,7 @@ const OUT = process.env.EASYEDA_REPAIR_ACTIONS || DIR + 'repair_actions.json';
 const REPORTS = [
 	{ gate: 'entrypoints', file: 'entrypoint_audit_report.json', rerun: 'npm.cmd run entrypoints' },
 	{ gate: 'agent-instructions', file: 'agent_instruction_report.json', rerun: 'npm.cmd run agent:instructions' },
+	{ gate: 'action-schema', file: 'action_schema_report.json', rerun: 'npm.cmd run action:schema' },
 	{ gate: 'project-spec', file: 'project_spec_report.json', rerun: 'npm.cmd run spec' },
 	{ gate: 'project-contract', file: 'project_contract_report.json', rerun: 'npm.cmd run contract' },
 	{ gate: 'project-rules', file: 'project_rule_report.json', rerun: 'npm.cmd run contract:rules' },
@@ -53,6 +54,13 @@ const RULE_PLANS = [
 		inspectFiles: ['agent_instruction_report.json', 'AGENTS.md', 'CLAUDE.md', 'README.md', 'README.en.md'],
 		nextCommand: 'npm.cmd run agent:instructions',
 		repairHint: 'Keep Codex/Claude-facing instructions complete: require official easyeda-api-skill, project spec/contract/netlist/assembly updates, no free-draw, fail-closed apply:gated, live evidence, and repair/next actions.',
+	}],
+	[/^AS/, {
+		area: 'action-schema',
+		editFiles: ['engine/next_actions.mjs', 'workflows/action_schema.mjs', 'engine/action_schema_gate.mjs'],
+		inspectFiles: ['next_actions.json', 'action_schema_report.json'],
+		nextCommand: 'npm.cmd run next:actions && npm.cmd run action:schema',
+		repairHint: 'Keep next_actions.json on the stable schema: schemaVersion, mode, normalized checks, action ids, severity/source/title/target, and evidence arrays.',
 	}],
 	[/^EA\d|entrypoint/i, {
 		area: 'entrypoints',

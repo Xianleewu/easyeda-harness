@@ -1,4 +1,5 @@
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { normalizeNextActions } from '../workflows/action_schema.mjs';
 
 const DIR = (process.env.EASYEDA_WORKDIR || process.cwd()).replace(/\\/g, '/') + '/';
 const OUT = process.env.EASYEDA_NEXT_ACTIONS || DIR + 'next_actions.json';
@@ -367,7 +368,8 @@ const result = {
 	actions,
 };
 
-writeFileSync(OUT, JSON.stringify(result, null, 2), 'utf8');
-console.log(`next actions ${result.pass ? 'PASS' : 'OPEN'} count=${actions.length}`);
+const normalized = normalizeNextActions(result);
+writeFileSync(OUT, JSON.stringify(normalized, null, 2), 'utf8');
+console.log(`next actions ${normalized.pass ? 'PASS' : 'OPEN'} count=${normalized.actions.length}`);
 console.log(`report -> ${OUT}`);
-process.exit(result.pass ? 0 : 1);
+process.exit(normalized.pass ? 0 : 1);

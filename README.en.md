@@ -64,6 +64,7 @@ Follow AGENTS.md for this repository. For a new project, create the project cont
 ```
 
 The agent runs the local checks, generates preview evidence, and writes `acceptance_report.json`, `next_actions.json`, and `repair_actions.json`. If a check fails, `next_actions.json` is the handoff summary and `repair_actions.json` maps each finding to edit targets, inspection files, and the next command to rerun.
+`next_actions.json` is a validated `schemaVersion=1` action contract; `npm run action:schema` checks ids, normalized check statuses, targets, evidence, and pass/action consistency.
 
 Preferred agent commands:
 
@@ -113,6 +114,7 @@ For handoff, review the global sheet and local crops for USB, LDO, RESET, BOOT, 
 - EasyEDA DRC: `0 error / 0 warning / 0 info`
 - EasyEDA live shots: at least 10 distinct module-level evidence images
 - `next_actions.json` has no open handoff summary actions
+- `action_schema_report.json` proves `next_actions.json` follows the stable action schema
 - `repair_actions.json` has no finding-level repair actions
 - No fake text net labels
 - No unnecessary NET PORT symbols on a single-sheet schematic
@@ -133,6 +135,7 @@ For handoff, review the global sheet and local crops for USB, LDO, RESET, BOOT, 
 - `engine/`: template assembly, layout search, write-back, rendering, DRC and live helpers.
 - `bin/easyeda-gsd.mjs`: neutral workflow wrapper for agent runners and CI.
 - `docs/agent-runner-guide.md`: concise runner contract for Codex, Claude Code, and other agents.
+- `reports/README.md`: generated report contract notes, including the `next_actions.json` action schema.
 - `harness/`: normalized model, module registry, and rule gates.
 - `project_spec.json` / `project_contract.json` / `project_netlist.json` / `project_assembly.json`: user intent, design contract, structured electrical endpoints, executable assembly mapping, and layout policy.
 - `circuit_packs/*/cell_manifest.json`: circuit-pack deterministic cell capability contracts.

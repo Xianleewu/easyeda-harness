@@ -64,6 +64,7 @@ EasyEDA Harness 是一套给 Codex、Claude Code 等编程 Agent 使用的原理
 ```
 
 Agent 会自动运行本地检查、生成预览图，并写出 `acceptance_report.json`、`next_actions.json` 和 `repair_actions.json`。如果检查未通过，`next_actions.json` 是接手摘要，`repair_actions.json` 会把每条 finding 映射到编辑目标、检查文件和下一条复跑命令。
+`next_actions.json` 是经过校验的 `schemaVersion=1` action contract；`npm run action:schema` 会检查 action id、标准化检查状态、target、evidence，以及 pass/actions 一致性。
 
 推荐给 Agent 的入口：
 
@@ -113,6 +114,7 @@ Agent 会通过 `apply:gated` 写回 EasyEDA。这个入口会先运行检查；
 - EasyEDA DRC：`0 error / 0 warning / 0 info`
 - EasyEDA live shots：至少 10 张模块级真实视觉证据互不重复
 - `next_actions.json` 无开放接手摘要项
+- `action_schema_report.json` 证明 `next_actions.json` 符合稳定 action schema
 - `repair_actions.json` 无逐条 finding 修复项
 - 无普通文本伪装网络标签
 - 单页图纸不使用无必要的 NET PORT
@@ -133,6 +135,7 @@ Agent 会通过 `apply:gated` 写回 EasyEDA。这个入口会先运行检查；
 - `engine/`：模板组装、布局搜索、写回、渲染、DRC/live 辅助。
 - `bin/easyeda-gsd.mjs`：面向 Agent runner 和 CI 的中立工作流包装入口。
 - `docs/agent-runner-guide.md`：给 Codex、Claude Code 和其它 Agent 的简明 runner 合同。
+- `reports/README.md`：生成报告契约说明，包括 `next_actions.json` action schema。
 - `harness/`：统一规则门禁、模型归一化、模块注册。
 - `project_spec.json` / `project_contract.json` / `project_netlist.json` / `project_assembly.json`：用户意图、设计合同、结构化电气端点、可执行装配映射和布局策略。
 - `circuit_packs/*/cell_manifest.json`：电路包确定性 cell 能力合同。

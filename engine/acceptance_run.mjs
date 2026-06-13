@@ -146,11 +146,25 @@ const acceptance = {
 	},
 };
 
-writeFileSync(REPORT, JSON.stringify(acceptance, null, 2), 'utf8');
 const repair = spawnSync('node', ['engine/repair_actions.mjs'], { cwd: DIR, stdio: 'inherit', shell: false, env: process.env });
 if (repair.error) console.warn(`repair actions failed: ${repair.error.message}`);
 const next = spawnSync('node', ['engine/next_actions.mjs'], { cwd: DIR, stdio: 'inherit', shell: false, env: process.env });
 if (next.error) console.warn(`next actions failed: ${next.error.message}`);
+const actionSchema = spawnSync('node', ['engine/action_schema_gate.mjs'], { cwd: DIR, stdio: 'inherit', shell: false, env: process.env });
+if (actionSchema.error) console.warn(`action schema failed: ${actionSchema.error.message}`);
+const postSteps = [
+	{ name: 'repair:actions', status: repair.status, pass: repair.status === 0, required: true },
+	{ name: 'next:actions', status: next.status, pass: next.status === 0, required: true },
+	{ name: 'action:schema', status: actionSchema.status, pass: actionSchema.status === 0, required: true },
+];
+steps.push(...postSteps.map(step => ({ ...step, command: step.name, durationMs: 0, error: '' })));
+const finalRequiredFailed = steps.filter(s => s.required && !s.pass);
+acceptance.pass = finalRequiredFailed.length === 0;
+acceptance.severity = { hard: finalRequiredFailed.length, soft: 0, info: 0 };
+acceptance.summary.local.repairActions = repair.status === 0;
+acceptance.summary.local.nextActions = next.status === 0;
+acceptance.summary.local.actionSchema = actionSchema.status === 0;
+writeFileSync(REPORT, JSON.stringify(acceptance, null, 2), 'utf8');
 console.log(`acceptance ${acceptance.pass ? 'PASS' : 'FAIL'} mode=${acceptance.mode} hard=${acceptance.severity.hard}`);
 console.log(`report -> ${REPORT}`);
 process.exit(acceptance.pass ? 0 : 1);
