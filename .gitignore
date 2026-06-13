@@ -18,6 +18,7 @@ apply_report.json
 acceptance_report.json
 gsd_plan_report.json
 gsd_generate_report.json
+gsd_scaffold_report.json
 next_actions.json
 repair_actions.json
 repair_loop_report.json

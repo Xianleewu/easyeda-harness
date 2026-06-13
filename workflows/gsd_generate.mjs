@@ -1,6 +1,6 @@
 import { spawnSync } from 'node:child_process';
 import { existsSync, readFileSync, writeFileSync, statSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { dirname, resolve } from 'node:path';
 import { buildGsdPlan } from './gsd_plan.mjs';
 
 function readJson(root, rel) {
@@ -17,10 +17,12 @@ function fileInfo(root, rel) {
 
 export function buildGeneratePlan(root, specPath = 'project_spec.json') {
 	const specAbs = resolve(root, specPath);
+	const specDir = dirname(specAbs).replace(/\\/g, '/');
+	const companion = name => existsSync(`${specDir}/${name}`) ? `${specDir}/${name}` : name;
 	const spec = readJson(root, specAbs);
-	const contract = readJson(root, 'project_contract.json');
-	const netlist = readJson(root, 'project_netlist.json');
-	const assembly = readJson(root, 'project_assembly.json');
+	const contract = readJson(root, companion('project_contract.json'));
+	const netlist = readJson(root, companion('project_netlist.json'));
+	const assembly = readJson(root, companion('project_assembly.json'));
 	const model = existsSync(`${root}/full_model.json`) ? readJson(root, 'full_model.json') : null;
 	return buildGsdPlan({ spec, contract, netlist, assembly, model, specPath });
 }
@@ -75,4 +77,3 @@ export function runGsdGenerate({ root, specPath = 'project_spec.json', command =
 	writeFileSync(`${root}/gsd_generate_report.json`, JSON.stringify(report, null, 2), 'utf8');
 	return { report, status: pass ? 0 : 1 };
 }
-

@@ -8,7 +8,7 @@ Use `docs/agent-runner-guide.md` as the neutral runner contract. Prefer `node bi
 
 This harness is an executable workflow, not a free-form schematic drawing assistant.
 
-For a new schematic project, do not draw directly in EasyEDA and then hope the gates catch the result. First create or update the project-specific structure that the gates can reason about:
+For a new schematic project, do not draw directly in EasyEDA and then hope the gates catch the result. Start with `node bin/easyeda-gsd.mjs init --pack <pack> --out <project-dir>` to create the editable spec/contract/netlist/assembly scaffold, then fill it until `gsd_plan_report.json` passes. First create or update the project-specific structure that the gates can reason about:
 
 - module contracts: functional blocks, pins, required nets, and intended signal flow
 - deterministic cells/templates: component placement, fanout wires, labels, and local routing
@@ -139,13 +139,14 @@ If a visual or DRC issue appears, update the deterministic template/rules first,
 When adapting this repository to a different schematic:
 
 1. Read the electrical spec and encode it in `project_spec.json` before placing symbols.
-2. Derive/update `project_contract.json` from the spec and run `npm.cmd run gsd:plan`, `npm.cmd run spec`, and `npm.cmd run contract` until all pass.
-3. Define required electrical endpoints in `project_netlist.json` and run `npm.cmd run contract:netlist` until it passes.
-4. Map every contract module and layout policy in `project_assembly.json`, then run `npm.cmd run contract:assembly` until it passes.
-5. Implement or update deterministic cells for that assembly mapping.
-6. Add/adjust rules so the project-specific contract is enforced by `project_rule_report.json`, `project_netlist_report.json`, `project_assembly_report.json`, `project_layout_report.json`, `report.json`, `project_model_report.json`, `project_visual_report.json`, live DRC, and visual evidence.
-7. Iterate from `next_actions.json`; do not bypass failed findings with manual EasyEDA edits.
+2. For a new project directory, run `node bin/easyeda-gsd.mjs init --pack <pack> --out <project-dir>` and use the generated scaffold files as the editing surface.
+3. Derive/update `project_contract.json` from the spec and run `npm.cmd run gsd:plan`, `npm.cmd run spec`, and `npm.cmd run contract` until all pass.
+4. Define required electrical endpoints in `project_netlist.json` and run `npm.cmd run contract:netlist` until it passes.
+5. Map every contract module and layout policy in `project_assembly.json`, then run `npm.cmd run contract:assembly` until it passes.
+6. Implement or update deterministic cells for that assembly mapping.
+7. Add/adjust rules so the project-specific contract is enforced by `project_rule_report.json`, `project_netlist_report.json`, `project_assembly_report.json`, `project_layout_report.json`, `report.json`, `project_model_report.json`, `project_visual_report.json`, live DRC, and visual evidence.
+8. Iterate from `next_actions.json`; do not bypass failed findings with manual EasyEDA edits.
    Use `node bin/easyeda-gsd.mjs repair` when you need the grouped repair plan and rerun commands.
-8. Write back only through `node bin/easyeda-gsd.mjs apply --gated`, then validate using live snapshot, real canvas image, DRC, and live shots.
+9. Write back only through `node bin/easyeda-gsd.mjs apply --gated`, then validate using live snapshot, real canvas image, DRC, and live shots.
 
 Do not claim completion from offline preview images alone.

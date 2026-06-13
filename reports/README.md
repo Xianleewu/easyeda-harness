@@ -2,6 +2,12 @@
 
 Generated reports are ignored by Git, but their shapes are part of the workflow contract.
 
+## `gsd_scaffold_report.json`
+
+`gsd_scaffold_report.json` is written by `node bin/easyeda-gsd.mjs init --pack <pack> --out <project-dir>` when `<project-dir>` is a directory path.
+
+It documents the scaffold files created for a new project. Scaffolds are intentionally not ready for generation; agents must fill contract parts, netlist pins, assembly cells/refs/anchors, and layout policy until `gsd_plan_report.json` passes.
+
 ## `gsd_plan_report.json`
 
 `gsd_plan_report.json` is written by `node bin/easyeda-gsd.mjs plan`.

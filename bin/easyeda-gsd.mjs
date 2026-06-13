@@ -6,6 +6,7 @@ import { validateSpecSchema } from '../contracts/spec_schema.mjs';
 import { loadRepairLoopPlan } from '../workflows/repair_loop.mjs';
 import { buildGsdPlan } from '../workflows/gsd_plan.mjs';
 import { runGsdGenerate } from '../workflows/gsd_generate.mjs';
+import { writeScaffold } from '../workflows/gsd_scaffold.mjs';
 
 const ROOT = resolve(new URL('..', import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1')).replace(/\\/g, '/');
 
@@ -28,7 +29,7 @@ Safe order:
 Commands:
   help                         Show this help.
   init --pack aihwdebugger --out <file>
-                               Write a minimal spec scaffold for the bundled pack.
+                               Write a spec file, or a full scaffold when <out> is a directory.
   plan [spec]                  Validate current project contracts and print selected pack data.
   generate [spec]              Plan-gated deterministic generation without write-back.
   accept                       Run local acceptance gates.
@@ -75,9 +76,21 @@ function writeInit(args) {
 	}
 	const spec = readJson('project_spec.json');
 	const target = resolve(ROOT, out).replace(/\\/g, '/');
+	if (!/\.[A-Za-z0-9]+$/.test(target)) {
+		const scaffold = writeScaffold({ outDir: target, spec, pack });
+		log(JSON.stringify(scaffold, null, 2));
+		log(`${target}/gsd_scaffold_report.json`);
+		return;
+	}
 	mkdirSync(dirname(target), { recursive: true });
 	writeFileSync(target, JSON.stringify({ ...spec, circuitPack: pack }, null, 2) + '\n', 'utf8');
 	log(`wrote ${target}`);
+}
+
+function companionPath(specAbs, name) {
+	const specDir = dirname(specAbs).replace(/\\/g, '/');
+	const local = `${specDir}/${name}`;
+	return existsSync(local) ? local : name;
 }
 
 function plan(args) {
@@ -88,9 +101,9 @@ function plan(args) {
 		process.exit(2);
 	}
 	const specDoc = readJson(specPath);
-	const assembly = readJson('project_assembly.json');
-	const contract = readJson('project_contract.json');
-	const netlist = readJson('project_netlist.json');
+	const assembly = readJson(companionPath(specPath, 'project_assembly.json'));
+	const contract = readJson(companionPath(specPath, 'project_contract.json'));
+	const netlist = readJson(companionPath(specPath, 'project_netlist.json'));
 	const model = existsSync(`${ROOT}/full_model.json`) ? readJson('full_model.json') : null;
 	const report = buildGsdPlan({ spec: specDoc, contract, netlist, assembly, model, specPath: spec });
 	writeFileSync(`${ROOT}/gsd_plan_report.json`, JSON.stringify(report, null, 2), 'utf8');

@@ -82,6 +82,7 @@ node bin/easyeda-gsd.mjs apply --gated
 ```
 
 For a new project, the first implementation step is updating `project_spec.json`, realizing it in `project_contract.json`, defining required endpoints in `project_netlist.json`, declaring/choosing a circuit-pack `cell_manifest.json`, then mapping the contract and layout policy in `project_assembly.json`. Only then should the agent implement project-specific deterministic cells and rules.
+For a new project directory, `node bin/easyeda-gsd.mjs init --pack <pack> --out <project-dir>` writes scaffold versions of those four files plus `gsd_scaffold_report.json`; the scaffold is intentionally incomplete and must not be treated as ready for generation until `plan` passes.
 
 ## Write Back To EasyEDA
 
@@ -156,6 +157,7 @@ For handoff, review the global sheet and local crops for USB, LDO, RESET, BOOT, 
 - `workflows/repair_loop.mjs`: read-only repair loop planner that groups `next_actions.json` and `repair_actions.json` into fix kinds, files, evidence, and rerun commands, then emits `repair_loop_report.json`.
 - `workflows/gsd_plan.mjs`: spec-to-contract realization planner that emits `gsd_plan_report.json`.
 - `workflows/gsd_generate.mjs`: plan-gated deterministic generation wrapper that emits `gsd_generate_report.json`.
+- `workflows/gsd_scaffold.mjs`: new-project scaffold writer for spec, contract, netlist, assembly, and `gsd_scaffold_report.json`.
 - `engine/final_evidence_gate.mjs`: fail-closed local/live evidence gate for freshness, zero DRC, live model proof, and empty repair actions.
 - `circuit_packs/*/cell_manifest.json`: circuit-pack deterministic cell capability contracts.
 - `circuit_packs/*/pack.mjs`: circuit-pack generation hooks and library normalization.
