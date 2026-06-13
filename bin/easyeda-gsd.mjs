@@ -4,8 +4,7 @@ import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { validateSpecSchema } from '../contracts/spec_schema.mjs';
 import { loadRepairLoopPlan } from '../workflows/repair_loop.mjs';
-import { buildGsdPlan } from '../workflows/gsd_plan.mjs';
-import { runGsdGenerate } from '../workflows/gsd_generate.mjs';
+import { buildGeneratePlan, runGsdGenerate } from '../workflows/gsd_generate.mjs';
 import { writeScaffold } from '../workflows/gsd_scaffold.mjs';
 import { buildMinimalSpec, validatePackId, writePackScaffold } from '../workflows/pack_scaffold.mjs';
 import { circuitPackIds } from '../circuit_packs/registry.mjs';
@@ -106,12 +105,6 @@ function writeInit(args) {
 	}
 }
 
-function companionPath(specAbs, name) {
-	const specDir = dirname(specAbs).replace(/\\/g, '/');
-	const local = `${specDir}/${name}`;
-	return existsSync(local) ? local : name;
-}
-
 function plan(args) {
 	const lock = acquireCliLock();
 	try {
@@ -121,13 +114,7 @@ function plan(args) {
 			console.error(`spec not found: ${spec}`);
 			return 2;
 		}
-		const specDoc = readJson(specPath);
-		const assembly = readJson(companionPath(specPath, 'project_assembly.json'));
-		const contract = readJson(companionPath(specPath, 'project_contract.json'));
-		const netlist = readJson(companionPath(specPath, 'project_netlist.json'));
-		const libraryManifest = readJson(companionPath(specPath, 'approved_library_manifest.json'));
-		const model = existsSync(`${ROOT}/full_model.json`) ? readJson('full_model.json') : null;
-		const report = buildGsdPlan({ spec: specDoc, contract, netlist, assembly, libraryManifest, model, specPath: spec });
+		const report = buildGeneratePlan(ROOT, spec);
 		writeFileSync(`${ROOT}/gsd_plan_report.json`, JSON.stringify(report, null, 2), 'utf8');
 		log(JSON.stringify(report, null, 2));
 		log('report -> gsd_plan_report.json');

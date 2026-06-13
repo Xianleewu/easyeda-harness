@@ -1,6 +1,6 @@
 import { spawnSync } from 'node:child_process';
 import { existsSync, readFileSync, writeFileSync, statSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
+import { basename, dirname, resolve } from 'node:path';
 import { buildGsdPlan } from './gsd_plan.mjs';
 import { acquireRunLock } from './run_lock.mjs';
 
@@ -19,11 +19,18 @@ function fileInfo(root, rel) {
 export function generateContext(root, specPath = 'project_spec.json') {
 	const specAbs = resolve(root, specPath);
 	const specDir = dirname(specAbs).replace(/\\/g, '/');
-	const companion = name => existsSync(`${specDir}/${name}`) ? `${specDir}/${name}` : name;
+	const rootDir = resolve(root).replace(/\\/g, '/');
+	const isRootSpec = specDir === rootDir && basename(specAbs) === 'project_spec.json';
+	const companion = name => {
+		const local = `${specDir}/${name}`;
+		if (existsSync(local)) return local;
+		return isRootSpec ? `${rootDir}/${name}` : local;
+	};
 	return {
 		specAbs,
 		specDir,
 		specPath,
+		isRootSpec,
 		contractPath: companion('project_contract.json'),
 		netlistPath: companion('project_netlist.json'),
 		assemblyPath: companion('project_assembly.json'),
@@ -31,15 +38,33 @@ export function generateContext(root, specPath = 'project_spec.json') {
 	};
 }
 
+function hard(rule, msg, where = {}) {
+	return { rule, severity: 'hard', category: 'gsd-plan', msg, where };
+}
+
+function readOptionalJson(root, path, label, findings) {
+	if (!existsSync(path)) {
+		findings.push(hard(`GP0-${label}-file`, `${label}.json is required beside the active project spec`, { path }));
+		return null;
+	}
+	try {
+		return readJson(root, path);
+	} catch (e) {
+		findings.push(hard(`GP0-${label}-parse`, `${label}.json must parse as JSON`, { path, error: e.message }));
+		return null;
+	}
+}
+
 export function buildGeneratePlan(root, specPath = 'project_spec.json') {
 	const context = generateContext(root, specPath);
-	const spec = readJson(root, context.specAbs);
-	const contract = readJson(root, context.contractPath);
-	const netlist = readJson(root, context.netlistPath);
-	const assembly = readJson(root, context.assemblyPath);
-	const libraryManifest = readJson(root, context.libraryManifestPath);
+	const inputFindings = [];
+	const spec = readOptionalJson(root, context.specAbs, 'project_spec', inputFindings);
+	const contract = readOptionalJson(root, context.contractPath, 'project_contract', inputFindings);
+	const netlist = readOptionalJson(root, context.netlistPath, 'project_netlist', inputFindings);
+	const assembly = readOptionalJson(root, context.assemblyPath, 'project_assembly', inputFindings);
+	const libraryManifest = readOptionalJson(root, context.libraryManifestPath, 'approved_library_manifest', inputFindings);
 	const model = existsSync(`${root}/full_model.json`) ? readJson(root, 'full_model.json') : null;
-	return buildGsdPlan({ spec, contract, netlist, assembly, libraryManifest, model, specPath });
+	return buildGsdPlan({ spec, contract, netlist, assembly, libraryManifest, model, specPath, inputFindings });
 }
 
 export function runGsdGenerate({ root, specPath = 'project_spec.json', command = ['engine/pipeline.mjs'], draft = false } = {}) {

@@ -512,6 +512,36 @@ try {
 		observedRules: checks.customPackCliPlan.rules,
 		status: customPlanCli.status,
 	});
+
+	const orphanSpecDir = `${TMP_DIR}/orphan_spec`;
+	mkdirSync(orphanSpecDir, { recursive: true });
+	writeFileSync(`${orphanSpecDir}/project_spec.json`, JSON.stringify(customSpec, null, 2) + '\n', 'utf8');
+	const orphanPlanCli = spawnSync(process.execPath, ['bin/easyeda-gsd.mjs', 'plan', '_tmp_workflow_smoke/orphan_spec/project_spec.json'], {
+		cwd: ROOT,
+		stdio: 'pipe',
+		shell: false,
+		env: { ...process.env, EASYEDA_GSD_LOCK_TOKEN: LOCK.token },
+		encoding: 'utf8',
+	});
+	const orphanPlanReport = existsSync(`${ROOT}/gsd_plan_report.json`) ? readJson(`${ROOT}/gsd_plan_report.json`) : null;
+	checks.externalSpecRequiresCompanions = {
+		status: orphanPlanCli.status,
+		pass: orphanPlanReport?.pass ?? null,
+		rules: (orphanPlanReport?.findings || []).map(f => f.rule),
+	};
+	assertFinding(
+		findings,
+		orphanPlanCli.status !== 0
+			&& ['GP0-project_contract-file', 'GP0-project_netlist-file', 'GP0-project_assembly-file', 'GP0-approved_library_manifest-file'].every(rule => hasRule(orphanPlanReport, rule)),
+		'WS26-external-spec-requires-companions',
+		'external project specs must not fall back to root project contracts; missing companion files must be explicit plan failures',
+		{
+			status: orphanPlanCli.status,
+			stdout: orphanPlanCli.stdout,
+			stderr: orphanPlanCli.stderr,
+			report: checks.externalSpecRequiresCompanions,
+		},
+	);
 	assertFinding(
 		findings,
 		customApplyContext.status === 0

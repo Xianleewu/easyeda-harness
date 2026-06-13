@@ -147,8 +147,8 @@ function validateExecutableCells(assembly, pack) {
 	return findings;
 }
 
-export function buildGsdPlan({ spec, contract, netlist, assembly, libraryManifest = null, model = null, specPath = 'project_spec.json' }) {
-	const findings = [];
+export function buildGsdPlan({ spec, contract, netlist, assembly, libraryManifest = null, model = null, specPath = 'project_spec.json', inputFindings = [] }) {
+	const findings = [...asArray(inputFindings)];
 	findings.push(...validateSpecSchema(spec));
 	if (contract) findings.push(...validateModuleContract(contract).map(f => ({ ...f, category: 'gsd-plan' })));
 	else hard(findings, 'GP0-contract-present', 'project_contract.json is required for planning');
