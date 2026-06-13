@@ -12,6 +12,7 @@ import { auditPageComposition } from './page_composition.mjs';
 import { inferModuleRegions } from './sheet_renderer.mjs';
 import { auditCommercialArchitecture } from './commercial_architecture.mjs';
 import { auditSystemIntent } from './system_intent_gate.mjs';
+import { auditDocumentStyle, buildDocumentLayer } from '../harness/document_style.mjs';
 import { acquireRunLock } from '../workflows/run_lock.mjs';
 
 const ROOT = (process.env.EASYEDA_WORKDIR || process.cwd()).replace(/\\/g, '/');
@@ -376,6 +377,42 @@ try {
 		'WS39-generic-intent-uses-project-assembly-modules',
 		'commercial architecture and system intent audits must use generic project rules for non-AIHWDEBUGER assemblies instead of fixed USB/ESP32/relay assumptions',
 		checks.genericIntentUsesProjectAssemblyModules,
+	);
+
+	const oldProjectAssemblyForDocumentStyle = process.env.EASYEDA_PROJECT_ASSEMBLY;
+	const oldProjectContractForDocumentStyle = process.env.EASYEDA_PROJECT_CONTRACT;
+	const externalDocumentContractPath = `${TMP_DIR}/external_document_contract.json`;
+	writeFileSync(externalDocumentContractPath, JSON.stringify({
+		projectId: 'workflow-smoke-external-structure',
+		modules: [{ id: 'sensor_frontend', title: 'Sensor Frontend' }],
+	}, null, 2) + '\n', 'utf8');
+	process.env.EASYEDA_PROJECT_ASSEMBLY = externalStructureAssemblyPath;
+	process.env.EASYEDA_PROJECT_CONTRACT = externalDocumentContractPath;
+	const externalDocumentLayer = buildDocumentLayer(externalVisualSnap);
+	const externalDocumentStyle = auditDocumentStyle({
+		...externalVisualSnap,
+		...externalDocumentLayer,
+	});
+	if (oldProjectAssemblyForDocumentStyle === undefined) delete process.env.EASYEDA_PROJECT_ASSEMBLY;
+	else process.env.EASYEDA_PROJECT_ASSEMBLY = oldProjectAssemblyForDocumentStyle;
+	if (oldProjectContractForDocumentStyle === undefined) delete process.env.EASYEDA_PROJECT_CONTRACT;
+	else process.env.EASYEDA_PROJECT_CONTRACT = oldProjectContractForDocumentStyle;
+	checks.documentStyleUsesProjectAssemblyModules = {
+		pass: externalDocumentStyle.pass,
+		source: externalDocumentStyle.stats?.moduleRegistry?.source || null,
+		modules: externalDocumentStyle.stats?.moduleRegistry?.modules ?? null,
+		moduleTitles: externalDocumentStyle.stats?.moduleTitles ?? null,
+		hard: externalDocumentStyle.severity?.hard ?? null,
+		firstFinding: externalDocumentStyle.findings?.[0] || null,
+	};
+	assertFinding(
+		findings,
+		checks.documentStyleUsesProjectAssemblyModules.pass === true
+			&& checks.documentStyleUsesProjectAssemblyModules.source === externalStructureAssemblyPath
+			&& checks.documentStyleUsesProjectAssemblyModules.modules === 1,
+		'WS40-document-style-uses-project-assembly-modules',
+		'document style generation and audit must use project assembly and contract titles for non-AIHWDEBUGER modules instead of requiring bundled module titles',
+		checks.documentStyleUsesProjectAssemblyModules,
 	);
 
 	const noDrawingRulesContract = clone(contract);

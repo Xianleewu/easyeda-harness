@@ -1,4 +1,5 @@
-import { MODULES } from './module_registry.mjs';
+import { existsSync, readFileSync } from 'node:fs';
+import { loadProjectModuleRegistry } from './module_registry.mjs';
 import { rectsGap, segIntersectsRect, shrinkRect } from './model.mjs';
 
 const MODULE_TITLES = {
@@ -58,6 +59,48 @@ function finite(v) {
 
 function round(v) {
 	return Math.round(v * 100) / 100;
+}
+
+function dir() {
+	return (process.env.EASYEDA_WORKDIR || process.cwd()).replace(/\\/g, '/') + '/';
+}
+
+function readJson(path) {
+	return JSON.parse(readFileSync(path, 'utf8').replace(/^\uFEFF/, ''));
+}
+
+function activeContractPath() {
+	return process.env.EASYEDA_PROJECT_CONTRACT || dir() + 'project_contract.json';
+}
+
+function titleCaseId(id) {
+	return String(id || '')
+		.replace(/[_-]+/g, ' ')
+		.replace(/\s+/g, ' ')
+		.trim()
+		.replace(/\b\w/g, c => c.toUpperCase());
+}
+
+function activeModuleTitles(registry = loadProjectModuleRegistry()) {
+	const titles = new Map(Object.entries(MODULE_TITLES));
+	for (const mod of registry.modules || []) {
+		const title = mod.title || titleCaseId(mod.id || mod.name);
+		if (mod.name) titles.set(mod.name, title);
+		if (mod.id) titles.set(mod.id, title);
+	}
+	const contractPath = activeContractPath();
+	if (existsSync(contractPath)) {
+		try {
+			const contract = readJson(contractPath);
+			for (const mod of contract.modules || []) {
+				const title = mod.title || titleCaseId(mod.id);
+				if (mod.id && title) titles.set(mod.id, title);
+			}
+		} catch {
+			// Contract titles are advisory for document style; parse failures are handled by contract gates.
+		}
+	}
+	return titles;
 }
 
 function expand(b, m) {
@@ -173,11 +216,14 @@ function sameBox(a, b, tol = 2) {
 }
 
 function moduleBoxes(model, margin = 0) {
+	const registry = loadProjectModuleRegistry();
+	const titleMap = activeModuleTitles(registry);
 	const byRef = new Map((model.components || model.parts || []).map(p => [p.designator, p]));
-	return MODULES.map(mod => {
+	return registry.modules.map(mod => {
 		const parts = mod.refs.map(ref => byRef.get(ref)).filter(Boolean);
 		const box = union(parts.map(p => p.bbox || p.bodyBBox));
-		return box ? { ...mod, box: expand(box, margin), parts } : null;
+		const title = titleMap.get(mod.id) || titleMap.get(mod.name) || titleCaseId(mod.id || mod.name);
+		return box ? { ...mod, title, box: expand(box, margin), parts } : null;
 	}).filter(Boolean);
 }
 
@@ -500,7 +546,7 @@ function clearOfOtherModuleFrames(title, frames) {
 }
 
 function chooseModuleTitle(mod, frame, model, segments, frames = []) {
-	const content = MODULE_TITLES[mod.name] || mod.name.toUpperCase();
+	const content = mod.title || MODULE_TITLES[mod.name] || titleCaseId(mod.name).toUpperCase();
 	const fontSize = 16;
 	const estimatedWidth = Math.max(30, content.length * fontSize * 0.56);
 	const xs = [
@@ -667,13 +713,16 @@ function hard(findings, rule, msg, where = {}) {
 
 export function auditDocumentStyle(model, opts = {}) {
 	const findings = [];
+	const registry = loadProjectModuleRegistry();
+	const titleMap = activeModuleTitles(registry);
 	const modules = moduleBoxes(model, 0);
 	const geometry = modelGeometryBox(model);
 	const segments = wireSegments(model);
 	const texts = (model.texts || []).map(t => ({ ...t, bbox: textBBox(t), content: String(t.content || '') }));
 	const rectangles = (model.rectangles || []).map(r => ({ ...r, bbox: normalizeBox(r.bbox || r) })).filter(r => r.bbox);
 	const titleTexts = texts.filter(t => /AIHWDEBUGER|DETAIL SCHEMATIC|CONTROL & POWER/i.test(t.content));
-	const moduleTitleTexts = texts.filter(t => t.role === 'module-title' || Object.values(MODULE_TITLES).some(title => t.content.toUpperCase().includes(title)));
+	const expectedTitles = [...new Set([...Object.values(MODULE_TITLES), ...titleMap.values()].filter(Boolean))];
+	const moduleTitleTexts = texts.filter(t => t.role === 'module-title' || expectedTitles.some(title => t.content.toUpperCase().includes(String(title).toUpperCase())));
 	const explicitSheetBox = normalizeBox(model.sheetBBox) || rectangles.find(r => r.role === 'sheet-frame')?.bbox;
 	const inferredSheet = explicitSheetBox || (geometry
 		? rectangles
@@ -729,8 +778,8 @@ export function auditDocumentStyle(model, opts = {}) {
 		.map(r => ({ ...r, role: 'module-frame', module: inferFrameModule(r) || r.module || null }));
 	const titleModule = new Map();
 	for (const mod of modules) {
-		const title = MODULE_TITLES[mod.name] || mod.name.toUpperCase();
-		const t = moduleTitleTexts.find(x => x.module === mod.name || x.content.toUpperCase().includes(title));
+		const title = mod.title || titleMap.get(mod.id) || titleMap.get(mod.name) || titleCaseId(mod.name).toUpperCase();
+		const t = moduleTitleTexts.find(x => x.module === mod.name || x.module === mod.id || x.content.toUpperCase().includes(String(title).toUpperCase()));
 		if (t) titleModule.set(mod.name, t);
 	}
 	const isModuleMarkerCandidate = r => {
@@ -779,8 +828,8 @@ export function auditDocumentStyle(model, opts = {}) {
 	}
 
 	for (const mod of modules) {
-		const title = MODULE_TITLES[mod.name] || mod.name.toUpperCase();
-		const hasTitle = moduleTitleTexts.some(t => t.module === mod.name || t.content.toUpperCase().includes(title));
+		const title = mod.title || titleMap.get(mod.id) || titleMap.get(mod.name) || titleCaseId(mod.name).toUpperCase();
+		const hasTitle = moduleTitleTexts.some(t => t.module === mod.name || t.module === mod.id || t.content.toUpperCase().includes(String(title).toUpperCase()));
 		if (!hasTitle) hard(findings, 'C20.5-module-title-missing', `${mod.name} module needs a visible functional title`, { module: mod.name, expected: title });
 		const titleText = titleModule.get(mod.name);
 		if (titleText) {
@@ -902,6 +951,10 @@ export function auditDocumentStyle(model, opts = {}) {
 		pass: findings.length === 0,
 		severity: { hard: findings.length, soft: 0, info: 0 },
 		stats: {
+			moduleRegistry: {
+				source: registry.source,
+				modules: registry.modules.length,
+			},
 			texts: texts.length,
 			rectangles: rectangles.length,
 			documentTexts: documentTexts.length,
