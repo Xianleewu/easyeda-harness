@@ -125,6 +125,9 @@ export function buildGsdPlan({ spec, contract, netlist, assembly, libraryManifes
 	const packId = spec?.circuitPack || assembly?.circuitPack || 'aihwdebugger';
 	try {
 		pack = getCircuitPack(packId);
+		if (pack.scaffoldOnly === true) {
+			hard(findings, 'GP14-pack-implemented', 'selected circuit pack is scaffold-only and must implement builders before generation', { circuitPack: packId });
+		}
 	} catch (e) {
 		hard(findings, 'GP13-pack-registered', 'spec/assembly circuitPack must be registered', { circuitPack: packId, registeredPacks: circuitPackIds(), error: e.message });
 	}

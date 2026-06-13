@@ -37,6 +37,7 @@ if (pack) {
 	if (!pack.cellBuilders || typeof pack.cellBuilders !== 'object') hard(findings, 'PP4-pack-cell-builders', 'circuit pack must expose cellBuilders');
 	if (!pack.fallbackAnchors || typeof pack.fallbackAnchors !== 'object') hard(findings, 'PP5-pack-fallback-anchors', 'circuit pack must expose fallbackAnchors');
 	if (typeof pack.normalizeLibrarySnapshot !== 'function') hard(findings, 'PP6-pack-library-normalizer', 'circuit pack must expose normalizeLibrarySnapshot');
+	if (pack.scaffoldOnly === true) hard(findings, 'PP8-pack-scaffold-only', 'circuit pack scaffold must be implemented before generation can be trusted', { packId: pack.id });
 }
 if (pack && manifest && manifest.packId !== pack.id) {
 	hard(findings, 'PP7-manifest-pack-match', 'cell manifest packId must match registered pack id', { manifestPackId: manifest.packId, packId: pack.id });

@@ -302,6 +302,19 @@ try {
 		planPass: customPlan.pass,
 		rules: (customPlan.findings || []).map(f => f.rule),
 	};
+	const customPlanCli = spawnSync(process.execPath, ['bin/easyeda-gsd.mjs', 'plan', '_tmp_workflow_smoke/custom_project/project_spec.json'], {
+		cwd: ROOT,
+		stdio: 'pipe',
+		shell: false,
+		env: { ...process.env, EASYEDA_GSD_LOCK_TOKEN: LOCK.token },
+		encoding: 'utf8',
+	});
+	const customPlanCliReport = existsSync(`${ROOT}/gsd_plan_report.json`) ? readJson(`${ROOT}/gsd_plan_report.json`) : null;
+	checks.customPackCliPlan = {
+		status: customPlanCli.status,
+		pass: customPlanCliReport?.pass ?? null,
+		rules: (customPlanCliReport?.findings || []).map(f => f.rule),
+	};
 	assertFinding(findings, existsSync(`${CUSTOM_PACK_DIR}/pack.mjs`) && existsSync(`${CUSTOM_PACK_DIR}/cell_manifest.json`), 'WS11-custom-pack-files', 'init workflow must be able to create a custom circuit pack scaffold', {
 		packDir: CUSTOM_PACK_DIR,
 	});
@@ -311,6 +324,10 @@ try {
 	});
 	assertFinding(findings, hasRule(customPlan, 'GP-LC3-approved-parts') && hasRule(customPlan, 'GP8-assembly-executable-module'), 'WS13-custom-pack-fails-explicitly', 'custom pack scaffold must fail with explicit library and executable assembly findings', {
 		observedRules: checks.customPackScaffold.rules,
+	});
+	assertFinding(findings, (customPlanCliReport?.findings || []).some(f => f.rule === 'GP14-pack-implemented'), 'WS17-custom-pack-scaffold-only-rejected', 'custom pack scaffold must be rejected explicitly until pack.mjs is implemented beyond scaffoldOnly on the real CLI path', {
+		observedRules: checks.customPackCliPlan.rules,
+		status: customPlanCli.status,
 	});
 
 	const restoreGenerate = runGsdGenerate({ root: ROOT, specPath: 'project_spec.json', command: ['engine/pipeline_fast.mjs'] });

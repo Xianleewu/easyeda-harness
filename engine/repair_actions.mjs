@@ -124,10 +124,10 @@ const RULE_PLANS = [
 	}],
 	[/^PP/, {
 		area: 'project-pack',
-		editFiles: ['project_assembly.json', 'circuit_packs/registry.mjs', 'circuit_packs/aihwdebugger/pack.mjs'],
-		inspectFiles: ['project_pack_report.json', 'circuit_packs/aihwdebugger/cell_manifest.json'],
+		editFiles: ['project_assembly.json', 'circuit_packs/registry.mjs', 'circuit_packs/<pack>/pack.mjs', 'circuit_packs/<pack>/cell_manifest.json'],
+		inspectFiles: ['project_pack_report.json', 'project_assembly.json', 'circuit_packs/<pack>/cell_manifest.json'],
 		nextCommand: 'npm.cmd run contract:pack',
-		repairHint: 'Keep the selected circuit pack registered and ensure it exposes id, cellBuilders, fallbackAnchors, library normalization, and matching cell manifest packId.',
+		repairHint: 'Implement the selected circuit pack, remove scaffoldOnly, keep it registered, and ensure it exposes id, cellBuilders, fallbackAnchors, library normalization, and matching cell manifest packId.',
 	}],
 	[/^LC|^GP-LC|^LIB-MANIFEST/, {
 		area: 'project-library',
