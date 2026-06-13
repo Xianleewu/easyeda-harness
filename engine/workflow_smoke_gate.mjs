@@ -486,6 +486,7 @@ try {
 		status: customPlanCli.status,
 		pass: customPlanCliReport?.pass ?? null,
 		rules: (customPlanCliReport?.findings || []).map(f => f.rule),
+		modelEvidence: customPlanCliReport?.modelEvidence || null,
 	};
 	const applyContextReportPath = `${TMP_DIR}/apply_context_report.json`;
 	const customApplyContext = spawnSync(process.execPath, ['bin/easyeda-gsd.mjs', 'apply', '--gated', '--context-only', '_tmp_workflow_smoke/custom_project/project_spec.json'], {
@@ -522,6 +523,18 @@ try {
 		observedRules: checks.customPackCliPlan.rules,
 		status: customPlanCli.status,
 	});
+	assertFinding(
+		findings,
+		customPlanCliReport?.modelEvidence?.path === `${customDir}/full_model.json`
+			&& customPlanCliReport?.modelEvidence?.used === false
+			&& customPlanCliReport?.modelEvidence?.skippedReason === 'missing',
+		'WS31-external-spec-model-evidence-is-local',
+		'external project plans must not use the repository root full_model.json as model evidence; only a full_model.json beside the active spec may be used',
+		{
+			expectedModelPath: `${customDir}/full_model.json`,
+			report: checks.customPackCliPlan,
+		},
+	);
 
 	const completeGenericContract = clone(genericContract);
 	if (completeGenericContract.modules?.[0]) {

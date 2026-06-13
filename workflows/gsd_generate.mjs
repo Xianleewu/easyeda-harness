@@ -36,6 +36,7 @@ export function generateContext(root, specPath = 'project_spec.json') {
 		assemblyPath: companion('project_assembly.json'),
 		libraryManifestPath: companion('approved_library_manifest.json'),
 		partLibPath: isRootSpec ? `${rootDir}/snap2.json` : companion('project_library_snapshot.json'),
+		modelPath: isRootSpec ? `${rootDir}/full_model.json` : `${specDir}/full_model.json`,
 	};
 }
 
@@ -65,8 +66,8 @@ export function buildGeneratePlan(root, specPath = 'project_spec.json') {
 	const assembly = readOptionalJson(root, context.assemblyPath, 'project_assembly', inputFindings);
 	const libraryManifest = readOptionalJson(root, context.libraryManifestPath, 'approved_library_manifest', inputFindings);
 	const partLibSnapshot = readOptionalJson(root, context.partLibPath, 'project_library_snapshot', inputFindings);
-	const model = existsSync(`${root}/full_model.json`) ? readJson(root, 'full_model.json') : null;
-	return buildGsdPlan({ spec, contract, netlist, assembly, libraryManifest, partLibSnapshot, model, specPath, assemblyPath: context.assemblyPath, partLibPath: context.partLibPath, inputFindings });
+	const model = existsSync(context.modelPath) ? readJson(root, context.modelPath) : null;
+	return buildGsdPlan({ spec, contract, netlist, assembly, libraryManifest, partLibSnapshot, model, specPath, assemblyPath: context.assemblyPath, partLibPath: context.partLibPath, modelPath: context.modelPath, inputFindings });
 }
 
 export function runGsdGenerate({ root, specPath = 'project_spec.json', command = ['engine/pipeline.mjs'], draft = false } = {}) {
@@ -129,6 +130,7 @@ export function runGsdGenerate({ root, specPath = 'project_spec.json', command =
 				netlistPath: context.netlistPath,
 				libraryManifestPath: context.libraryManifestPath,
 				partLibPath: context.partLibPath,
+				modelPath: context.modelPath,
 			},
 			plan: { pass: plan.pass, severity: plan.severity },
 			generated,

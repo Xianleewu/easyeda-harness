@@ -163,8 +163,25 @@ function validatePartLibrarySnapshot(contract, partLibSnapshot, partLibPath = ''
 	return findings;
 }
 
-export function buildGsdPlan({ spec, contract, netlist, assembly, libraryManifest = null, partLibSnapshot = null, model = null, specPath = 'project_spec.json', assemblyPath = '', partLibPath = '', inputFindings = [] }) {
+export function buildGsdPlan({ spec, contract, netlist, assembly, libraryManifest = null, partLibSnapshot = null, model = null, specPath = 'project_spec.json', assemblyPath = '', partLibPath = '', modelPath = '', inputFindings = [] }) {
 	const findings = [...asArray(inputFindings)];
+	const expectedProjectId = spec?.projectId || contract?.projectId || assembly?.projectId || null;
+	const modelEvidence = model ? {
+		path: modelPath || null,
+		projectId: model.layoutProfile?.projectId || model.projectId || model.project || null,
+		used: true,
+		skippedReason: null,
+	} : {
+		path: modelPath || null,
+		projectId: null,
+		used: false,
+		skippedReason: 'missing',
+	};
+	if (model && expectedProjectId && modelEvidence.projectId && modelEvidence.projectId !== expectedProjectId) {
+		modelEvidence.used = false;
+		modelEvidence.skippedReason = 'project-id-mismatch';
+		modelEvidence.expectedProjectId = expectedProjectId;
+	}
 	findings.push(...validateSpecSchema(spec));
 	if (contract) findings.push(...validateModuleContract(contract).map(f => ({ ...f, category: 'gsd-plan' })));
 	else hard(findings, 'GP0-contract-present', 'project_contract.json is required for planning');
@@ -190,7 +207,7 @@ export function buildGsdPlan({ spec, contract, netlist, assembly, libraryManifes
 	if (assembly && pack) findings.push(...validateExecutableCells(assembly, pack, assemblyPath));
 	findings.push(...validatePartLibrarySnapshot(contract, partLibSnapshot, partLibPath));
 
-	if (contract && netlist && assembly) findings.push(...validateSpecRealization(spec, contract, netlist, assembly, model));
+	if (contract && netlist && assembly) findings.push(...validateSpecRealization(spec, contract, netlist, assembly, modelEvidence.used ? model : null));
 
 	const report = {
 		generatedAt: new Date().toISOString(),
@@ -202,6 +219,7 @@ export function buildGsdPlan({ spec, contract, netlist, assembly, libraryManifes
 		cellManifest: assembly?.cellManifest || null,
 		libraryManifest: 'approved_library_manifest.json',
 		partLib: partLibPath || null,
+		modelEvidence,
 		modules: asArray(spec?.modules).map(mod => mod.id),
 		interfaces: asArray(spec?.interfaces).length,
 		requiredLocalGate: 'node bin/easyeda-gsd.mjs accept',
