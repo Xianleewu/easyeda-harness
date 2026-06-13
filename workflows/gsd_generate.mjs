@@ -42,7 +42,7 @@ export function buildGeneratePlan(root, specPath = 'project_spec.json') {
 	return buildGsdPlan({ spec, contract, netlist, assembly, libraryManifest, model, specPath });
 }
 
-export function runGsdGenerate({ root, specPath = 'project_spec.json', command = ['engine/pipeline_fast.mjs'] }) {
+export function runGsdGenerate({ root, specPath = 'project_spec.json', command = ['engine/pipeline.mjs'], draft = false } = {}) {
 	const started = Date.now();
 	const lock = acquireRunLock(root);
 	const context = generateContext(root, specPath);
@@ -82,13 +82,16 @@ export function runGsdGenerate({ root, specPath = 'project_spec.json', command =
 			fullModel: fileInfo(root, 'full_model.json'),
 			report: fileInfo(root, 'report.json'),
 		};
-		const pass = child.status === 0 && reportJson?.pass === true && generated.fullModel.exists;
+		const layoutEvidenceOk = draft || reportJson?.coverage?.layoutPlanner === true;
+		const pass = child.status === 0 && reportJson?.pass === true && generated.fullModel.exists && layoutEvidenceOk;
 		const report = {
 			generatedAt: new Date().toISOString(),
 			pass,
 			spec: specPath,
 			stage: 'generate',
 			command: [process.execPath, ...command].join(' '),
+			draft,
+			layoutSearchRequired: !draft,
 			projectId: plan.projectId,
 			circuitPack: plan.circuitPack,
 			generationContext: {
@@ -100,14 +103,20 @@ export function runGsdGenerate({ root, specPath = 'project_spec.json', command =
 			},
 			plan: { pass: plan.pass, severity: plan.severity },
 			generated,
-			template: reportJson ? { pass: reportJson.pass, severity: reportJson.severity, score: reportJson.score, mode: reportJson.mode } : null,
+			template: reportJson ? {
+				pass: reportJson.pass,
+				severity: reportJson.severity,
+				score: reportJson.score,
+				mode: reportJson.mode,
+				layoutPlanner: reportJson.coverage?.layoutPlanner === true,
+			} : null,
 			severity: { hard: pass ? 0 : 1, soft: 0, info: 0 },
 			findings: pass ? [] : [{
 				rule: 'GG1-generate-pass',
 				severity: 'hard',
 				category: 'gsd-generate',
 				msg: 'deterministic generation must pass after a passing GSD plan',
-				where: { status: child.status, reportPass: reportJson?.pass ?? null, fullModelExists: generated.fullModel.exists },
+				where: { status: child.status, reportPass: reportJson?.pass ?? null, fullModelExists: generated.fullModel.exists, layoutEvidenceOk },
 			}],
 			durationMs: Date.now() - started,
 		};

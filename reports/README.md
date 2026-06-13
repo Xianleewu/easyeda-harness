@@ -18,7 +18,7 @@ It must pass before generation work is trusted. It proves that `project_spec.jso
 
 `gsd_generate_report.json` is written by `node bin/easyeda-gsd.mjs generate`.
 
-It must pass before local acceptance is trusted. It proves that deterministic generation ran only after a passing `gsd_plan_report.json` and produced `full_model.json` plus `report.json`.
+It must pass before local acceptance is trusted. The public `generate` command runs full layout search by default and records layout evidence in the report. `generate --fast` is draft-only; draft reports are useful for iteration but are not final layout evidence by themselves.
 
 ## `workflow_smoke_report.json`
 

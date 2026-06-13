@@ -184,6 +184,7 @@ try {
 		root: ROOT,
 		specPath: '_tmp_workflow_smoke/bad_project_spec.json',
 		command: ['engine/pipeline_fast.mjs'],
+		draft: true,
 	});
 	const afterFullModelMtime = fileMtimeMs(fullModelPath);
 	checks.badGenerateRejected = {
@@ -583,7 +584,7 @@ try {
 		},
 	);
 
-	const restoreGenerate = runGsdGenerate({ root: ROOT, specPath: 'project_spec.json', command: ['engine/pipeline_fast.mjs'] });
+	const restoreGenerate = runGsdGenerate({ root: ROOT, specPath: 'project_spec.json', command: ['engine/pipeline_fast.mjs'], draft: true });
 	checks.restoreGenerate = {
 		pass: restoreGenerate.status === 0,
 		stage: restoreGenerate.report?.stage || null,
@@ -600,6 +601,37 @@ try {
 		'WS14-generate-context-bound',
 		'GSD generate must record and pass the active project assembly path into deterministic generation',
 		checks.restoreGenerate,
+	);
+
+	const fullGenerate = spawnSync(process.execPath, ['bin/easyeda-gsd.mjs', 'generate', 'project_spec.json'], {
+		cwd: ROOT,
+		stdio: 'pipe',
+		shell: false,
+		env: { ...process.env, EASYEDA_GSD_LOCK_TOKEN: LOCK.token },
+		encoding: 'utf8',
+	});
+	const fullGenerateReport = existsSync(`${ROOT}/gsd_generate_report.json`) ? readJson(`${ROOT}/gsd_generate_report.json`) : null;
+	checks.fullGenerateLayoutEvidence = {
+		status: fullGenerate.status,
+		pass: fullGenerateReport?.pass ?? null,
+		draft: fullGenerateReport?.draft ?? null,
+		layoutPlanner: fullGenerateReport?.template?.layoutPlanner ?? null,
+		command: fullGenerateReport?.command || null,
+	};
+	assertFinding(
+		findings,
+		fullGenerate.status === 0
+			&& fullGenerateReport?.pass === true
+			&& fullGenerateReport?.draft === false
+			&& fullGenerateReport?.template?.layoutPlanner === true,
+		'WS23-public-generate-runs-layout-search',
+		'public easyeda-gsd generate must produce full layout-search evidence by default; fast generation must be explicit draft mode',
+		{
+			status: fullGenerate.status,
+			stdout: fullGenerate.stdout?.slice(0, 500),
+			stderr: fullGenerate.stderr,
+			report: checks.fullGenerateLayoutEvidence,
+		},
 	);
 
 	const blockedConcurrent = spawnSync(process.execPath, ['bin/easyeda-gsd.mjs', 'plan', 'project_spec.json'], {

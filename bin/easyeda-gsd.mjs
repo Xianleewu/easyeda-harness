@@ -34,7 +34,7 @@ Commands:
   init --pack <pack> --out <file-or-dir>
                                Write a spec file, or a full project + circuit-pack scaffold when <out> is a directory.
   plan [spec]                  Validate current project contracts and print selected pack data.
-  generate [spec]              Plan-gated deterministic generation without write-back.
+  generate [--fast] [spec]     Plan-gated deterministic generation without write-back; full layout search by default.
   accept [spec]                Run local acceptance gates for the selected spec context.
   live-check [spec]            Run live EasyEDA snapshot, image, DRC, and live shot checks.
   apply --gated [spec]         Write back through the fail-closed gated entrypoint for the selected spec context.
@@ -191,7 +191,9 @@ function repair(args) {
 
 function generate(args) {
 	const spec = args.find(a => !a.startsWith('-')) || 'project_spec.json';
-	const { report, status } = runGsdGenerate({ root: ROOT, specPath: spec });
+	const fast = args.includes('--fast');
+	const command = fast ? ['engine/pipeline_fast.mjs'] : ['engine/pipeline.mjs'];
+	const { report, status } = runGsdGenerate({ root: ROOT, specPath: spec, command, draft: fast });
 	log(JSON.stringify(report, null, 2));
 	log('report -> gsd_generate_report.json');
 	process.exit(status);

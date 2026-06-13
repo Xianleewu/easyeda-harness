@@ -59,7 +59,7 @@ steps.push(runStep('entrypoints', 'node', ['engine/entrypoint_audit.mjs']));
 steps.push(runStep('agent:instructions', 'node', ['engine/agent_instruction_gate.mjs']));
 steps.push(runStep('workflow:smoke', 'node', ['engine/workflow_smoke_gate.mjs']));
 steps.push(runStep('gsd:plan', 'node', ['bin/easyeda-gsd.mjs', 'plan', SPEC_PATH]));
-steps.push(runStep('gsd:generate', 'node', ['bin/easyeda-gsd.mjs', 'generate', SPEC_PATH]));
+steps.push(runStep('gsd:generate', 'node', ['bin/easyeda-gsd.mjs', 'generate', '--fast', SPEC_PATH]));
 steps.push(runStep('spec:schema', 'node', ['engine/spec_schema_gate.mjs']));
 steps.push(runStep('spec', 'node', ['engine/project_spec_gate.mjs']));
 steps.push(runStep('contract', 'node', ['engine/project_contract_gate.mjs']));

@@ -88,6 +88,7 @@ const local = {
 	projectNetlist: requireReportPass(findings, 'project_netlist_report.json', 'project netlist report'),
 	projectLayout: requireReportPass(findings, 'project_layout_report.json', 'project layout report'),
 	projectVisual: requireReportPass(findings, 'project_visual_report.json', 'project visual report'),
+	template: requireReportPass(findings, 'report.json', 'template/layout report', data => data?.pass === true && data?.coverage?.layoutPlanner === true),
 };
 
 function requireProjectId(report, rel, label) {
