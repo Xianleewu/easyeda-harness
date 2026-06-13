@@ -10,6 +10,7 @@ import { auditSystemIntent } from './system_intent_gate.mjs';
 import { renderSheetOutput } from './sheet_renderer.mjs';
 import { auditSheetOutput } from './sheet_output_gate.mjs';
 import { computeStructureMetricsFromSnapshot } from './structure_metrics.mjs';
+import { loadProjectAssembly } from './assemble.mjs';
 import { MODULES } from '../harness/module_registry.mjs';
 
 const DIR = (process.env.EASYEDA_WORKDIR || process.cwd()).replace(/\\/g, '/') + '/';
@@ -19,17 +20,6 @@ const OUT_REPORT = process.env.EASYEDA_LAYOUT_PLANNER_REPORT || DIR + 'layout_pl
 const STRUCTURE_REPORT = process.env.EASYEDA_LAYOUT_PLANNER_STRUCTURE || DIR + 'layout_planner_structure.json';
 const SHEET_IMAGE = process.env.EASYEDA_LAYOUT_PLANNER_SHEET_IMAGE || DIR + 'layout_planner_sheet.png';
 const DEFAULT_MAX_CANDIDATES = 1200;
-
-const BASE = {
-	usb:   { x: 640,  y: 1000 },
-	ldo:   { x: 440,  y: 820 },
-	btn1:  { x: 760,  y: 520 },
-	btn2:  { x: 1000, y: 520 },
-	mcu:   { x: 920,  y: 820 },
-	pmos:  { x: 1340, y: 780 },
-	relay1:{ x: 1720, y: 740 },
-	relay2:{ x: 1720, y: 495 },
-};
 
 const LIVE_IMAGE_BOUNDS = {
 	maxSheetWidth: 1550,
@@ -54,7 +44,18 @@ function cloneAnchors(a) {
 	return Object.fromEntries(Object.entries(a).map(([k, v]) => [k, { ...v }]));
 }
 
-function familyAnchors() {
+function completeAnchors(base, patch = {}) {
+	return { ...cloneAnchors(base), ...cloneAnchors(patch) };
+}
+
+function chooseThreshold(thresholds, usbY) {
+	return (thresholds || []).find(x => usbY <= x.maxUsbY) || thresholds?.[thresholds.length - 1] || {};
+}
+
+function familyAnchors(assembly = loadProjectAssembly()) {
+	const policy = assembly.layoutPolicy || {};
+	const base = policy.baseAnchors || assembly.anchors || {};
+	if (!Object.keys(base).length) throw new Error('project_assembly.json layoutPolicy.baseAnchors or anchors is required for layout planning');
 	const candidates = [];
 	const seen = new Set();
 	const add = (a) => {
@@ -64,69 +65,44 @@ function familyAnchors() {
 			candidates.push(a);
 		}
 	};
-	add(cloneAnchors(BASE));
-	add({
-		usb: { x: 640, y: 1020 },
-		ldo: { x: 440, y: 830 },
-		btn1: { x: 720, y: 500 },
-		btn2: { x: 1020, y: 500 },
-		mcu: { x: 900, y: 800 },
-		pmos: { x: 1370, y: 860 },
-		relay1: { x: 1710, y: 740 },
-		relay2: { x: 1710, y: 495 },
-	});
-	const inputRows = [
-		{ usbY: 960, ldoY: 780 },
-		{ usbY: 980, ldoY: 800 },
-		{ usbY: 1000, ldoY: 820 },
-		{ usbY: 1020, ldoY: 840 },
-		{ usbY: 1040, ldoY: 860 },
-	];
-	const outputRows = [
-		{ pmosY: 760, relay1Y: 720 },
-		{ pmosY: 780, relay1Y: 730 },
-		{ pmosY: 780, relay1Y: 720 },
-		{ pmosY: 780, relay1Y: 740 },
-		{ pmosY: 800, relay1Y: 740 },
-		{ pmosY: 820, relay1Y: 740 },
-		{ pmosY: 780, relay1Y: 760 },
-	];
-	const xProfiles = [
-		{ usbX: 620, ldoX: 420, mcuX: 860, pmosX: 1260, relayX: 1620 },
-		{ usbX: 620, ldoX: 420, mcuX: 860, pmosX: 1260, relayX: 1560 },
-		{ usbX: 620, ldoX: 420, mcuX: 860, pmosX: 1250, relayX: 1590 },
-		{ usbX: 620, ldoX: 420, mcuX: 860, pmosX: 1260, relayX: 1600 },
-		{ usbX: 620, ldoX: 420, mcuX: 880, pmosX: 1280, relayX: 1580 },
-		{ usbX: 620, ldoX: 430, mcuX: 880, pmosX: 1300, relayX: 1600 },
-		{ usbX: 640, ldoX: 440, mcuX: 900, pmosX: 1300, relayX: 1600 },
-		{ usbX: 640, ldoX: 440, mcuX: 920, pmosX: 1320, relayX: 1620 },
-		{ usbX: 640, ldoX: 440, mcuX: 920, pmosX: 1340, relayX: 1680 },
-		{ usbX: 640, ldoX: 440, mcuX: 900, pmosX: 1340, relayX: 1680 },
-		{ usbX: 640, ldoX: 440, mcuX: 900, pmosX: 1370, relayX: 1710 },
-		{ usbX: 620, ldoX: 440, mcuX: 920, pmosX: 1340, relayX: 1680 },
-		{ usbX: 620, ldoX: 440, mcuX: 900, pmosX: 1340, relayX: 1680 },
-		{ usbX: 640, ldoX: 460, mcuX: 920, pmosX: 1340, relayX: 1700 },
-		{ usbX: 640, ldoX: 440, mcuX: 940, pmosX: 1360, relayX: 1700 },
-	];
+	add(cloneAnchors(base));
+	for (const alt of policy.alternateAnchors || []) add(completeAnchors(base, alt));
+	const inputRows = policy.inputRows || [];
+	const outputRows = policy.outputRows || [];
+	const xProfiles = policy.xProfiles || [];
+	const derived = policy.derivedAnchors || {};
 	for (const xs of xProfiles) {
 		for (const input of inputRows) {
 			for (const output of outputRows) {
-				const a = cloneAnchors(BASE);
+				const a = cloneAnchors(base);
 				a.usb = { x: xs.usbX, y: input.usbY };
 				a.ldo = { x: xs.ldoX, y: input.ldoY };
-				const mcuY = input.usbY <= 960 ? 790 : (input.usbY <= 980 ? 800 : 820);
-				const btnY = input.usbY <= 980 ? 500 : 520;
+				const threshold = chooseThreshold(derived.inputUsbYThresholds, input.usbY);
+				const mcuY = threshold.mcuY ?? base.mcu?.y;
+				const btnY = threshold.buttonY ?? base.btn1?.y;
 				a.mcu = { x: xs.mcuX, y: mcuY };
-				a.btn1 = { x: xs.mcuX - 210, y: btnY };
-				a.btn2 = { x: xs.mcuX + 110, y: btnY };
+				a.btn1 = { x: xs.mcuX + (derived.btn1DxFromMcu ?? -210), y: btnY };
+				a.btn2 = { x: xs.mcuX + (derived.btn2DxFromMcu ?? 110), y: btnY };
 				a.pmos = { x: xs.pmosX, y: output.pmosY };
 				a.relay1 = { x: xs.relayX, y: output.relay1Y };
-				a.relay2 = { x: xs.relayX, y: output.relay1Y - 245 };
+				a.relay2 = { x: xs.relayX, y: output.relay1Y + (derived.relay2DyFromRelay1 ?? -245) };
 				add(a);
 			}
 		}
 	}
-	return candidates;
+	return {
+		candidateSource: policy.candidateSource || 'project_assembly.layoutPolicy',
+		projectId: assembly.projectId || null,
+		layoutProfile: assembly.layoutProfile || null,
+		candidates,
+		policyStats: {
+			baseAnchors: Object.keys(base).length,
+			alternateAnchors: (policy.alternateAnchors || []).length,
+			inputRows: inputRows.length,
+			outputRows: outputRows.length,
+			xProfiles: xProfiles.length,
+		},
+	};
 }
 
 function geometryBoundsFromPage(pageComposition) {
@@ -442,8 +418,10 @@ async function evaluateQuickCandidates(partLib, anchorsList) {
 
 export async function planLayout(opts = {}) {
 	const started = performance.now();
+	const assembly = loadProjectAssembly();
 	const { snap, byDes } = loadPartLib(PART_LIB);
-	const anchorsList = familyAnchors();
+	const anchorFamily = familyAnchors(assembly);
+	const anchorsList = anchorFamily.candidates;
 	const maxCandidates = opts.maxCandidates ?? Number(process.env.EASYEDA_LAYOUT_MAX_CANDIDATES ?? DEFAULT_MAX_CANDIDATES);
 	const plannedAnchors = maxCandidates > 0 ? anchorsList.slice(0, maxCandidates) : anchorsList;
 	const afterAnchors = performance.now();
@@ -481,6 +459,10 @@ export async function planLayout(opts = {}) {
 	writeFileSync(modelOut, JSON.stringify(bestModel, null, 2), 'utf8');
 	const report = {
 		generatedAt: new Date().toISOString(),
+		projectId: assembly.projectId || null,
+		layoutProfile: assembly.layoutProfile || null,
+		candidateSource: anchorFamily.candidateSource,
+		policyStats: anchorFamily.policyStats,
 		best,
 		top: finalists.slice(0, 12),
 		quickTop: candidates.slice(0, 12),

@@ -21,6 +21,7 @@ entrypoint_audit_report.json
 project_spec_report.json
 project_contract_report.json
 project_assembly_report.json
+project_layout_report.json
 project_model_report.json
 project_visual_report.json
 project_rule_report.json

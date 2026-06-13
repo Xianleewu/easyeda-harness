@@ -16,6 +16,77 @@
     "relay1": { "x": 1720, "y": 740 },
     "relay2": { "x": 1720, "y": 475 }
   },
+  "layoutPolicy": {
+    "candidateSource": "project_assembly.layoutPolicy",
+    "minModuleGap": 90,
+    "maxModuleWireIntrusions": 0,
+    "requireNoLaneInterlocks": true,
+    "baseAnchors": {
+      "usb": { "x": 640, "y": 1000 },
+      "ldo": { "x": 440, "y": 820 },
+      "btn1": { "x": 760, "y": 520 },
+      "btn2": { "x": 1000, "y": 520 },
+      "mcu": { "x": 920, "y": 820 },
+      "pmos": { "x": 1340, "y": 780 },
+      "relay1": { "x": 1720, "y": 740 },
+      "relay2": { "x": 1720, "y": 495 }
+    },
+    "alternateAnchors": [
+      {
+        "usb": { "x": 640, "y": 1020 },
+        "ldo": { "x": 440, "y": 830 },
+        "btn1": { "x": 720, "y": 500 },
+        "btn2": { "x": 1020, "y": 500 },
+        "mcu": { "x": 900, "y": 800 },
+        "pmos": { "x": 1370, "y": 860 },
+        "relay1": { "x": 1710, "y": 740 },
+        "relay2": { "x": 1710, "y": 495 }
+      }
+    ],
+    "inputRows": [
+      { "usbY": 960, "ldoY": 780 },
+      { "usbY": 980, "ldoY": 800 },
+      { "usbY": 1000, "ldoY": 820 },
+      { "usbY": 1020, "ldoY": 840 },
+      { "usbY": 1040, "ldoY": 860 }
+    ],
+    "outputRows": [
+      { "pmosY": 760, "relay1Y": 720 },
+      { "pmosY": 780, "relay1Y": 730 },
+      { "pmosY": 780, "relay1Y": 720 },
+      { "pmosY": 780, "relay1Y": 740 },
+      { "pmosY": 800, "relay1Y": 740 },
+      { "pmosY": 820, "relay1Y": 740 },
+      { "pmosY": 780, "relay1Y": 760 }
+    ],
+    "xProfiles": [
+      { "usbX": 620, "ldoX": 420, "mcuX": 860, "pmosX": 1260, "relayX": 1620 },
+      { "usbX": 620, "ldoX": 420, "mcuX": 860, "pmosX": 1260, "relayX": 1560 },
+      { "usbX": 620, "ldoX": 420, "mcuX": 860, "pmosX": 1250, "relayX": 1590 },
+      { "usbX": 620, "ldoX": 420, "mcuX": 860, "pmosX": 1260, "relayX": 1600 },
+      { "usbX": 620, "ldoX": 420, "mcuX": 880, "pmosX": 1280, "relayX": 1580 },
+      { "usbX": 620, "ldoX": 430, "mcuX": 880, "pmosX": 1300, "relayX": 1600 },
+      { "usbX": 640, "ldoX": 440, "mcuX": 900, "pmosX": 1300, "relayX": 1600 },
+      { "usbX": 640, "ldoX": 440, "mcuX": 920, "pmosX": 1320, "relayX": 1620 },
+      { "usbX": 640, "ldoX": 440, "mcuX": 920, "pmosX": 1340, "relayX": 1680 },
+      { "usbX": 640, "ldoX": 440, "mcuX": 900, "pmosX": 1340, "relayX": 1680 },
+      { "usbX": 640, "ldoX": 440, "mcuX": 900, "pmosX": 1370, "relayX": 1710 },
+      { "usbX": 620, "ldoX": 440, "mcuX": 920, "pmosX": 1340, "relayX": 1680 },
+      { "usbX": 620, "ldoX": 440, "mcuX": 900, "pmosX": 1340, "relayX": 1680 },
+      { "usbX": 640, "ldoX": 460, "mcuX": 920, "pmosX": 1340, "relayX": 1700 },
+      { "usbX": 640, "ldoX": 440, "mcuX": 940, "pmosX": 1360, "relayX": 1700 }
+    ],
+    "derivedAnchors": {
+      "inputUsbYThresholds": [
+        { "maxUsbY": 960, "mcuY": 790, "buttonY": 500 },
+        { "maxUsbY": 980, "mcuY": 800, "buttonY": 500 },
+        { "maxUsbY": 99999, "mcuY": 820, "buttonY": 520 }
+      ],
+      "btn1DxFromMcu": -210,
+      "btn2DxFromMcu": 110,
+      "relay2DyFromRelay1": -245
+    }
+  },
   "modules": [
     {
       "id": "usb",

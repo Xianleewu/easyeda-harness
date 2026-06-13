@@ -29,6 +29,7 @@ const spec = readJson('project_spec_report.json');
 const contract = readJson('project_contract_report.json');
 const projectRules = readJson('project_rule_report.json');
 const projectAssembly = readJson('project_assembly_report.json');
+const projectLayout = readJson('project_layout_report.json');
 const projectModel = readJson('project_model_report.json');
 const projectVisual = readJson('project_visual_report.json');
 const template = readJson('report.json');
@@ -76,6 +77,18 @@ const checks = {
 		cellTypes: projectAssembly?.cellTypes ?? null,
 		firstFinding: projectAssembly?.findings?.[0] || null,
 		evidence: 'project_assembly_report.json',
+	},
+	projectLayout: {
+		status: status(projectLayout?.pass),
+		severity: projectLayout?.severity || null,
+		projectId: projectLayout?.projectId || null,
+		candidateSource: projectLayout?.candidateSource || null,
+		totalCandidates: projectLayout?.totalCandidates ?? null,
+		minModuleGap: projectLayout?.minModuleGap ?? null,
+		moduleWireIntrusions: projectLayout?.moduleWireIntrusions ?? null,
+		laneInterlocks: projectLayout?.laneInterlocks ?? null,
+		firstFinding: projectLayout?.findings?.[0] || null,
+		evidence: 'project_layout_report.json',
 	},
 	template: {
 		status: status(template?.pass),
@@ -178,6 +191,14 @@ if (checks.projectAssembly.status !== 'pass') {
 		action: 'Make project_assembly.json map every project_contract.json module to a deterministic cell, anchor, refs, and nets before generation. This is the bridge from user intent to executable schematic layout.',
 		evidence: ['project_spec.json', 'project_contract.json', 'project_assembly.json', 'engine/cells.mjs', 'engine/assemble.mjs', 'project_assembly_report.json'],
 		observed: checks.projectAssembly.firstFinding || checks.projectAssembly,
+	});
+}
+if (checks.projectLayout.status !== 'pass') {
+	pushAction(actions, {
+		area: 'project-layout',
+		action: 'Make project_assembly.json layoutPolicy drive layout_planner.mjs and satisfy module spacing, no interlock, and no unrelated wire intrusion requirements.',
+		evidence: ['project_assembly.json', 'engine/layout_planner.mjs', 'layout_planner_report.json', 'layout_planner_structure.json', 'project_layout_report.json'],
+		observed: checks.projectLayout.firstFinding || checks.projectLayout,
 	});
 }
 if (checks.template.status !== 'pass') {

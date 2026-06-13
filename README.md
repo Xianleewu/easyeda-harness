@@ -12,9 +12,9 @@ EasyEDA Harness 是一套给 Codex、Claude Code 等编程 Agent 使用的原理
 
 当前模型 PASS 只证明当前模型 PASS，不能证明其它项目、其它原理图或手工绘制结果符合规则。
 
-`project_spec.json` 是用户电路需求的机器输入；`project_contract.json` 是 Agent 从 spec 落下来的设计合同；`project_assembly.json` 把每个合同模块映射到确定性 cell、refs、anchors 和 nets。`npm run spec` 会检查 spec 已被 contract 覆盖，`npm run contract:assembly` 和 `npm run accept` 会继续检查合同、装配清单与模型。
+`project_spec.json` 是用户电路需求的机器输入；`project_contract.json` 是 Agent 从 spec 落下来的设计合同；`project_assembly.json` 把每个合同模块映射到确定性 cell、refs、anchors、nets 和布局策略。`npm run spec` 会检查 spec 已被 contract 覆盖，`npm run contract:assembly`、`npm run contract:layout` 和 `npm run accept` 会继续检查合同、装配清单、布局策略与模型。
 
-`project_contract.json` 是 Agent 接手新项目时必须先修改的机器合同，`project_assembly.json` 是随后必须补齐的可执行装配映射。`npm run contract`、`npm run contract:assembly` 和 `npm run accept` 会检查这些文件；未通过时，不应继续写回或声称已完成。
+`project_contract.json` 是 Agent 接手新项目时必须先修改的机器合同，`project_assembly.json` 是随后必须补齐的可执行装配映射和布局策略。`npm run contract`、`npm run contract:assembly`、`npm run contract:layout` 和 `npm run accept` 会检查这些文件；未通过时，不应继续写回或声称已完成。
 
 ## 核心能力
 
@@ -23,6 +23,7 @@ EasyEDA Harness 是一套给 Codex、Claude Code 等编程 Agent 使用的原理
 - 项目合同门禁：`project_contract.json` 定义模块、关键网络、接口、视觉证据区域和禁止自由绘图策略。
 - 规则覆盖检查：`contract:rules` 会确认模块注册、必备零件、接口合同和核心规则覆盖了项目合同。
 - 装配覆盖检查：`contract:assembly` 会确认每个合同模块都映射到了确定性 cell、anchor、refs 和 nets。
+- 布局策略检查：`contract:layout` 会确认布局搜索来自 `project_assembly.json`，并验证最终模块间距、无榫卯穿插、无无关导线侵入。
 - 合同兑现检查：生成 `full_model.json` 后，`contract:model` 会确认模型实际包含合同要求的模块、零件、网络和接口表达。
 - 视觉证据检查：生成离线预览后，`contract:visual` 会确认合同要求的截图区域都存在且通过图像检查。
 - 快速离线检查：`npm run fast` 在本机 CPU 上完成核心模板校验，适合日常坐标和规则迭代。
@@ -60,7 +61,7 @@ EasyEDA Harness 是一套给 Codex、Claude Code 等编程 Agent 使用的原理
 
 Agent 会自动运行本地检查、生成预览图，并写出 `acceptance_report.json` 和 `next_actions.json`。如果检查未通过，`next_actions.json` 是下一步修复清单。
 
-新项目的第一步不是画图，而是让 Agent 修改 `project_spec.json`，再把它落实到 `project_contract.json`，随后用 `project_assembly.json` 定义可执行装配映射；通过这些门禁后再实现项目自己的 deterministic cells 和规则覆盖。
+新项目的第一步不是画图，而是让 Agent 修改 `project_spec.json`，再把它落实到 `project_contract.json`，随后用 `project_assembly.json` 定义可执行装配映射和布局策略；通过这些门禁后再实现项目自己的 deterministic cells 和规则覆盖。
 
 ## 写回 EasyEDA
 
@@ -85,6 +86,7 @@ Agent 会通过 `apply:gated` 写回 EasyEDA。这个入口会先运行检查；
 - 项目规格覆盖检查：`project_spec_report.json` 中 `HARD=0 SOFT=0 INFO=0`
 - 项目规则覆盖检查：`project_rule_report.json` 中 `HARD=0 SOFT=0 INFO=0`
 - 项目装配覆盖检查：`project_assembly_report.json` 中 `HARD=0 SOFT=0 INFO=0`
+- 项目布局策略检查：`project_layout_report.json` 中 `HARD=0 SOFT=0 INFO=0`
 - 合同兑现检查：`project_model_report.json` 中 `HARD=0 SOFT=0 INFO=0`
 - 本地快速检查：`HARD=0 SOFT=0 INFO=0`
 - 完整布局检查：`HARD=0 SOFT=0 INFO=0`
@@ -111,7 +113,7 @@ Agent 会通过 `apply:gated` 写回 EasyEDA。这个入口会先运行检查；
 
 - `engine/`：模板组装、布局搜索、写回、渲染、DRC/live 辅助。
 - `harness/`：统一规则门禁、模型归一化、模块注册。
-- `project_spec.json` / `project_contract.json` / `project_assembly.json`：用户意图、设计合同和可执行装配映射。
+- `project_spec.json` / `project_contract.json` / `project_assembly.json`：用户意图、设计合同、可执行装配映射和布局策略。
 - `snap2.json`：器件快照输入。
 - `comp_state.json`：器件状态输入，用于写回时保留器件绑定信息。
 - `engine/bridge_client.mjs` / `engine/bridge_exec.mjs`：跨平台 EasyEDA bridge 执行入口。

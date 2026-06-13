@@ -15,7 +15,7 @@ For a new schematic project, do not draw directly in EasyEDA and then hope the g
 
 A PASS on the bundled model only proves that the bundled model passes. It does not validate another project, another schematic, or hand-drawn EasyEDA edits.
 
-`project_spec.json` is the first user-intent input. `project_contract.json` is the required machine contract derived from it. `project_assembly.json` maps each contract module to deterministic cells, refs, anchors, and nets. Update all three before changing cells for a new project, then run `npm.cmd run spec`, `npm.cmd run contract`, and `npm.cmd run contract:assembly`. A failing spec, contract, or assembly gate blocks all write-back and delivery claims.
+`project_spec.json` is the first user-intent input. `project_contract.json` is the required machine contract derived from it. `project_assembly.json` maps each contract module to deterministic cells, refs, anchors, nets, and layout policy. Update all three before changing cells for a new project, then run `npm.cmd run spec`, `npm.cmd run contract`, `npm.cmd run contract:assembly`, and `npm.cmd run accept`. A failing spec, contract, assembly, or layout gate blocks all write-back and delivery claims.
 
 ## Required External Skill
 
@@ -53,6 +53,7 @@ Acceptance requires all local gates to pass:
 - `contract:assembly`: `project_assembly.json` maps every contract module to deterministic cells, anchors, refs, and nets
 - `fast`: `HARD=0 SOFT=0 INFO=0`
 - `pipeline`: `HARD=0 SOFT=0 INFO=0`
+- `contract:layout`: layout search is driven by `project_assembly.json` layout policy and final module spacing/interlock/intrusion checks pass
 - `contract:model`: generated `full_model.json` satisfies `project_contract.json`
 - `preview`: at least 10 offline preview screenshots plus visual audit PASS
 - `contract:visual`: preview evidence covers every `project_contract.json` visual region
@@ -110,9 +111,9 @@ When adapting this repository to a different schematic:
 
 1. Read the electrical spec and encode it in `project_spec.json` before placing symbols.
 2. Derive/update `project_contract.json` from the spec and run `npm.cmd run spec` plus `npm.cmd run contract` until both pass.
-3. Map every contract module in `project_assembly.json` and run `npm.cmd run contract:assembly` until it passes.
+3. Map every contract module and layout policy in `project_assembly.json`, then run `npm.cmd run contract:assembly` until it passes.
 4. Implement or update deterministic cells for that assembly mapping.
-5. Add/adjust rules so the project-specific contract is enforced by `project_rule_report.json`, `project_assembly_report.json`, `report.json`, `project_model_report.json`, `project_visual_report.json`, live DRC, and visual evidence.
+5. Add/adjust rules so the project-specific contract is enforced by `project_rule_report.json`, `project_assembly_report.json`, `project_layout_report.json`, `report.json`, `project_model_report.json`, `project_visual_report.json`, live DRC, and visual evidence.
 6. Iterate from `next_actions.json`; do not bypass failed findings with manual EasyEDA edits.
 7. Write back only through `apply:gated`, then validate using live snapshot, real canvas image, DRC, and live shots.
 
