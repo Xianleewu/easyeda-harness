@@ -1,4 +1,4 @@
-import { REPEATED_GROUPS, moduleByName } from '../module_registry.mjs';
+import { loadProjectModuleRegistry } from '../module_registry.mjs';
 import { round2 } from '../model.mjs';
 import { CONFIG } from '../config.mjs';
 
@@ -43,9 +43,10 @@ function axisCorridor(aBox, bBox) {
 export function c12ReferenceStructure(m) {
 	const F = [];
 	const parts = new Map((m.parts || []).map(p => [p.designator, p]));
-	const modules = moduleByName();
+	const registry = loadProjectModuleRegistry();
+	const modules = new Map((registry.modules || []).map(mod => [mod.name, mod]));
 
-	for (const group of REPEATED_GROUPS) {
+	for (const group of registry.repeatedGroups || []) {
 		if (group.modules.length !== 2) continue;
 		const [aName, bName] = group.modules;
 		const aMod = modules.get(aName);

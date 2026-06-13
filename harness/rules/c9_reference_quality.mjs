@@ -1,6 +1,6 @@
 import { CONFIG } from '../config.mjs';
 import { round2 } from '../model.mjs';
-import { MODULES } from '../module_registry.mjs';
+import { loadProjectModuleRegistry } from '../module_registry.mjs';
 
 function boxOf(parts, refs, margin = 0) {
 	const hit = refs.map(r => parts.get(r)).filter(Boolean);
@@ -91,8 +91,9 @@ function netIslandStats(groups) {
 export function c9ReferenceQuality(m) {
 	const F = [];
 	const byRef = new Map(m.parts.map(p => [p.designator, p]));
+	const registry = loadProjectModuleRegistry();
 	const moduleMargin = CONFIG.reference?.moduleMargin ?? 12;
-	const modules = MODULES.map(({ name, refs }) => ({ name, refs, box: boxOf(byRef, refs, moduleMargin) }))
+	const modules = registry.modules.map(({ name, refs }) => ({ name, refs, box: boxOf(byRef, refs, moduleMargin) }))
 		.filter(x => x.box);
 	const mod = Object.fromEntries(modules.map(x => [x.name, x]));
 

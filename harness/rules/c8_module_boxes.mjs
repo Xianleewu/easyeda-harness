@@ -1,6 +1,6 @@
 import { CONFIG } from '../config.mjs';
 import { segIntersectsRect, shrinkRect, rectsGap } from '../model.mjs';
-import { MODULES, partToModuleMap } from '../module_registry.mjs';
+import { activePartToModuleMap, loadProjectModuleRegistry } from '../module_registry.mjs';
 
 function expand(r, m) {
 	return { minX: r.minX - m, maxX: r.maxX + m, minY: r.minY - m, maxY: r.maxY + m };
@@ -35,16 +35,17 @@ function segKey(s) {
 export function c8ModuleBoxes(m) {
 	const F = [];
 	const byRef = new Map(m.parts.map(p => [p.designator, p]));
+	const registry = loadProjectModuleRegistry();
 	const boxMargin = CONFIG.module?.boxMargin ?? 24;
 	const minGap = CONFIG.module?.minGap ?? 40;
 	const interlockMargin = CONFIG.module?.interlockMargin ?? 0;
 	const interlockMaxSeparation = CONFIG.module?.interlockMaxSeparation ?? 180;
 	const partialMin = CONFIG.module?.interlockPartialMin ?? 0.2;
 	const partialMax = CONFIG.module?.interlockPartialMax ?? 0.75;
-	const partToModule = partToModuleMap();
+	const partToModule = activePartToModuleMap();
 	const segmentModules = new Map();
 	const modules = [];
-	for (const { name, refs } of MODULES) {
+	for (const { name, refs } of registry.modules) {
 		const parts = refs.map(r => byRef.get(r)).filter(Boolean);
 		if (!parts.length) continue;
 		modules.push({ name, refs, parts, box: unionBox(parts, boxMargin), laneBox: unionBox(parts, interlockMargin) });

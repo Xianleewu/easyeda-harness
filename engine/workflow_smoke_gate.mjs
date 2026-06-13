@@ -13,6 +13,8 @@ import { inferModuleRegions } from './sheet_renderer.mjs';
 import { auditCommercialArchitecture } from './commercial_architecture.mjs';
 import { auditSystemIntent } from './system_intent_gate.mjs';
 import { auditDocumentStyle, buildDocumentLayer } from '../harness/document_style.mjs';
+import { buildModel } from '../harness/model.mjs';
+import { runRules } from '../harness/rule_registry.mjs';
 import { acquireRunLock } from '../workflows/run_lock.mjs';
 
 const ROOT = (process.env.EASYEDA_WORKDIR || process.cwd()).replace(/\\/g, '/');
@@ -466,6 +468,37 @@ try {
 		'WS41-visual-crops-use-contract-evidence',
 		'offline visual crops must be generated from the active project contract evidence regions instead of fixed AIHWDEBUGER crop names',
 		checks.visualCropsUseContractEvidence,
+	);
+
+	const oldProjectAssemblyForHarnessRules = process.env.EASYEDA_PROJECT_ASSEMBLY;
+	process.env.EASYEDA_PROJECT_ASSEMBLY = externalStructureAssemblyPath;
+	const externalRuleFindings = runRules(buildModel({
+		projectId: 'workflow-smoke-external-structure',
+		components: [
+			{ designator: 'U99', value: 'IC', bbox: { minX: 100, minY: 100, maxX: 160, maxY: 160 }, pins: [
+				{ num: '1', name: 'IN', x: 100, y: 130 },
+				{ num: '2', name: 'OUT', x: 160, y: 130 },
+			] },
+			{ designator: 'R99', value: '10k', bbox: { minX: 210, minY: 115, maxX: 250, maxY: 145 }, pins: [
+				{ num: '1', name: '1', x: 210, y: 130 },
+				{ num: '2', name: '2', x: 250, y: 130 },
+			] },
+		],
+		wires: [{ id: 'W99', net: 'SENSE_OUT', line: [160, 130, 210, 130] }],
+		netflags: [{ net: 'SENSE_OUT', kind: 'sig', x: 250, y: 130, bbox: { minX: 250, minY: 120, maxX: 320, maxY: 138 } }],
+	}));
+	if (oldProjectAssemblyForHarnessRules === undefined) delete process.env.EASYEDA_PROJECT_ASSEMBLY;
+	else process.env.EASYEDA_PROJECT_ASSEMBLY = oldProjectAssemblyForHarnessRules;
+	checks.harnessRulesUseProjectAssemblyModules = {
+		findings: externalRuleFindings.map(f => f.rule),
+		defaultRequiredPartFindings: externalRuleFindings.filter(f => f.rule === 'C10.1-required-part-missing' || f.rule === 'C10.2-unexpected-part').map(f => f.where),
+	};
+	assertFinding(
+		findings,
+		checks.harnessRulesUseProjectAssemblyModules.defaultRequiredPartFindings.length === 0,
+		'WS42-harness-rules-use-project-assembly-modules',
+		'core harness rules must derive required parts and module boxes from active project_assembly.json instead of the bundled AIHWDEBUGER module registry',
+		checks.harnessRulesUseProjectAssemblyModules,
 	);
 
 	const noDrawingRulesContract = clone(contract);
