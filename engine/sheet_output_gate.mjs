@@ -256,6 +256,11 @@ export function auditSheetOutput(renderReport, imagePath = DEFAULT_IMAGE, opts =
 		minModuleWidthRatio: opts.minModuleWidthRatio ?? 0.88,
 		minModuleHeightRatio: opts.minModuleHeightRatio ?? 0.72,
 		minModulePackingRatio: opts.minModulePackingRatio ?? 0.28,
+		minSchematicContentWidthRatio: opts.minSchematicContentWidthRatio ?? 0.7,
+		minSchematicContentHeightRatio: opts.minSchematicContentHeightRatio ?? 0.7,
+		minSchematicMarginPx: opts.minSchematicMarginPx ?? 20,
+		minSchematicMarginRatio: opts.minSchematicMarginRatio ?? 0.01,
+		requireModuleGridRhythm: opts.requireModuleGridRhythm ?? true,
 		minRenderedPins: opts.minRenderedPins ?? 120,
 		minRenderedNoConnects: opts.minRenderedNoConnects ?? 20,
 		minRenderedJunctions: opts.minRenderedJunctions ?? 20,
@@ -417,11 +422,11 @@ export function auditSheetOutput(renderReport, imagePath = DEFAULT_IMAGE, opts =
 			minWidth: cfg.minWidth,
 			minHeight: cfg.minHeight,
 			minFileBytes: cfg.minFileBytes,
-			minSchematicContentWidthRatio: 0.7,
-			minSchematicContentHeightRatio: 0.7,
+			minSchematicContentWidthRatio: cfg.minSchematicContentWidthRatio,
+			minSchematicContentHeightRatio: cfg.minSchematicContentHeightRatio,
 			minSchematicInkRatio: 0.003,
-			minSchematicMarginPx: 20,
-			minSchematicMarginRatio: 0.01,
+			minSchematicMarginPx: cfg.minSchematicMarginPx,
+			minSchematicMarginRatio: cfg.minSchematicMarginRatio,
 		});
 		for (const f of image.findings || []) hard(findings, f.rule, f.msg, f.where);
 		if (renderReport && typeof renderReport === 'object') {
@@ -477,7 +482,9 @@ export function auditSheetOutput(renderReport, imagePath = DEFAULT_IMAGE, opts =
 				}
 			}
 			moduleGridRhythm = measureModuleGridRhythm(renderReport);
-			if (!moduleGridRhythm || (moduleGridRhythm.missing || []).length) {
+			if (cfg.requireModuleGridRhythm === false) {
+				// Generic projects may use arbitrary module names; fixed USB/MCU/relay rhythm is checked only for the bundled reference pack.
+			} else if (!moduleGridRhythm || (moduleGridRhythm.missing || []).length) {
 				hard(findings, 'SO32-module-grid-rhythm-measurement', 'sheet-output must expose measurable module row/column rhythm evidence', {
 					missing: moduleGridRhythm?.missing || [],
 				});

@@ -384,7 +384,8 @@ try {
 	const externalDocumentContractPath = `${TMP_DIR}/external_document_contract.json`;
 	writeFileSync(externalDocumentContractPath, JSON.stringify({
 		projectId: 'workflow-smoke-external-structure',
-		modules: [{ id: 'sensor_frontend', title: 'Sensor Frontend' }],
+		modules: [{ id: 'sensor_frontend', title: 'Sensor Frontend', visualEvidence: 'sensor-frontend' }],
+		visualEvidenceRegions: ['global-sheet', 'sensor-frontend', 'title-template'],
 	}, null, 2) + '\n', 'utf8');
 	process.env.EASYEDA_PROJECT_ASSEMBLY = externalStructureAssemblyPath;
 	process.env.EASYEDA_PROJECT_CONTRACT = externalDocumentContractPath;
@@ -413,6 +414,58 @@ try {
 		'WS40-document-style-uses-project-assembly-modules',
 		'document style generation and audit must use project assembly and contract titles for non-AIHWDEBUGER modules instead of requiring bundled module titles',
 		checks.documentStyleUsesProjectAssemblyModules,
+	);
+
+	const externalVisualCropSnapPath = `${TMP_DIR}/external_visual_snapshot.json`;
+	const externalVisualCropReportPath = `${TMP_DIR}/external_visual_review_report.json`;
+	const externalVisualCropOut = `${TMP_DIR}/external_visual_crops/`;
+	writeFileSync(externalVisualCropSnapPath, JSON.stringify({
+		projectId: 'workflow-smoke-external-structure',
+		components: [
+			{ designator: 'U99', value: 'IC', bbox: { minX: 100, minY: 100, maxX: 160, maxY: 160 }, pins: [
+				{ num: '1', name: 'IN', x: 100, y: 130 },
+				{ num: '2', name: 'OUT', x: 160, y: 130 },
+			] },
+			{ designator: 'R99', value: '10k', bbox: { minX: 210, minY: 115, maxX: 250, maxY: 145 }, pins: [
+				{ num: '1', name: '1', x: 210, y: 130 },
+				{ num: '2', name: '2', x: 250, y: 130 },
+			] },
+		],
+		wires: [{ id: 'W99', net: 'SENSE_OUT', line: [160, 130, 210, 130] }],
+		netflags: [{ net: 'SENSE_OUT', kind: 'sig', x: 250, y: 130, bbox: { minX: 250, minY: 120, maxX: 320, maxY: 138 } }],
+	}, null, 2) + '\n', 'utf8');
+	const externalVisualCrop = spawnSync(process.execPath, ['engine/visual_crops.mjs'], {
+		cwd: ROOT,
+		stdio: 'pipe',
+		shell: false,
+		env: {
+			...process.env,
+			EASYEDA_PROJECT_ASSEMBLY: externalStructureAssemblyPath,
+			EASYEDA_PROJECT_CONTRACT: externalDocumentContractPath,
+			EASYEDA_VISUAL_SNAP: externalVisualCropSnapPath,
+			EASYEDA_VISUAL_REPORT: externalVisualCropReportPath,
+			EASYEDA_VISUAL_CROPS_OUT: externalVisualCropOut,
+		},
+		encoding: 'utf8',
+	});
+	const externalVisualCropReport = existsSync(externalVisualCropReportPath) ? readJson(externalVisualCropReportPath) : null;
+	checks.visualCropsUseContractEvidence = {
+		status: externalVisualCrop.status,
+		pass: externalVisualCropReport?.pass ?? null,
+		screenshots: externalVisualCropReport?.screenshots ?? null,
+		available: (externalVisualCropReport?.regions || []).map(r => r.evidenceId),
+		findings: (externalVisualCropReport?.findings || []).map(f => f.rule),
+		stderr: externalVisualCrop.stderr,
+	};
+	assertFinding(
+		findings,
+		externalVisualCrop.status === 0
+			&& externalVisualCropReport?.pass === true
+			&& (externalVisualCropReport?.regions || []).some(r => r.evidenceId === 'sensor-frontend')
+			&& !(externalVisualCropReport?.regions || []).some(r => r.evidenceId === 'usb'),
+		'WS41-visual-crops-use-contract-evidence',
+		'offline visual crops must be generated from the active project contract evidence regions instead of fixed AIHWDEBUGER crop names',
+		checks.visualCropsUseContractEvidence,
 	);
 
 	const noDrawingRulesContract = clone(contract);
