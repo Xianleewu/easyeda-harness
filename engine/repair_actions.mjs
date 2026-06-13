@@ -5,6 +5,7 @@ const OUT = process.env.EASYEDA_REPAIR_ACTIONS || DIR + 'repair_actions.json';
 
 const REPORTS = [
 	{ gate: 'entrypoints', file: 'entrypoint_audit_report.json', rerun: 'npm.cmd run entrypoints' },
+	{ gate: 'agent-instructions', file: 'agent_instruction_report.json', rerun: 'npm.cmd run agent:instructions' },
 	{ gate: 'project-spec', file: 'project_spec_report.json', rerun: 'npm.cmd run spec' },
 	{ gate: 'project-contract', file: 'project_contract_report.json', rerun: 'npm.cmd run contract' },
 	{ gate: 'project-rules', file: 'project_rule_report.json', rerun: 'npm.cmd run contract:rules' },
@@ -45,6 +46,13 @@ function firstMatch(rule, patterns) {
 }
 
 const RULE_PLANS = [
+	[/^AI/, {
+		area: 'agent-instructions',
+		editFiles: ['AGENTS.md', 'CLAUDE.md', 'README.md', 'README.en.md', 'package.json'],
+		inspectFiles: ['agent_instruction_report.json', 'AGENTS.md', 'CLAUDE.md', 'README.md', 'README.en.md'],
+		nextCommand: 'npm.cmd run agent:instructions',
+		repairHint: 'Keep Codex/Claude-facing instructions complete: require official easyeda-api-skill, project spec/contract/netlist/assembly updates, no free-draw, fail-closed apply:gated, live evidence, and repair/next actions.',
+	}],
 	[/^EA\d|entrypoint/i, {
 		area: 'entrypoints',
 		editFiles: ['package.json', 'engine/entrypoint_audit.mjs'],

@@ -25,6 +25,7 @@ function pushAction(actions, item) {
 }
 
 const acceptance = readJson('acceptance_report.json');
+const agentInstructions = readJson('agent_instruction_report.json');
 const spec = readJson('project_spec_report.json');
 const contract = readJson('project_contract_report.json');
 const projectRules = readJson('project_rule_report.json');
@@ -42,6 +43,13 @@ const liveDiagnose = readJson('live_diagnose_report.json');
 const repair = readJson('repair_actions.json');
 
 const checks = {
+	agentInstructions: {
+		status: status(agentInstructions?.pass),
+		severity: agentInstructions?.severity || null,
+		filesChecked: agentInstructions?.filesChecked || null,
+		firstFinding: agentInstructions?.findings?.[0] || null,
+		evidence: 'agent_instruction_report.json',
+	},
 	spec: {
 		status: status(spec?.pass),
 		severity: spec?.severity || null,
@@ -188,6 +196,14 @@ const checks = {
 };
 
 const actions = [];
+if (checks.agentInstructions.status !== 'pass') {
+	pushAction(actions, {
+		area: 'agent-instructions',
+		action: 'Fix Codex/Claude-facing instructions so agents are forced through project spec, contract, netlist, assembly, local gates, live evidence, and fail-closed apply:gated instead of free-drawing in EasyEDA.',
+		evidence: ['AGENTS.md', 'CLAUDE.md', 'README.md', 'README.en.md', 'agent_instruction_report.json'],
+		observed: checks.agentInstructions.firstFinding || checks.agentInstructions,
+	});
+}
 if (checks.spec.status !== 'pass') {
 	pushAction(actions, {
 		area: 'project-spec',
