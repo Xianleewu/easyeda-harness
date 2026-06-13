@@ -27,6 +27,7 @@ function pushAction(actions, item) {
 const acceptance = readJson('acceptance_report.json');
 const spec = readJson('project_spec_report.json');
 const contract = readJson('project_contract_report.json');
+const projectRules = readJson('project_rule_report.json');
 const projectModel = readJson('project_model_report.json');
 const projectVisual = readJson('project_visual_report.json');
 const template = readJson('report.json');
@@ -54,6 +55,16 @@ const checks = {
 		visualEvidenceRegions: contract?.visualEvidenceRegions ?? null,
 		firstFinding: contract?.findings?.[0] || null,
 		evidence: 'project_contract_report.json',
+	},
+	projectRules: {
+		status: status(projectRules?.pass),
+		severity: projectRules?.severity || null,
+		projectId: projectRules?.projectId || null,
+		registeredRules: projectRules?.registeredRules ?? null,
+		registeredModules: projectRules?.registeredModules ?? null,
+		registeredInterfaces: projectRules?.registeredInterfaces ?? null,
+		firstFinding: projectRules?.findings?.[0] || null,
+		evidence: 'project_rule_report.json',
 	},
 	template: {
 		status: status(template?.pass),
@@ -140,6 +151,14 @@ if (checks.contract.status !== 'pass') {
 		action: 'Create or fix project_contract.json before editing schematic cells or writing back. The contract must define modules, required parts/nets, interfaces, visual evidence regions, and no-free-draw policy.',
 		evidence: ['project_contract.json', 'project_contract_report.json'],
 		observed: checks.contract.firstFinding || checks.contract,
+	});
+}
+if (checks.projectRules.status !== 'pass') {
+	pushAction(actions, {
+		area: 'project-rules',
+		action: 'Make harness rule registries cover project_contract.json. Update module registry, required parts, interface contracts, or rule registration before trusting template PASS.',
+		evidence: ['project_contract.json', 'harness/module_registry.mjs', 'engine/interface_contract.mjs', 'harness/rule_registry.mjs', 'project_rule_report.json'],
+		observed: checks.projectRules.firstFinding || checks.projectRules,
 	});
 }
 if (checks.template.status !== 'pass') {

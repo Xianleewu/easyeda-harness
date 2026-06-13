@@ -28,6 +28,7 @@ const steps = [];
 steps.push(runStep('entrypoints', 'node', ['engine/entrypoint_audit.mjs']));
 steps.push(runStep('spec', 'node', ['engine/project_spec_gate.mjs']));
 steps.push(runStep('contract', 'node', ['engine/project_contract_gate.mjs']));
+steps.push(runStep('contract:rules', 'node', ['engine/project_rule_gate.mjs']));
 steps.push(runStep('fast', 'node', ['engine/pipeline_fast.mjs']));
 steps.push(runStep('pipeline', 'node', ['engine/pipeline.mjs']));
 steps.push(runStep('contract:model', 'node', ['engine/project_model_gate.mjs']));
@@ -48,6 +49,7 @@ for (const [key, path] of Object.entries({
 	report: DIR + 'report.json',
 	projectSpec: DIR + 'project_spec_report.json',
 	projectContract: DIR + 'project_contract_report.json',
+	projectRules: DIR + 'project_rule_report.json',
 	projectModel: DIR + 'project_model_report.json',
 	projectVisual: DIR + 'project_visual_report.json',
 	visualReview: DIR + 'visual_review_report.json',
@@ -72,6 +74,7 @@ const acceptance = {
 		local: {
 			spec: steps.find(s => s.name === 'spec')?.pass === true,
 			contract: steps.find(s => s.name === 'contract')?.pass === true,
+			projectRules: steps.find(s => s.name === 'contract:rules')?.pass === true,
 			fast: steps.find(s => s.name === 'fast')?.pass === true,
 			pipeline: steps.find(s => s.name === 'pipeline')?.pass === true,
 			projectModel: steps.find(s => s.name === 'contract:model')?.pass === true,
@@ -90,6 +93,7 @@ const acceptance = {
 		report: artifacts.report ? { pass: artifacts.report.pass, severity: artifacts.report.severity, score: artifacts.report.score } : null,
 		projectSpec: artifacts.projectSpec ? { pass: artifacts.projectSpec.pass, severity: artifacts.projectSpec.severity, projectId: artifacts.projectSpec.projectId, modules: artifacts.projectSpec.modules, interfaces: artifacts.projectSpec.interfaces } : null,
 		projectContract: artifacts.projectContract ? { pass: artifacts.projectContract.pass, severity: artifacts.projectContract.severity, projectId: artifacts.projectContract.projectId, modules: artifacts.projectContract.modules, interfaces: artifacts.projectContract.interfaces } : null,
+		projectRules: artifacts.projectRules ? { pass: artifacts.projectRules.pass, severity: artifacts.projectRules.severity, projectId: artifacts.projectRules.projectId, registeredRules: artifacts.projectRules.registeredRules, registeredModules: artifacts.projectRules.registeredModules, registeredInterfaces: artifacts.projectRules.registeredInterfaces } : null,
 		projectModel: artifacts.projectModel ? { pass: artifacts.projectModel.pass, severity: artifacts.projectModel.severity, projectId: artifacts.projectModel.projectId, modelStats: artifacts.projectModel.modelStats } : null,
 		projectVisual: artifacts.projectVisual ? { pass: artifacts.projectVisual.pass, severity: artifacts.projectVisual.severity, projectId: artifacts.projectVisual.projectId, requiredRegions: artifacts.projectVisual.requiredRegions, availableRegions: artifacts.projectVisual.availableRegions } : null,
 		visualReview: artifacts.visualReview ? { pass: artifacts.visualReview.pass, severity: artifacts.visualReview.severity, screenshots: artifacts.visualReview.screenshots, mode: artifacts.visualReview.mode } : null,

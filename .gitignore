@@ -22,6 +22,7 @@ project_spec_report.json
 project_contract_report.json
 project_model_report.json
 project_visual_report.json
+project_rule_report.json
 commercial_*_report.json
 design_memory_report.json
 system_intent_gate.json

@@ -48,6 +48,7 @@ Acceptance requires all local gates to pass:
 
 - `spec`: `project_contract.json` covers `project_spec.json`
 - `contract`: `HARD=0 SOFT=0 INFO=0`
+- `contract:rules`: harness registries and core rules cover `project_contract.json`
 - `fast`: `HARD=0 SOFT=0 INFO=0`
 - `pipeline`: `HARD=0 SOFT=0 INFO=0`
 - `contract:model`: generated `full_model.json` satisfies `project_contract.json`
@@ -108,7 +109,7 @@ When adapting this repository to a different schematic:
 1. Read the electrical spec and encode it in `project_spec.json` before placing symbols.
 2. Derive/update `project_contract.json` from the spec and run `npm.cmd run spec` plus `npm.cmd run contract` until both pass.
 3. Implement or update deterministic cells and assembly code for that contract.
-4. Add/adjust rules so the project-specific contract is enforced by `report.json`, `project_model_report.json`, `project_visual_report.json`, live DRC, and visual evidence.
+4. Add/adjust rules so the project-specific contract is enforced by `project_rule_report.json`, `report.json`, `project_model_report.json`, `project_visual_report.json`, live DRC, and visual evidence.
 5. Iterate from `next_actions.json`; do not bypass failed findings with manual EasyEDA edits.
 6. Write back only through `apply:gated`, then validate using live snapshot, real canvas image, DRC, and live shots.
 

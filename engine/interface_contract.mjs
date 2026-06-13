@@ -1,5 +1,21 @@
 export const INTERFACE_CONTRACTS = [
 	{
+		net: 'SYS_5V',
+		from: 'usb',
+		to: 'ldo',
+		mode: 'input-power-to-regulator',
+		allowed: 'visible-or-grouped-contract',
+		reason: 'USB VBUS supplies the 5V rail that feeds the 3V3 regulator.',
+	},
+	{
+		net: 'SYS_3V3',
+		from: 'ldo',
+		to: 'mcu',
+		mode: 'regulated-power-to-controller',
+		allowed: 'visible-or-grouped-contract',
+		reason: 'The 3V3 regulator output supplies the MCU and low-voltage support circuits.',
+	},
+	{
 		net: 'RESET_EN',
 		from: 'btn1',
 		to: 'mcu',

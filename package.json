@@ -13,6 +13,7 @@
     "contract": "node engine/project_contract_gate.mjs",
     "contract:model": "node engine/project_model_gate.mjs",
     "contract:visual": "node engine/project_visual_gate.mjs",
+    "contract:rules": "node engine/project_rule_gate.mjs",
     "accept": "node engine/acceptance_run.mjs",
     "accept:live": "node engine/acceptance_run.mjs --live",
     "next:actions": "node engine/next_actions.mjs",

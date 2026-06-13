@@ -21,6 +21,7 @@ A PASS on the current model only proves the current model. It does not validate 
 - Deterministic schematic assembly: functional cells live in `engine/cells.mjs`, and whole-sheet composition lives in `engine/assemble.mjs`.
 - Project spec gate: `project_spec.json` defines user-level modules, nets, interfaces, and quality policy.
 - Project contract gate: `project_contract.json` defines modules, key nets, interfaces, visual evidence regions, and the no-free-draw policy.
+- Rule coverage check: `contract:rules` proves module registry, required parts, interface contracts, and core rules cover the project contract.
 - Contract realization check: after `full_model.json` is generated, `contract:model` proves the model actually expresses the contract modules, parts, nets, and interfaces.
 - Visual evidence check: after offline previews are generated, `contract:visual` proves every contract visual evidence region exists and passes image inspection.
 - Fast offline check: validates the schematic model on local CPU and is intended for daily coordinate and rule iteration.
@@ -81,6 +82,7 @@ For handoff, review the global sheet and local crops for USB, LDO, RESET, BOOT, 
 
 - Project contract check: `project_contract_report.json` has `HARD=0 SOFT=0 INFO=0`
 - Project spec coverage check: `project_spec_report.json` has `HARD=0 SOFT=0 INFO=0`
+- Project rule coverage check: `project_rule_report.json` has `HARD=0 SOFT=0 INFO=0`
 - Contract realization check: `project_model_report.json` has `HARD=0 SOFT=0 INFO=0`
 - Fast local check: `HARD=0 SOFT=0 INFO=0`
 - Full layout check: `HARD=0 SOFT=0 INFO=0`
