@@ -68,6 +68,8 @@ npm run accept:live
 
 `live:image` captures the current EasyEDA canvas. `live:shots` attempts 10+ module-level EasyEDA visual evidence. It prefers true zoom-region captures. If the EasyEDA API returns the same full-page rendered image for every zoom request, it may accept coordinate crops from that real EasyEDA rendered schematic image, but only when all required crops exist, hashes are distinct, and every image-quality gate passes. When it fails, inspect `live_shots_report.json.zoomEvidence` first.
 
+`accept:live` also runs `contract:live:model`. This checks `live.json` from the real EasyEDA canvas against `project_contract.json`; local-only `full_model.json` PASS is not final acceptance.
+
 If the report points to fixed rendered-area screenshots, run `npm run live:diagnose` and inspect `live_diagnose_report.json.zoomChecks`; matching hashes after different zoom requests prove the issue is the EasyEDA capture API behavior, not schematic coordinates.
 
 `accept:live` also runs `npm run drc`; final handoff requires `drc_report.json` to prove EasyEDA DRC `0 error / 0 warning / 0 info`.
@@ -97,6 +99,7 @@ Before claiming completion, produce or inspect:
 - `visual_review_report.json`
 - `visual_crops/00_global_sheet.png`
 - `live.json` pulled from EasyEDA for final review
+- `project_live_model_report.json` proving `live.json` satisfies `project_contract.json`
 - `live_canvas.png` captured from the real EasyEDA canvas for final visual proof
 - `drc_report.json` with `pass=true` and `errors=0`, `warnings=0`, `info=0`
 - `live_shots_report.json` with `pass=true`, `screenshots>=10`, and distinct module-level live evidence

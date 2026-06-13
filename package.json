@@ -14,6 +14,7 @@
     "contract:assembly": "node engine/project_assembly_gate.mjs",
     "contract:layout": "node engine/project_layout_gate.mjs",
     "contract:model": "node engine/project_model_gate.mjs",
+    "contract:live:model": "node engine/project_live_model_gate.mjs",
     "contract:visual": "node engine/project_visual_gate.mjs",
     "contract:rules": "node engine/project_rule_gate.mjs",
     "accept": "node engine/acceptance_run.mjs",

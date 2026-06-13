@@ -13,6 +13,7 @@ const REPORTS = [
 	{ gate: 'pipeline', file: 'layout_planner_report.json', rerun: 'npm.cmd run pipeline' },
 	{ gate: 'project-layout', file: 'project_layout_report.json', rerun: 'npm.cmd run pipeline && npm.cmd run contract:layout' },
 	{ gate: 'project-model', file: 'project_model_report.json', rerun: 'npm.cmd run contract:model' },
+	{ gate: 'project-live-model', file: 'project_live_model_report.json', rerun: 'npm.cmd run accept:live' },
 	{ gate: 'preview', file: 'visual_review_report.json', rerun: 'npm.cmd run preview' },
 	{ gate: 'project-visual', file: 'project_visual_report.json', rerun: 'npm.cmd run contract:visual' },
 	{ gate: 'drc', file: 'drc_report.json', rerun: 'npm.cmd run drc' },
@@ -105,6 +106,13 @@ const RULE_PLANS = [
 		inspectFiles: ['full_model.json', 'project_model_report.json'],
 		nextCommand: 'npm.cmd run fast && npm.cmd run contract:model',
 		repairHint: 'Make the generated model express every required part, net, and interface near its source and target modules.',
+	}],
+	[/^PLM/, {
+		area: 'project-live-model',
+		editFiles: ['engine/cells.mjs', 'engine/assemble.mjs', 'project_assembly.json', 'engine/apply_gated.mjs'],
+		inspectFiles: ['live.json', 'project_live_model_report.json', 'full_model.json', 'apply_report.json'],
+		nextCommand: 'npm.cmd run accept:live',
+		repairHint: 'Make the real EasyEDA live snapshot satisfy project_contract.json; fix deterministic generation or gated write-back rather than trusting local-only PASS.',
 	}],
 	[/^PV/, {
 		area: 'project-visual',

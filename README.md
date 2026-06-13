@@ -74,6 +74,8 @@ Agent 会通过 `apply:gated` 写回 EasyEDA。这个入口会先运行检查；
 它会运行本地检查、live snapshot、真实画布图、EasyEDA DRC、模块级 live shots，并在需要时自动运行 live diagnose，最后写出 `acceptance_report.json`。
 如果仍有检查未通过，先看 `next_actions.json`；它是给下一个 agent 的机器可读接手清单。随后看 `repair_actions.json`，它给出逐条 finding 的修复目标和复跑命令。
 
+在 live 模式下，`contract:live:model` 会把真实 EasyEDA 画布拉取到的 `live.json` 与 `project_contract.json` 对照检查；最终验收不能只相信 `full_model.json`。
+
 `live:shots` 会先尝试 EasyEDA zoom 区域截图。如果 EasyEDA API 对不同 zoom 请求返回同一张全页渲染图，工具会改用这张真实 EasyEDA 渲染图做坐标裁剪；只有模块图数量足够、裁剪区域在图内、hash 互不重复且图像检查通过时才算 PASS。
 
 当 `live:shots` 指向固定渲染图时，Agent 会运行 live diagnose。诊断报告会记录 EasyEDA canvas 列表、当前文档/tab 信息，以及不同 zoom 请求后的截图 hash。
@@ -93,6 +95,7 @@ Agent 会通过 `apply:gated` 写回 EasyEDA。这个入口会先运行检查；
 - 离线预览：至少生成 10 张全局/局部离线预览图，视觉审计 PASS
 - 合同视觉证据检查：`project_visual_report.json` 中 `HARD=0 SOFT=0 INFO=0`
 - EasyEDA live：拉取 `live.json`，并复核从真实 EasyEDA 画布抓取的 `live_canvas.png`
+- EasyEDA live 合同检查：`project_live_model_report.json` 中 `HARD=0 SOFT=0 INFO=0`
 - EasyEDA DRC：`0 error / 0 warning / 0 info`
 - EasyEDA live shots：至少 10 张模块级真实视觉证据互不重复
 - `next_actions.json` 无开放接手摘要项

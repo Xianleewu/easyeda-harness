@@ -9,11 +9,11 @@ function readJson(path) {
 	return JSON.parse(readFileSync(path, 'utf8').replace(/^\uFEFF/, ''));
 }
 
-function hard(findings, rule, msg, where = {}) {
+export function hard(findings, rule, msg, where = {}) {
 	findings.push({ rule, severity: 'hard', category: 'project-model', msg, where });
 }
 
-function asArray(value) {
+export function asArray(value) {
 	return Array.isArray(value) ? value : [];
 }
 
@@ -68,7 +68,7 @@ function netTouchesModule(model, net, box) {
 	return flags.some(f => f.x >= box.minX - 80 && f.x <= box.maxX + 80 && f.y >= box.minY - 80 && f.y <= box.maxY + 80);
 }
 
-function validateModelAgainstContract(contract, model) {
+export function validateModelAgainstContract(contract, model) {
 	const findings = [];
 	const components = new Set(asArray(model.components).map(c => c.designator).filter(Boolean));
 	const nets = modelNetNames(model);
@@ -103,32 +103,41 @@ function validateModelAgainstContract(contract, model) {
 	return findings;
 }
 
-const findings = [];
-let contract = null;
-let model = null;
-if (!existsSync(CONTRACT)) hard(findings, 'PM0-contract-file', 'project_contract.json is required before model contract audit', { path: CONTRACT });
-if (!existsSync(MODEL)) hard(findings, 'PM0-model-file', 'full_model.json is required before model contract audit', { path: MODEL });
-if (!findings.length) {
-	try { contract = readJson(CONTRACT); } catch (e) { hard(findings, 'PM0-contract-parse', 'project_contract.json must parse as JSON', { error: e.message }); }
-	try { model = readJson(MODEL); } catch (e) { hard(findings, 'PM0-model-parse', 'full_model.json must parse as JSON', { error: e.message }); }
+export function projectModelReport(contract, model, findings = []) {
+	return {
+		generatedAt: new Date().toISOString(),
+		pass: findings.length === 0,
+		severity: { hard: findings.length, soft: 0, info: 0 },
+		projectId: contract?.projectId || null,
+		modelStats: model ? {
+			components: asArray(model.components).length,
+			wires: asArray(model.wires).length,
+			netflags: asArray(model.netflags).length,
+			nets: modelNetNames(model).size,
+		} : null,
+		findings,
+	};
 }
-if (contract && model) findings.push(...validateModelAgainstContract(contract, model));
 
-const report = {
-	generatedAt: new Date().toISOString(),
-	pass: findings.length === 0,
-	severity: { hard: findings.length, soft: 0, info: 0 },
-	projectId: contract?.projectId || null,
-	modelStats: model ? {
-		components: asArray(model.components).length,
-		wires: asArray(model.wires).length,
-		netflags: asArray(model.netflags).length,
-		nets: modelNetNames(model).size,
-	} : null,
-	findings,
-};
+export function runProjectModelGate({ contractPath = CONTRACT, modelPath = MODEL, reportPath = REPORT, modelLabel = 'full_model.json' } = {}) {
+	const findings = [];
+	let contract = null;
+	let model = null;
+	if (!existsSync(contractPath)) hard(findings, 'PM0-contract-file', 'project_contract.json is required before model contract audit', { path: contractPath });
+	if (!existsSync(modelPath)) hard(findings, 'PM0-model-file', `${modelLabel} is required before model contract audit`, { path: modelPath });
+	if (!findings.length) {
+		try { contract = readJson(contractPath); } catch (e) { hard(findings, 'PM0-contract-parse', 'project_contract.json must parse as JSON', { error: e.message }); }
+		try { model = readJson(modelPath); } catch (e) { hard(findings, 'PM0-model-parse', `${modelLabel} must parse as JSON`, { error: e.message }); }
+	}
+	if (contract && model) findings.push(...validateModelAgainstContract(contract, model));
+	const report = projectModelReport(contract, model, findings);
+	writeFileSync(reportPath, JSON.stringify(report, null, 2), 'utf8');
+	return report;
+}
 
-writeFileSync(REPORT, JSON.stringify(report, null, 2), 'utf8');
-console.log(`project model ${report.pass ? 'PASS' : 'FAIL'} hard=${report.severity.hard}`);
-console.log(`report -> ${REPORT}`);
-process.exit(report.pass ? 0 : 1);
+if (import.meta.url === `file:///${process.argv[1]?.replace(/\\/g, '/')}`) {
+	const report = runProjectModelGate();
+	console.log(`project model ${report.pass ? 'PASS' : 'FAIL'} hard=${report.severity.hard}`);
+	console.log(`report -> ${REPORT}`);
+	process.exit(report.pass ? 0 : 1);
+}

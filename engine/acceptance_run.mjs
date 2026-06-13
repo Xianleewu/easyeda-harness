@@ -39,6 +39,7 @@ steps.push(runStep('contract:visual', 'node', ['engine/project_visual_gate.mjs']
 
 if (RUN_LIVE) {
 	steps.push(runStep('live:save', 'node', ['engine/bridge_exec.mjs', '--js', 'snapshot2.js', '--out', 'live.json']));
+	steps.push(runStep('contract:live:model', 'node', ['engine/project_live_model_gate.mjs']));
 	steps.push(runStep('live:image', 'node', ['engine/bridge_exec.mjs', '--js', 'snapshot-image.js', '--out', 'live_canvas.png', '--mode', 'image']));
 	steps.push(runStep('drc', 'node', ['engine/drc_check.mjs']));
 	const liveShots = runStep('live:shots', 'node', ['engine/live_shots.mjs']);
@@ -55,6 +56,7 @@ for (const [key, path] of Object.entries({
 	projectAssembly: DIR + 'project_assembly_report.json',
 	projectLayout: DIR + 'project_layout_report.json',
 	projectModel: DIR + 'project_model_report.json',
+	projectLiveModel: DIR + 'project_live_model_report.json',
 	projectVisual: DIR + 'project_visual_report.json',
 	visualReview: DIR + 'visual_review_report.json',
 	drc: DIR + 'drc_report.json',
@@ -89,6 +91,7 @@ const acceptance = {
 		},
 		live: RUN_LIVE ? {
 			save: steps.find(s => s.name === 'live:save')?.pass === true,
+			projectLiveModel: steps.find(s => s.name === 'contract:live:model')?.pass === true,
 			image: steps.find(s => s.name === 'live:image')?.pass === true,
 			drc: steps.find(s => s.name === 'drc')?.pass === true,
 			shots: steps.find(s => s.name === 'live:shots')?.pass === true,
@@ -103,6 +106,7 @@ const acceptance = {
 		projectAssembly: artifacts.projectAssembly ? { pass: artifacts.projectAssembly.pass, severity: artifacts.projectAssembly.severity, projectId: artifacts.projectAssembly.projectId, modules: artifacts.projectAssembly.modules, anchors: artifacts.projectAssembly.anchors, cellTypes: artifacts.projectAssembly.cellTypes } : null,
 		projectLayout: artifacts.projectLayout ? { pass: artifacts.projectLayout.pass, severity: artifacts.projectLayout.severity, projectId: artifacts.projectLayout.projectId, candidateSource: artifacts.projectLayout.candidateSource, totalCandidates: artifacts.projectLayout.totalCandidates, minModuleGap: artifacts.projectLayout.minModuleGap, moduleWireIntrusions: artifacts.projectLayout.moduleWireIntrusions, laneInterlocks: artifacts.projectLayout.laneInterlocks } : null,
 		projectModel: artifacts.projectModel ? { pass: artifacts.projectModel.pass, severity: artifacts.projectModel.severity, projectId: artifacts.projectModel.projectId, modelStats: artifacts.projectModel.modelStats } : null,
+		projectLiveModel: artifacts.projectLiveModel ? { pass: artifacts.projectLiveModel.pass, severity: artifacts.projectLiveModel.severity, projectId: artifacts.projectLiveModel.projectId, source: artifacts.projectLiveModel.source, liveStats: artifacts.projectLiveModel.liveStats } : null,
 		projectVisual: artifacts.projectVisual ? { pass: artifacts.projectVisual.pass, severity: artifacts.projectVisual.severity, projectId: artifacts.projectVisual.projectId, requiredRegions: artifacts.projectVisual.requiredRegions, availableRegions: artifacts.projectVisual.availableRegions } : null,
 		visualReview: artifacts.visualReview ? { pass: artifacts.visualReview.pass, severity: artifacts.visualReview.severity, screenshots: artifacts.visualReview.screenshots, mode: artifacts.visualReview.mode } : null,
 		drc: artifacts.drc ? { pass: artifacts.drc.pass, severity: artifacts.drc.severity, drc: artifacts.drc.drc } : null,

@@ -31,6 +31,7 @@ const projectRules = readJson('project_rule_report.json');
 const projectAssembly = readJson('project_assembly_report.json');
 const projectLayout = readJson('project_layout_report.json');
 const projectModel = readJson('project_model_report.json');
+const projectLiveModel = readJson('project_live_model_report.json');
 const projectVisual = readJson('project_visual_report.json');
 const template = readJson('report.json');
 const preview = readJson('visual_review_report.json');
@@ -103,6 +104,15 @@ const checks = {
 		modelStats: projectModel?.modelStats || null,
 		firstFinding: projectModel?.findings?.[0] || null,
 		evidence: 'project_model_report.json',
+	},
+	projectLiveModel: {
+		status: status(projectLiveModel?.pass),
+		severity: projectLiveModel?.severity || null,
+		projectId: projectLiveModel?.projectId || null,
+		source: projectLiveModel?.source || null,
+		liveStats: projectLiveModel?.liveStats || null,
+		firstFinding: projectLiveModel?.findings?.[0] || null,
+		evidence: 'project_live_model_report.json',
 	},
 	projectVisual: {
 		status: status(projectVisual?.pass),
@@ -222,6 +232,14 @@ if (checks.projectModel.status !== 'pass') {
 		action: 'Make full_model.json satisfy project_contract.json. Fix deterministic cells, assembly, or the contract so required modules, parts, nets, and interfaces match the generated model.',
 		evidence: ['project_contract.json', 'full_model.json', 'project_model_report.json'],
 		observed: checks.projectModel.firstFinding || checks.projectModel,
+	});
+}
+if (acceptance?.mode === 'full-with-live' && checks.projectLiveModel.status !== 'pass') {
+	pushAction(actions, {
+		area: 'project-live-model',
+		action: 'Make live.json from the real EasyEDA canvas satisfy project_contract.json. Local-only model PASS is not final acceptance.',
+		evidence: ['live.json', 'project_contract.json', 'project_live_model_report.json', 'apply_report.json'],
+		observed: checks.projectLiveModel.firstFinding || checks.projectLiveModel,
 	});
 }
 if (checks.preview.status !== 'pass' || checks.preview.screenshots < 10) {
