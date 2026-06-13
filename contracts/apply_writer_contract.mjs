@@ -30,6 +30,12 @@ export function resolveApplyWriter({ assembly, pack, root }) {
 		if (!writer.id) hard(findings, 'AW2-writer-id', 'pack writer must have a stable id', { writer });
 		if (!writer.generate || typeof writer.generate !== 'string') hard(findings, 'AW3-writer-generate-entrypoint', 'pack writer must declare a generate entrypoint', { writer });
 		if (!writer.run || typeof writer.run !== 'string') hard(findings, 'AW4-writer-run-entrypoint', 'pack writer must declare a run entrypoint', { writer });
+		if (writer.scaffoldOnly === true) {
+			hard(findings, 'AW6-writer-scaffold-only', 'pack writer scaffold must be implemented before apply:gated can write to EasyEDA', {
+				circuitPack: pack?.id || assembly?.circuitPack || null,
+				writer,
+			});
+		}
 		for (const [key, rel] of Object.entries({ generate: writer.generate, run: writer.run })) {
 			if (rel && typeof rel === 'string' && !existsSync(`${root.replace(/\\/g, '/')}/${rel}`)) {
 				hard(findings, 'AW5-writer-entrypoint-exists', 'pack writer entrypoint must exist before apply:gated can write', {

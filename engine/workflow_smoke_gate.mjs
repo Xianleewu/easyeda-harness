@@ -100,6 +100,7 @@ try {
 	const assembleSource = readFileSync(`${ROOT}/engine/assemble.mjs`, 'utf8');
 	const repairSource = readFileSync(`${ROOT}/engine/repair_actions.mjs`, 'utf8');
 	const nextActionsSource = readFileSync(`${ROOT}/engine/next_actions.mjs`, 'utf8');
+	const applyGatedSource = readFileSync(`${ROOT}/engine/apply_gated.mjs`, 'utf8');
 
 	checks.noGlobalCellBuildersExport = {
 		assembleExportsGlobalCellBuilders: /export\s+const\s+CELL_BUILDERS\b/.test(assembleSource),
@@ -129,6 +130,24 @@ try {
 		'WS25-pack-aware-repair-targets',
 		'repair and next-action guidance must point agents at the selected circuit pack instead of the bundled root engine/cells.mjs example',
 		checks.packAwareRepairTargets,
+	);
+	checks.applyGatedUsesSelectedWriter = {
+		hasResolver: /resolveApplyWriter/.test(applyGatedSource),
+		hasWriterGenerateCall: /runApplyWriterGenerate\(\)/.test(applyGatedSource),
+		hasWriterRunCall: /runApplyWriterRun\(\)/.test(applyGatedSource),
+		hardcodedApplyFullExec: /execSync\(['"`]node engine\/apply_full\.mjs/.test(applyGatedSource),
+		hardcodedApplyRunArgs: /\['"`]engine\/apply_run\.mjs['"`], ['"`]--force['"`]/.test(applyGatedSource),
+	};
+	assertFinding(
+		findings,
+		checks.applyGatedUsesSelectedWriter.hasResolver
+			&& checks.applyGatedUsesSelectedWriter.hasWriterGenerateCall
+			&& checks.applyGatedUsesSelectedWriter.hasWriterRunCall
+			&& !checks.applyGatedUsesSelectedWriter.hardcodedApplyFullExec
+			&& !checks.applyGatedUsesSelectedWriter.hardcodedApplyRunArgs,
+		'WS54-apply-gated-uses-selected-pack-writer',
+		'apply:gated must execute the selected circuit pack writer entrypoints instead of hardcoding the bundled AIHWDEBUGER writer',
+		checks.applyGatedUsesSelectedWriter,
 	);
 
 	const rootPlan = buildPlanForFiles({
@@ -1205,6 +1224,8 @@ export const pack = { id: '${badBuilderPackId}', fallbackAnchors, cellBuilders, 
 		projectScaffoldPass: customScaffold.pass,
 		planPass: customPlan.pass,
 		rules: (customPlan.findings || []).map(f => f.rule),
+		hasApplyWriterTemplate: existsSync(`${CUSTOM_PACK_DIR}/apply_writer.mjs`),
+		hasApplyRunTemplate: existsSync(`${CUSTOM_PACK_DIR}/apply_run.mjs`),
 	};
 	const customPlanCli = spawnSync(process.execPath, ['bin/easyeda-gsd.mjs', 'plan', '_tmp_workflow_smoke/custom_project/project_spec.json'], {
 		cwd: ROOT,
@@ -1241,6 +1262,7 @@ export const pack = { id: '${badBuilderPackId}', fallbackAnchors, cellBuilders, 
 		spec: customApplyContextReport?.context?.spec || null,
 		assemblyPath: customApplyContextReport?.context?.assemblyPath || null,
 		applyWriterPass: customApplyContextReport?.applyWriter?.pass ?? null,
+		applyWriterRules: (customApplyContextReport?.applyWriter?.findings || []).map(f => f.rule),
 	};
 	mkdirSync(NO_WRITER_PACK_DIR, { recursive: true });
 	writeFileSync(`${NO_WRITER_PACK_DIR}/pack.mjs`, `export const fallbackAnchors = {};
@@ -1363,9 +1385,26 @@ export const pack = { id: '${NO_WRITER_PACK}', fallbackAnchors, cellBuilders, no
 			report: checks.noWriterApplyBlocked,
 		},
 	);
-	assertFinding(findings, existsSync(`${CUSTOM_PACK_DIR}/pack.mjs`) && existsSync(`${CUSTOM_PACK_DIR}/cell_manifest.json`), 'WS11-custom-pack-files', 'init workflow must be able to create a custom circuit pack scaffold', {
+	assertFinding(
+		findings,
+		existsSync(`${CUSTOM_PACK_DIR}/pack.mjs`)
+			&& existsSync(`${CUSTOM_PACK_DIR}/cell_manifest.json`)
+			&& existsSync(`${CUSTOM_PACK_DIR}/apply_writer.mjs`)
+			&& existsSync(`${CUSTOM_PACK_DIR}/apply_run.mjs`),
+		'WS11-custom-pack-files',
+		'init workflow must be able to create a custom circuit pack scaffold with deterministic cells and writer entrypoint templates',
+		{
 		packDir: CUSTOM_PACK_DIR,
-	});
+		},
+	);
+	assertFinding(
+		findings,
+		checks.customPackScaffold.hasApplyWriterTemplate
+			&& checks.customPackScaffold.hasApplyRunTemplate,
+		'WS52-pack-scaffold-includes-writer-template',
+		'custom circuit pack scaffold must include apply writer templates so agents know where external EasyEDA write-back must be implemented',
+		checks.customPackScaffold,
+	);
 	assertFinding(findings, customPlan.pass === false, 'WS12-custom-pack-scaffold-not-ready', 'custom pack scaffold must fail plan until contract, library, and executable cells are implemented', {
 		severity: customPlan.severity,
 		firstFinding: customPlan.findings?.[0] || null,
@@ -1618,6 +1657,14 @@ export const pack = { id: '${NO_WRITER_PACK}', fallbackAnchors, cellBuilders, no
 			report: checks.customApplyContext,
 			expectedAssemblyPath: `${TMP_DIR}/custom_project/project_assembly.json`,
 		},
+	);
+	assertFinding(
+		findings,
+		customApplyContextReport?.applyWriter?.pass === false
+			&& (customApplyContextReport?.applyWriter?.findings || []).some(f => f.rule === 'AW6-writer-scaffold-only'),
+		'WS53-pack-writer-scaffold-fails-closed',
+		'custom circuit pack writer templates must be visible in apply context but blocked until the scaffoldOnly writer is implemented',
+		checks.customApplyContext,
 	);
 	const customFinalEvidenceReportPath = `${TMP_DIR}/custom_final_evidence_report.json`;
 	const customFinalEvidence = spawnSync(process.execPath, ['engine/final_evidence_gate.mjs', '_tmp_workflow_smoke/custom_project/project_spec.json'], {

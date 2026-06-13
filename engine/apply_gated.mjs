@@ -154,6 +154,38 @@ function runRequiredNode(args, label, env = STEP_ENV) {
 	return child;
 }
 
+function writerRel(key) {
+	return APPLY_WRITER.writer?.[key] || '';
+}
+
+function runApplyWriterGenerate() {
+	const generate = writerRel('generate');
+	if (!generate) throw new Error('apply writer generate entrypoint missing after writer gate');
+	const child = spawnSync(process.execPath, [generate], {
+		cwd: DIR,
+		stdio: 'inherit',
+		shell: false,
+		env: { ...STEP_ENV, EASYEDA_APPLY_FULL_AUTHORIZED: '1', EASYEDA_APPLY_WRITER_AUTHORIZED: '1' },
+	});
+	if (child.error) throw child.error;
+	if (child.status !== 0) throw new Error(`${generate} failed`);
+}
+
+function runApplyWriterRun() {
+	const run = writerRel('run');
+	if (!run) throw new Error('apply writer run entrypoint missing after writer gate');
+	const args = [run, '--force'];
+	if (TARGET_WINDOW_ID) args.push('--window-id', TARGET_WINDOW_ID);
+	const child = spawnSync(process.execPath, args, {
+		cwd: DIR,
+		stdio: 'inherit',
+		shell: false,
+		env: { ...STEP_ENV, EASYEDA_APPLY_RUN_AUTHORIZED: '1', EASYEDA_APPLY_WRITER_AUTHORIZED: '1' },
+	});
+	if (child.error) throw child.error;
+	if (child.status !== 0) throw new Error(`${run} failed`);
+}
+
 if (process.env.EASYEDA_APPLY_CONTEXT_ONLY === '1' || process.argv.includes('--context-only')) {
 	saveApplyReport({
 		pass: true,
@@ -228,19 +260,8 @@ if (!process.exitCode) {
 		console.error('ABORT: model net contract failed, write-back blocked');
 		process.exit(1);
 	}
-	execSync('node engine/apply_full.mjs', {
-		cwd: DIR,
-		stdio: 'inherit',
-		env: { ...STEP_ENV, EASYEDA_APPLY_FULL_AUTHORIZED: '1' },
-	});
-	const applyArgs = ['engine/apply_run.mjs', '--force'];
-	if (TARGET_WINDOW_ID) applyArgs.push('--window-id', TARGET_WINDOW_ID);
-	const applyPs = spawnSync('node', applyArgs, {
-		cwd: DIR,
-		stdio: 'inherit',
-		env: { ...STEP_ENV, EASYEDA_APPLY_RUN_AUTHORIZED: '1' },
-	});
-	if (applyPs.status !== 0) throw new Error('apply_run.mjs failed');
+	runApplyWriterGenerate();
+	runApplyWriterRun();
 	const postProcess = {
 		removeDuplicateTitleBlock: await runBridgeBestEffort(DIR + 'remove_duplicate_title_block.js'),
 		deleteFakeNetTexts: await runBridgeBestEffort(DIR + 'delete_fake_net_texts.js'),

@@ -22,13 +22,47 @@ export function normalizeLibrarySnapshot(snap) {
 \treturn snap;
 }
 
+export const writer = {
+\tid: '${packId}-writer',
+\tscaffoldOnly: true,
+\tgenerate: 'circuit_packs/${packId}/apply_writer.mjs',
+\trun: 'circuit_packs/${packId}/apply_run.mjs',
+};
+
 export const pack = {
 \tid: '${packId}',
 \tscaffoldOnly: true,
 \tfallbackAnchors,
 \tcellBuilders,
 \tnormalizeLibrarySnapshot,
+\twriter,
 };
+`;
+}
+
+function applyWriterSource(packId) {
+	return `if (process.env.EASYEDA_APPLY_WRITER_AUTHORIZED !== '1') {
+\tconsole.error('ABORT: apply writer is only callable through apply:gated.');
+\tprocess.exit(1);
+}
+
+console.error('ABORT: ${packId} apply writer scaffold is not implemented. Generate EasyEDA write-back JS from full_model.json here.');
+process.exit(2);
+`;
+}
+
+function applyRunSource(packId) {
+	return `if (process.env.EASYEDA_APPLY_WRITER_AUTHORIZED !== '1' || process.env.EASYEDA_APPLY_RUN_AUTHORIZED !== '1') {
+\tconsole.error('ABORT: apply runner is only callable through apply:gated.');
+\tprocess.exit(1);
+}
+if (!process.argv.includes('--force')) {
+\tconsole.error('ABORT: ${packId} apply runner requires --force from apply:gated.');
+\tprocess.exit(1);
+}
+
+console.error('ABORT: ${packId} apply runner scaffold is not implemented. Execute generated EasyEDA JS chunks here.');
+process.exit(2);
 `;
 }
 
@@ -114,6 +148,8 @@ export function writePackScaffold({ root, packId }) {
 	mkdirSync(dir, { recursive: true });
 	const files = [
 		writeIfMissing(`${dir}/pack.mjs`, packSource(id)),
+		writeIfMissing(`${dir}/apply_writer.mjs`, applyWriterSource(id)),
+		writeIfMissing(`${dir}/apply_run.mjs`, applyRunSource(id)),
 		writeIfMissing(`${dir}/cell_manifest.json`, manifestSource(id)),
 		syncPackRegistry(root),
 	];
@@ -124,6 +160,6 @@ export function writePackScaffold({ root, packId }) {
 		dir,
 		readyForGenerate: false,
 		files,
-		nextStep: `Implement circuit_packs/${id}/pack.mjs cellBuilders and circuit_packs/${id}/cell_manifest.json, then fill project_contract.json, project_netlist.json, approved_library_manifest.json, and project_assembly.json until plan passes.`,
+		nextStep: `Implement circuit_packs/${id}/pack.mjs cellBuilders, circuit_packs/${id}/cell_manifest.json, and the pack writer entrypoints, then fill project_contract.json, project_netlist.json, approved_library_manifest.json, and project_assembly.json until plan passes and apply:gated writer preflight passes.`,
 	};
 }
