@@ -59,7 +59,7 @@ EasyEDA Harness 是一套给 Codex、Claude Code 等编程 Agent 使用的原理
 请按 AGENTS.md 接手这个仓库；如果是新项目，先建立项目合同、模块模板和规则覆盖，不要直接在 EasyEDA 里自由画。确认 easyeda-api-skill/Bridge，运行本地门禁；写回前必须拉取 EasyEDA live snapshot/截图/DRC 复核，只有全部 PASS 后才写回 EasyEDA。
 ```
 
-Agent 会自动运行本地检查、生成预览图，并写出 `acceptance_report.json` 和 `next_actions.json`。如果检查未通过，`next_actions.json` 是下一步修复清单。
+Agent 会自动运行本地检查、生成预览图，并写出 `acceptance_report.json`、`next_actions.json` 和 `repair_actions.json`。如果检查未通过，`next_actions.json` 是接手摘要，`repair_actions.json` 会把每条 finding 映射到编辑目标、检查文件和下一条复跑命令。
 
 新项目的第一步不是画图，而是让 Agent 修改 `project_spec.json`，再把它落实到 `project_contract.json`，随后用 `project_assembly.json` 定义可执行装配映射和布局策略；通过这些门禁后再实现项目自己的 deterministic cells 和规则覆盖。
 
@@ -72,7 +72,7 @@ Agent 会通过 `apply:gated` 写回 EasyEDA。这个入口会先运行检查；
 离线预览图由 harness renderer 生成，用于快速检查结构、模块区域和明显重叠。它不是 EasyEDA 真实画布截图，不能单独作为最终复核证据。
 
 它会运行本地检查、live snapshot、真实画布图、EasyEDA DRC、模块级 live shots，并在需要时自动运行 live diagnose，最后写出 `acceptance_report.json`。
-如果仍有检查未通过，先看 `next_actions.json`；它是给下一个 agent 的机器可读接手清单。
+如果仍有检查未通过，先看 `next_actions.json`；它是给下一个 agent 的机器可读接手清单。随后看 `repair_actions.json`，它给出逐条 finding 的修复目标和复跑命令。
 
 `live:shots` 会先尝试 EasyEDA zoom 区域截图。如果 EasyEDA API 对不同 zoom 请求返回同一张全页渲染图，工具会改用这张真实 EasyEDA 渲染图做坐标裁剪；只有模块图数量足够、裁剪区域在图内、hash 互不重复且图像检查通过时才算 PASS。
 
@@ -95,6 +95,8 @@ Agent 会通过 `apply:gated` 写回 EasyEDA。这个入口会先运行检查；
 - EasyEDA live：拉取 `live.json`，并复核从真实 EasyEDA 画布抓取的 `live_canvas.png`
 - EasyEDA DRC：`0 error / 0 warning / 0 info`
 - EasyEDA live shots：至少 10 张模块级真实视觉证据互不重复
+- `next_actions.json` 无开放接手摘要项
+- `repair_actions.json` 无逐条 finding 修复项
 - 无普通文本伪装网络标签
 - 单页图纸不使用无必要的 NET PORT
 - wire `Name` 锚点可读：左侧标签使用左下角，右侧标签使用右下角

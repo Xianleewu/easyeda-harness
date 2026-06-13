@@ -44,7 +44,7 @@ npm.cmd run accept
 ```
 
 `accept` runs the local gates in order and writes `acceptance_report.json`.
-It also writes `next_actions.json`, which is the first file to inspect when a gate fails or when another agent takes over.
+It also writes `next_actions.json` and `repair_actions.json`. Inspect `next_actions.json` first for the handoff summary, then `repair_actions.json` for finding-level edit targets, inspection files, and rerun commands.
 Acceptance requires all local gates to pass:
 
 - `spec`: `project_contract.json` covers `project_spec.json`
@@ -101,6 +101,7 @@ Before claiming completion, produce or inspect:
 - `drc_report.json` with `pass=true` and `errors=0`, `warnings=0`, `info=0`
 - `live_shots_report.json` with `pass=true`, `screenshots>=10`, and distinct module-level live evidence
 - `next_actions.json` with no open actions before final delivery
+- `repair_actions.json` with no finding-level repair actions before final delivery
 - Local module crops for USB, LDO, RESET, BOOT, MCU left/right, PMOS, RELAY1, RELAY2, and title/template area
 
 If a visual or DRC issue appears, update the deterministic template/rules first, then rerun the gates.

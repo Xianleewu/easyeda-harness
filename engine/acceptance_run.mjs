@@ -131,6 +131,8 @@ const acceptance = {
 };
 
 writeFileSync(REPORT, JSON.stringify(acceptance, null, 2), 'utf8');
+const repair = spawnSync('node', ['engine/repair_actions.mjs'], { cwd: DIR, stdio: 'inherit', shell: false, env: process.env });
+if (repair.error) console.warn(`repair actions failed: ${repair.error.message}`);
 const next = spawnSync('node', ['engine/next_actions.mjs'], { cwd: DIR, stdio: 'inherit', shell: false, env: process.env });
 if (next.error) console.warn(`next actions failed: ${next.error.message}`);
 console.log(`acceptance ${acceptance.pass ? 'PASS' : 'FAIL'} mode=${acceptance.mode} hard=${acceptance.severity.hard}`);

@@ -37,6 +37,7 @@ const preview = readJson('visual_review_report.json');
 const drc = readJson('drc_report.json');
 const liveShots = readJson('live_shots_report.json');
 const liveDiagnose = readJson('live_diagnose_report.json');
+const repair = readJson('repair_actions.json');
 
 const checks = {
 	spec: {
@@ -158,6 +159,13 @@ const checks = {
 		})),
 		evidence: 'live_diagnose_report.json',
 	},
+	repairActions: {
+		status: status(repair?.pass),
+		severity: repair?.severity || null,
+		actionCount: repair?.actionCount ?? null,
+		firstAction: repair?.actions?.[0] || null,
+		evidence: 'repair_actions.json',
+	},
 };
 
 const actions = [];
@@ -264,6 +272,23 @@ if (checks.acceptance.status === 'fail' && !actions.length) {
 		action: 'Inspect acceptance_report.json for failed required steps.',
 		evidence: ['acceptance_report.json'],
 	});
+}
+if (checks.repairActions.status === 'fail') {
+	for (const action of (repair.actions || []).slice(0, 5)) {
+		pushAction(actions, {
+			area: `repair:${action.area}`,
+			action: action.repairHint,
+			evidence: action.inspectFiles,
+			observed: {
+				gate: action.gate,
+				rule: action.rule,
+				message: action.message,
+				where: action.where,
+			},
+			editFiles: action.editFiles,
+			nextCommand: action.nextCommand,
+		});
+	}
 }
 
 const result = {
