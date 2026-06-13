@@ -18,6 +18,7 @@ apply_report.json
 acceptance_report.json
 next_actions.json
 entrypoint_audit_report.json
+project_spec_report.json
 project_contract_report.json
 project_model_report.json
 commercial_*_report.json

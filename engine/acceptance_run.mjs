@@ -26,6 +26,7 @@ function runStep(name, command, args, { required = true } = {}) {
 
 const steps = [];
 steps.push(runStep('entrypoints', 'node', ['engine/entrypoint_audit.mjs']));
+steps.push(runStep('spec', 'node', ['engine/project_spec_gate.mjs']));
 steps.push(runStep('contract', 'node', ['engine/project_contract_gate.mjs']));
 steps.push(runStep('fast', 'node', ['engine/pipeline_fast.mjs']));
 steps.push(runStep('pipeline', 'node', ['engine/pipeline.mjs']));
@@ -44,6 +45,9 @@ if (RUN_LIVE) {
 const artifacts = {};
 for (const [key, path] of Object.entries({
 	report: DIR + 'report.json',
+	projectSpec: DIR + 'project_spec_report.json',
+	projectContract: DIR + 'project_contract_report.json',
+	projectModel: DIR + 'project_model_report.json',
 	visualReview: DIR + 'visual_review_report.json',
 	drc: DIR + 'drc_report.json',
 	liveShots: DIR + 'live_shots_report.json',
@@ -64,8 +68,11 @@ const acceptance = {
 	steps,
 	summary: {
 		local: {
+			spec: steps.find(s => s.name === 'spec')?.pass === true,
+			contract: steps.find(s => s.name === 'contract')?.pass === true,
 			fast: steps.find(s => s.name === 'fast')?.pass === true,
 			pipeline: steps.find(s => s.name === 'pipeline')?.pass === true,
+			projectModel: steps.find(s => s.name === 'contract:model')?.pass === true,
 			preview: steps.find(s => s.name === 'preview')?.pass === true,
 		},
 		live: RUN_LIVE ? {
@@ -78,6 +85,9 @@ const acceptance = {
 	},
 	artifacts: {
 		report: artifacts.report ? { pass: artifacts.report.pass, severity: artifacts.report.severity, score: artifacts.report.score } : null,
+		projectSpec: artifacts.projectSpec ? { pass: artifacts.projectSpec.pass, severity: artifacts.projectSpec.severity, projectId: artifacts.projectSpec.projectId, modules: artifacts.projectSpec.modules, interfaces: artifacts.projectSpec.interfaces } : null,
+		projectContract: artifacts.projectContract ? { pass: artifacts.projectContract.pass, severity: artifacts.projectContract.severity, projectId: artifacts.projectContract.projectId, modules: artifacts.projectContract.modules, interfaces: artifacts.projectContract.interfaces } : null,
+		projectModel: artifacts.projectModel ? { pass: artifacts.projectModel.pass, severity: artifacts.projectModel.severity, projectId: artifacts.projectModel.projectId, modelStats: artifacts.projectModel.modelStats } : null,
 		visualReview: artifacts.visualReview ? { pass: artifacts.visualReview.pass, severity: artifacts.visualReview.severity, screenshots: artifacts.visualReview.screenshots, mode: artifacts.visualReview.mode } : null,
 		drc: artifacts.drc ? { pass: artifacts.drc.pass, severity: artifacts.drc.severity, drc: artifacts.drc.drc } : null,
 		liveShots: artifacts.liveShots ? {

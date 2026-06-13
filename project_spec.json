@@ -1,0 +1,34 @@
+{
+  "schemaVersion": 1,
+  "projectId": "easyeda-harness-default",
+  "intent": "USB-C powered ESP32-C3 control schematic with 3V3 regulation, reset/boot support, high-side power switching, and two relay outputs.",
+  "modules": [
+    { "id": "usb", "title": "USB-C input", "requiredNets": ["SYS_5V", "GND", "USB_DP", "USB_DN", "USB_CC1", "USB_CC2"] },
+    { "id": "ldo", "title": "5V to 3V3 power", "requiredNets": ["SYS_5V", "SYS_3V3", "GND"] },
+    { "id": "mcu", "title": "ESP32-C3 MCU", "requiredNets": ["SYS_3V3", "GND", "RESET_EN", "BOOT_IO9", "USB_DP", "USB_DN", "EXT_PWR_EN", "RELAY1_EN", "RELAY2_EN"] },
+    { "id": "pmos", "title": "High-side power switch", "requiredNets": ["EXT_PWR_EN", "PMOS_GATE", "SYS_5V", "GND"] },
+    { "id": "reset", "title": "Reset support", "requiredNets": ["RESET_EN", "SYS_3V3", "GND"] },
+    { "id": "boot", "title": "Boot support", "requiredNets": ["BOOT_IO9", "SYS_3V3", "GND"] },
+    { "id": "relay1", "title": "Relay output 1", "requiredNets": ["RELAY1_EN", "RLY1_GATE", "RLY1_COIL_A", "RLY1_COIL_V", "GND"] },
+    { "id": "relay2", "title": "Relay output 2", "requiredNets": ["RELAY2_EN", "RLY2_GATE", "RLY2_COIL_A", "RLY2_COIL_V", "GND"] }
+  ],
+  "interfaces": [
+    { "net": "SYS_5V", "from": "usb", "to": "ldo" },
+    { "net": "SYS_3V3", "from": "ldo", "to": "mcu" },
+    { "net": "USB_DP", "from": "usb", "to": "mcu" },
+    { "net": "USB_DN", "from": "usb", "to": "mcu" },
+    { "net": "RESET_EN", "from": "reset", "to": "mcu" },
+    { "net": "BOOT_IO9", "from": "boot", "to": "mcu" },
+    { "net": "EXT_PWR_EN", "from": "mcu", "to": "pmos" },
+    { "net": "RELAY1_EN", "from": "mcu", "to": "relay1" },
+    { "net": "RELAY2_EN", "from": "mcu", "to": "relay2" }
+  ],
+  "qualityPolicy": {
+    "severityMustBeZero": true,
+    "drcErrors": 0,
+    "drcWarnings": 0,
+    "drcInfo": 0,
+    "singleSheetNoNetPortsByDefault": true,
+    "fakeTextNetLabelsAllowed": false
+  }
+}

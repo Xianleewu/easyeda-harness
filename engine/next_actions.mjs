@@ -25,6 +25,7 @@ function pushAction(actions, item) {
 }
 
 const acceptance = readJson('acceptance_report.json');
+const spec = readJson('project_spec_report.json');
 const contract = readJson('project_contract_report.json');
 const projectModel = readJson('project_model_report.json');
 const template = readJson('report.json');
@@ -34,6 +35,15 @@ const liveShots = readJson('live_shots_report.json');
 const liveDiagnose = readJson('live_diagnose_report.json');
 
 const checks = {
+	spec: {
+		status: status(spec?.pass),
+		severity: spec?.severity || null,
+		projectId: spec?.projectId || null,
+		modules: spec?.modules ?? null,
+		interfaces: spec?.interfaces ?? null,
+		firstFinding: spec?.findings?.[0] || null,
+		evidence: 'project_spec_report.json',
+	},
 	contract: {
 		status: status(contract?.pass),
 		severity: contract?.severity || null,
@@ -106,6 +116,14 @@ const checks = {
 };
 
 const actions = [];
+if (checks.spec.status !== 'pass') {
+	pushAction(actions, {
+		area: 'project-spec',
+		action: 'Create or fix project_spec.json first. The spec is the user-intent input and must be covered by project_contract.json before cells, assembly, or write-back work can be trusted.',
+		evidence: ['project_spec.json', 'project_contract.json', 'project_spec_report.json'],
+		observed: checks.spec.firstFinding || checks.spec,
+	});
+}
 if (checks.contract.status !== 'pass') {
 	pushAction(actions, {
 		area: 'project-contract',

@@ -15,7 +15,7 @@ For a new schematic project, do not draw directly in EasyEDA and then hope the g
 
 A PASS on the bundled model only proves that the bundled model passes. It does not validate another project, another schematic, or hand-drawn EasyEDA edits.
 
-`project_contract.json` is the first required machine contract. Update it before changing cells or assembly for a new project, then run `npm.cmd run contract`. A failing project contract blocks all write-back and delivery claims.
+`project_spec.json` is the first user-intent input. `project_contract.json` is the required machine contract derived from it. Update both before changing cells or assembly for a new project, then run `npm.cmd run spec` and `npm.cmd run contract`. A failing spec or contract blocks all write-back and delivery claims.
 
 ## Required External Skill
 
@@ -37,6 +37,7 @@ For an existing harnessed project, run these commands from the repository root:
 
 ```powershell
 npm.cmd install
+npm.cmd run spec
 npm.cmd run contract
 npm.cmd run accept
 ```
@@ -45,6 +46,7 @@ npm.cmd run accept
 It also writes `next_actions.json`, which is the first file to inspect when a gate fails or when another agent takes over.
 Acceptance requires all local gates to pass:
 
+- `spec`: `project_contract.json` covers `project_spec.json`
 - `contract`: `HARD=0 SOFT=0 INFO=0`
 - `fast`: `HARD=0 SOFT=0 INFO=0`
 - `pipeline`: `HARD=0 SOFT=0 INFO=0`
@@ -102,8 +104,8 @@ If a visual or DRC issue appears, update the deterministic template/rules first,
 
 When adapting this repository to a different schematic:
 
-1. Read the electrical spec and produce a machine-checkable module/net contract before placing symbols.
-2. Update `project_contract.json` and run `npm.cmd run contract` until it passes.
+1. Read the electrical spec and encode it in `project_spec.json` before placing symbols.
+2. Derive/update `project_contract.json` from the spec and run `npm.cmd run spec` plus `npm.cmd run contract` until both pass.
 3. Implement or update deterministic cells and assembly code for that contract.
 4. Add/adjust rules so the project-specific contract is enforced by `report.json`, `project_model_report.json`, live DRC, and visual evidence.
 5. Iterate from `next_actions.json`; do not bypass failed findings with manual EasyEDA edits.
