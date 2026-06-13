@@ -2,31 +2,13 @@
 import { readFileSync } from 'node:fs';
 import { withLocalPins } from './transform.mjs';
 import { buildModel } from './buildmodel.mjs';
-import { relayDriver, ldoCell, buttonCell, mcuCell, usbCell, pmosCell } from './cells.mjs';
 import { buildDocumentLayer } from '../harness/document_style.mjs';
+import { getCircuitPack } from '../circuit_packs/registry.mjs';
 
 const DIR = (process.env.EASYEDA_WORKDIR || process.cwd()).replace(/\\/g, '/') + '/';
 const PROJECT_ASSEMBLY = process.env.EASYEDA_PROJECT_ASSEMBLY || DIR + 'project_assembly.json';
 
-const FALLBACK_ANCHORS = {
-	usb:   { x: 620,  y: 980 },
-	ldo:   { x: 440,  y: 800 },
-	btn1:  { x: 760,  y: 520 },
-	btn2:  { x: 1000, y: 520 },
-	mcu:   { x: 920,  y: 820 },
-	pmos:  { x: 1340, y: 780 },
-	relay1:{ x: 1720, y: 740 },
-	relay2:{ x: 1720, y: 475 },
-};
-
-export const CELL_BUILDERS = {
-	usbCell,
-	ldoCell,
-	buttonCell,
-	mcuCell,
-	pmosCell,
-	relayDriver,
-};
+export const CELL_BUILDERS = getCircuitPack('aihwdebugger').cellBuilders;
 
 let cachedAssemblyPath = null;
 let cachedAssembly = null;
@@ -37,9 +19,10 @@ function cloneAnchors(anchors) {
 
 export function loadProjectAssembly(path = PROJECT_ASSEMBLY) {
 	const assembly = JSON.parse(readFileSync(path, 'utf8').replace(/^\uFEFF/, ''));
+	const pack = getCircuitPack(assembly.circuitPack || 'aihwdebugger');
 	return {
 		...assembly,
-		anchors: assembly.anchors || FALLBACK_ANCHORS,
+		anchors: assembly.anchors || pack.fallbackAnchors,
 		modules: [...(assembly.modules || [])].sort((a, b) => (a.order ?? 0) - (b.order ?? 0)),
 	};
 }
@@ -54,40 +37,20 @@ function projectAssembly() {
 
 export function loadPartLib(snapPath) {
 	const snap = JSON.parse(readFileSync(snapPath, 'utf8').replace(/^\uFEFF/, ''));
-	for (const c of snap.components || []) {
-		if (c.designator === 'Q1') {
-			for (const p of c.pins || []) {
-				if (['5', '6', '7', '8'].includes(String(p.num))) p.x = c.x + 25;
-			}
-			if (c.bbox) c.bbox.maxX = Math.min(c.bbox.maxX, c.x + 25.5);
-		}
-		if (c.designator === 'SW1' || c.designator === 'SW2') {
-			const mk = (num, name, dx, dy, rot) => ({ num, name, x: c.x + dx, y: c.y + dy, rot, len: 10 });
-			c.pins = [
-				mk('1', '1', -20, 10, 180),
-				mk('2', '2', -20, -10, 180),
-				mk('3', '3', -20, -20, 180),
-				mk('4', '4', 20, -20, 0),
-				mk('5', '5', 20, 10, 0),
-				mk('6', '6', 20, -10, 0),
-			];
-			if (c.bbox) {
-				c.bbox.minX = c.x - 10.5;
-				c.bbox.maxX = c.x + 10.5;
-				c.bbox.minY = c.y - 20.5;
-				c.bbox.maxY = c.y + 10.5;
-			}
-		}
-	}
-	const byDes = new Map(snap.components.map(c => [c.designator, withLocalPins(c)]));
-	return { snap, byDes };
+	const assembly = projectAssembly();
+	const pack = getCircuitPack(assembly.circuitPack || 'aihwdebugger');
+	const normalizedSnap = pack.normalizeLibrarySnapshot ? pack.normalizeLibrarySnapshot(snap) : snap;
+	const byDes = new Map(normalizedSnap.components.map(c => [c.designator, withLocalPins(c)]));
+	return { snap: normalizedSnap, byDes };
 }
 
 export function assemble(byDes, anchors = null, assembly = projectAssembly()) {
-	const resolvedAnchors = { ...cloneAnchors(assembly.anchors || FALLBACK_ANCHORS), ...(anchors ? cloneAnchors(anchors) : {}) };
+	const pack = getCircuitPack(assembly.circuitPack || 'aihwdebugger');
+	const cellBuilders = pack.cellBuilders || {};
+	const resolvedAnchors = { ...cloneAnchors(assembly.anchors || pack.fallbackAnchors), ...(anchors ? cloneAnchors(anchors) : {}) };
 	const cells = [];
 	for (const mod of assembly.modules || []) {
-		const build = CELL_BUILDERS[mod.cell];
+		const build = cellBuilders[mod.cell];
 		if (!build) throw new Error(`Unknown assembly cell ${mod.cell} for module ${mod.id}`);
 		const anchor = resolvedAnchors[mod.anchor];
 		if (!anchor) throw new Error(`Missing assembly anchor ${mod.anchor} for module ${mod.id}`);

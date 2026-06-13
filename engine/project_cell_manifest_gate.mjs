@@ -1,6 +1,6 @@
 import { existsSync, writeFileSync } from 'node:fs';
-import { CELL_BUILDERS } from './assemble.mjs';
 import { asArray, cellContractMap, loadCellManifest, readJson, resolveCellManifestPath } from './cell_manifest.mjs';
+import { getCircuitPack } from '../circuit_packs/registry.mjs';
 
 const DIR = (process.env.EASYEDA_WORKDIR || process.cwd()).replace(/\\/g, '/') + '/';
 const ASSEMBLY = process.env.EASYEDA_PROJECT_ASSEMBLY || DIR + 'project_assembly.json';
@@ -14,7 +14,7 @@ function unique(values) {
 	return [...new Set(values.filter(Boolean))];
 }
 
-function validateManifest(manifest, assembly, manifestPath) {
+function validateManifest(manifest, assembly, manifestPath, pack) {
 	const findings = [];
 	if (manifest.schemaVersion !== 1) hard(findings, 'CM1-schema-version', 'cell manifest schemaVersion must be 1', { schemaVersion: manifest.schemaVersion });
 	if (!manifest.packId) hard(findings, 'CM2-pack-id', 'cell manifest needs a stable packId');
@@ -39,10 +39,10 @@ function validateManifest(manifest, assembly, manifestPath) {
 		if (!asArray(cell?.refs).length) hard(findings, 'CM8-ref-roles', `${id} must declare required ref roles`, { cell: id });
 		if (!asArray(cell?.ports).length) hard(findings, 'CM9-ports', `${id} must declare electrical ports`, { cell: id });
 		if (!cell?.layoutIntent) hard(findings, 'CM10-layout-intent', `${id} must declare layoutIntent so agents know the template purpose`, { cell: id });
-		if (cell?.id && !CELL_BUILDERS[cell.id]) {
+		if (cell?.id && !pack.cellBuilders?.[cell.id]) {
 			hard(findings, 'CM11-builder-exists', `${cell.id} is declared in the manifest but has no implemented builder`, {
 				cell: cell.id,
-				implementedBuilders: Object.keys(CELL_BUILDERS),
+				implementedBuilders: Object.keys(pack.cellBuilders || {}),
 			});
 		}
 	}
@@ -71,6 +71,7 @@ const findings = [];
 let assembly = null;
 let manifest = null;
 let manifestPath = null;
+let pack = null;
 
 if (!existsSync(ASSEMBLY)) hard(findings, 'CM0-assembly-file', 'project_assembly.json is required before cell manifest audit', { path: ASSEMBLY });
 if (!findings.length) {
@@ -78,12 +79,13 @@ if (!findings.length) {
 }
 if (assembly) {
 	manifestPath = resolveCellManifestPath(assembly);
+	try { pack = getCircuitPack(assembly.circuitPack || 'aihwdebugger'); } catch (e) { hard(findings, 'CM0-pack-known', 'project_assembly.json must select a known circuit pack', { circuitPack: assembly.circuitPack, error: e.message }); }
 	if (!existsSync(manifestPath)) hard(findings, 'CM0-manifest-file', 'selected cell manifest is missing', { path: manifestPath });
 	else {
 		try { manifest = loadCellManifest(manifestPath); } catch (e) { hard(findings, 'CM0-manifest-parse', 'cell manifest must parse as JSON', { path: manifestPath, error: e.message }); }
 	}
 }
-if (manifest && assembly) findings.push(...validateManifest(manifest, assembly, manifestPath));
+if (manifest && assembly && pack) findings.push(...validateManifest(manifest, assembly, manifestPath, pack));
 
 const report = {
 	generatedAt: new Date().toISOString(),
@@ -92,7 +94,7 @@ const report = {
 	packId: manifest?.packId || null,
 	manifestPath,
 	cellCount: asArray(manifest?.cells).length,
-	implementedBuilders: Object.keys(CELL_BUILDERS),
+	implementedBuilders: Object.keys(pack?.cellBuilders || {}),
 	assemblyCells: unique(asArray(assembly?.modules).map(mod => mod.cell)),
 	findings,
 };

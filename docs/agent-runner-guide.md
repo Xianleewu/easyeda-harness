@@ -7,7 +7,7 @@ Use this repository as an executable schematic workflow, not as permission to dr
 1. Capture user intent in `project_spec.json`.
 2. Derive `project_contract.json`.
 3. Define required electrical endpoints in `project_netlist.json`.
-4. Select or declare the circuit-pack `cell_manifest.json`.
+4. Select or declare the circuit-pack `pack.mjs` and `cell_manifest.json`.
 5. Map modules, refs, anchors, nets, and layout policy in `project_assembly.json`.
 6. Implement deterministic cells and rules only after those contracts exist.
 7. Run `node bin/easyeda-gsd.mjs accept`.

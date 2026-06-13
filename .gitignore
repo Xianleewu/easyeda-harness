@@ -24,6 +24,7 @@ action_schema_report.json
 cell_manifest_report.json
 spec_schema_report.json
 project_spec_report.json
+project_pack_report.json
 project_contract_report.json
 project_assembly_report.json
 project_layout_report.json

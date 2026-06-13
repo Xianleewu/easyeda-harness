@@ -31,6 +31,7 @@ steps.push(runStep('spec:schema', 'node', ['engine/spec_schema_gate.mjs']));
 steps.push(runStep('spec', 'node', ['engine/project_spec_gate.mjs']));
 steps.push(runStep('contract', 'node', ['engine/project_contract_gate.mjs']));
 steps.push(runStep('contract:rules', 'node', ['engine/project_rule_gate.mjs']));
+steps.push(runStep('contract:pack', 'node', ['engine/project_pack_gate.mjs']));
 steps.push(runStep('contract:cells', 'node', ['engine/project_cell_manifest_gate.mjs']));
 steps.push(runStep('contract:assembly', 'node', ['engine/project_assembly_gate.mjs']));
 steps.push(runStep('fast', 'node', ['engine/pipeline_fast.mjs']));
@@ -59,6 +60,7 @@ for (const [key, path] of Object.entries({
 	projectSpec: DIR + 'project_spec_report.json',
 	projectContract: DIR + 'project_contract_report.json',
 	projectRules: DIR + 'project_rule_report.json',
+	projectPack: DIR + 'project_pack_report.json',
 	cellManifest: DIR + 'cell_manifest_report.json',
 	projectAssembly: DIR + 'project_assembly_report.json',
 	projectLayout: DIR + 'project_layout_report.json',
@@ -91,6 +93,7 @@ const acceptance = {
 			spec: steps.find(s => s.name === 'spec')?.pass === true,
 			contract: steps.find(s => s.name === 'contract')?.pass === true,
 			projectRules: steps.find(s => s.name === 'contract:rules')?.pass === true,
+			projectPack: steps.find(s => s.name === 'contract:pack')?.pass === true,
 			cellManifest: steps.find(s => s.name === 'contract:cells')?.pass === true,
 			projectAssembly: steps.find(s => s.name === 'contract:assembly')?.pass === true,
 			fast: steps.find(s => s.name === 'fast')?.pass === true,
@@ -117,6 +120,7 @@ const acceptance = {
 		projectSpec: artifacts.projectSpec ? { pass: artifacts.projectSpec.pass, severity: artifacts.projectSpec.severity, projectId: artifacts.projectSpec.projectId, modules: artifacts.projectSpec.modules, interfaces: artifacts.projectSpec.interfaces } : null,
 		projectContract: artifacts.projectContract ? { pass: artifacts.projectContract.pass, severity: artifacts.projectContract.severity, projectId: artifacts.projectContract.projectId, modules: artifacts.projectContract.modules, interfaces: artifacts.projectContract.interfaces } : null,
 		projectRules: artifacts.projectRules ? { pass: artifacts.projectRules.pass, severity: artifacts.projectRules.severity, projectId: artifacts.projectRules.projectId, registeredRules: artifacts.projectRules.registeredRules, registeredModules: artifacts.projectRules.registeredModules, registeredInterfaces: artifacts.projectRules.registeredInterfaces } : null,
+		projectPack: artifacts.projectPack ? { pass: artifacts.projectPack.pass, severity: artifacts.projectPack.severity, circuitPack: artifacts.projectPack.circuitPack, registeredPacks: artifacts.projectPack.registeredPacks } : null,
 		cellManifest: artifacts.cellManifest ? { pass: artifacts.cellManifest.pass, severity: artifacts.cellManifest.severity, packId: artifacts.cellManifest.packId, cellCount: artifacts.cellManifest.cellCount, assemblyCells: artifacts.cellManifest.assemblyCells } : null,
 		projectAssembly: artifacts.projectAssembly ? { pass: artifacts.projectAssembly.pass, severity: artifacts.projectAssembly.severity, projectId: artifacts.projectAssembly.projectId, modules: artifacts.projectAssembly.modules, anchors: artifacts.projectAssembly.anchors, cellTypes: artifacts.projectAssembly.cellTypes } : null,
 		projectLayout: artifacts.projectLayout ? { pass: artifacts.projectLayout.pass, severity: artifacts.projectLayout.severity, projectId: artifacts.projectLayout.projectId, candidateSource: artifacts.projectLayout.candidateSource, totalCandidates: artifacts.projectLayout.totalCandidates, minModuleGap: artifacts.projectLayout.minModuleGap, moduleWireIntrusions: artifacts.projectLayout.moduleWireIntrusions, laneInterlocks: artifacts.projectLayout.laneInterlocks } : null,
@@ -150,6 +154,7 @@ const acceptance = {
 	},
 };
 
+writeFileSync(REPORT, JSON.stringify(acceptance, null, 2), 'utf8');
 const repair = spawnSync('node', ['engine/repair_actions.mjs'], { cwd: DIR, stdio: 'inherit', shell: false, env: process.env });
 if (repair.error) console.warn(`repair actions failed: ${repair.error.message}`);
 const next = spawnSync('node', ['engine/next_actions.mjs'], { cwd: DIR, stdio: 'inherit', shell: false, env: process.env });

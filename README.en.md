@@ -18,6 +18,7 @@ A PASS on the current model only proves the current model. It does not validate 
 `npm run spec:schema` validates the spec shape before contract coverage is checked.
 
 `project_contract.json` is the first machine-readable file an agent must update for a new project. `project_netlist.json` records the required electrical endpoints. `circuit_packs/*/cell_manifest.json` declares deterministic cell capabilities for the selected circuit pack, and `project_assembly.json` maps each contract module to those cells, refs, anchors, nets, and layout policy. `npm run contract`, `npm run contract:netlist`, `npm run contract:cells`, `npm run contract:assembly`, `npm run contract:layout`, and `npm run accept` check them; if they fail, the agent should not edit write-back scripts, apply to EasyEDA, or claim completion.
+`circuit_packs/*/pack.mjs` owns circuit-family behavior such as cell builders, fallback anchors, and library snapshot normalization. `npm run contract:pack` verifies the selected pack before generation.
 
 ## Capabilities
 
@@ -26,6 +27,7 @@ A PASS on the current model only proves the current model. It does not validate 
 - Spec schema gate: `spec:schema` validates `project_spec.json` as the first-layer user-intent contract.
 - Project contract gate: `project_contract.json` defines modules, key nets, interfaces, visual evidence regions, and the no-free-draw policy.
 - Project netlist gate: `project_netlist.json` defines required pins for key nets and proves the generated model connects them.
+- Circuit pack gate: `contract:pack` verifies the selected `pack.mjs` is registered and exposes required generation hooks.
 - Cell manifest gate: `circuit_packs/*/cell_manifest.json` declares circuit-pack cell roles, required refs, net args, ports, and layout intent before assembly can use those cells.
 - Rule coverage check: `contract:rules` proves module registry, required parts, interface contracts, and core rules cover the project contract.
 - Assembly coverage check: `contract:assembly` proves every contract module is mapped to a deterministic cell, anchor, refs, and nets before generation.
@@ -104,6 +106,7 @@ For handoff, review the global sheet and local crops for USB, LDO, RESET, BOOT, 
 - Spec schema check: `spec_schema_report.json` has `HARD=0 SOFT=0 INFO=0`
 - Project rule coverage check: `project_rule_report.json` has `HARD=0 SOFT=0 INFO=0`
 - Project netlist check: `project_netlist_report.json` has `HARD=0 SOFT=0 INFO=0`
+- Circuit pack check: `project_pack_report.json` has `HARD=0 SOFT=0 INFO=0`
 - Cell manifest check: `cell_manifest_report.json` has `HARD=0 SOFT=0 INFO=0`
 - Project assembly coverage check: `project_assembly_report.json` has `HARD=0 SOFT=0 INFO=0`
 - Project layout policy check: `project_layout_report.json` has `HARD=0 SOFT=0 INFO=0`
@@ -143,6 +146,7 @@ For handoff, review the global sheet and local crops for USB, LDO, RESET, BOOT, 
 - `project_spec.json` / `project_contract.json` / `project_netlist.json` / `project_assembly.json`: user intent, design contract, structured electrical endpoints, executable assembly mapping, and layout policy.
 - `contracts/spec_schema.mjs`: reusable schema validation for the first user-intent input.
 - `circuit_packs/*/cell_manifest.json`: circuit-pack deterministic cell capability contracts.
+- `circuit_packs/*/pack.mjs`: circuit-pack generation hooks and library normalization.
 - `snap2.json`: component snapshot input.
 - `comp_state.json`: component state input for write-back preservation.
 - `engine/bridge_client.mjs` / `engine/bridge_exec.mjs`: cross-platform EasyEDA bridge runners.

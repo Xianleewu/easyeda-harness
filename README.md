@@ -18,6 +18,7 @@ EasyEDA Harness 是一套给 Codex、Claude Code 等编程 Agent 使用的原理
 `npm run spec:schema` 会先验证 spec 自身结构，再进入合同覆盖检查。
 
 `project_contract.json` 是 Agent 接手新项目时必须先修改的机器合同，`project_netlist.json` 记录关键网络的必连端点，`circuit_packs/*/cell_manifest.json` 声明所选电路包的确定性 cell 能力，`project_assembly.json` 是随后必须补齐的可执行装配映射和布局策略。`npm run contract`、`npm run contract:netlist`、`npm run contract:cells`、`npm run contract:assembly`、`npm run contract:layout` 和 `npm run accept` 会检查这些文件；未通过时，不应继续写回或声称已完成。
+`circuit_packs/*/pack.mjs` 承载电路族行为，例如 cell builders、fallback anchors 和器件库快照归一化；`npm run contract:pack` 会在生成前校验所选 pack。
 
 ## 核心能力
 
@@ -26,6 +27,7 @@ EasyEDA Harness 是一套给 Codex、Claude Code 等编程 Agent 使用的原理
 - Spec schema 门禁：`spec:schema` 验证 `project_spec.json` 是合法的第一层用户意图合同。
 - 项目合同门禁：`project_contract.json` 定义模块、关键网络、接口、视觉证据区域和禁止自由绘图策略。
 - 项目网表门禁：`project_netlist.json` 定义关键网络必连引脚，并证明生成模型实际连接这些端点。
+- Circuit pack 门禁：`contract:pack` 验证所选 `pack.mjs` 已注册且暴露必要生成 hook。
 - Cell manifest 门禁：`circuit_packs/*/cell_manifest.json` 在装配前声明电路包 cell 的 ref role、netArg、端口和布局意图。
 - 规则覆盖检查：`contract:rules` 会确认模块注册、必备零件、接口合同和核心规则覆盖了项目合同。
 - 装配覆盖检查：`contract:assembly` 会确认每个合同模块都映射到了确定性 cell、anchor、refs 和 nets。
@@ -104,6 +106,7 @@ Agent 会通过 `apply:gated` 写回 EasyEDA。这个入口会先运行检查；
 - Spec schema 检查：`spec_schema_report.json` 中 `HARD=0 SOFT=0 INFO=0`
 - 项目规则覆盖检查：`project_rule_report.json` 中 `HARD=0 SOFT=0 INFO=0`
 - 项目网表检查：`project_netlist_report.json` 中 `HARD=0 SOFT=0 INFO=0`
+- Circuit pack 检查：`project_pack_report.json` 中 `HARD=0 SOFT=0 INFO=0`
 - Cell manifest 检查：`cell_manifest_report.json` 中 `HARD=0 SOFT=0 INFO=0`
 - 项目装配覆盖检查：`project_assembly_report.json` 中 `HARD=0 SOFT=0 INFO=0`
 - 项目布局策略检查：`project_layout_report.json` 中 `HARD=0 SOFT=0 INFO=0`
@@ -143,6 +146,7 @@ Agent 会通过 `apply:gated` 写回 EasyEDA。这个入口会先运行检查；
 - `project_spec.json` / `project_contract.json` / `project_netlist.json` / `project_assembly.json`：用户意图、设计合同、结构化电气端点、可执行装配映射和布局策略。
 - `contracts/spec_schema.mjs`：第一层用户意图输入的可复用 schema 校验。
 - `circuit_packs/*/cell_manifest.json`：电路包确定性 cell 能力合同。
+- `circuit_packs/*/pack.mjs`：电路包生成 hook 和器件库归一化。
 - `snap2.json`：器件快照输入。
 - `comp_state.json`：器件状态输入，用于写回时保留器件绑定信息。
 - `engine/bridge_client.mjs` / `engine/bridge_exec.mjs`：跨平台 EasyEDA bridge 执行入口。

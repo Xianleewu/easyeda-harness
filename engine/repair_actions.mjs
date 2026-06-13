@@ -11,6 +11,7 @@ const REPORTS = [
 	{ gate: 'project-spec', file: 'project_spec_report.json', rerun: 'npm.cmd run spec' },
 	{ gate: 'project-contract', file: 'project_contract_report.json', rerun: 'npm.cmd run contract' },
 	{ gate: 'project-rules', file: 'project_rule_report.json', rerun: 'npm.cmd run contract:rules' },
+	{ gate: 'project-pack', file: 'project_pack_report.json', rerun: 'npm.cmd run contract:pack' },
 	{ gate: 'cell-manifest', file: 'cell_manifest_report.json', rerun: 'npm.cmd run contract:cells' },
 	{ gate: 'project-assembly', file: 'project_assembly_report.json', rerun: 'npm.cmd run contract:assembly' },
 	{ gate: 'template', file: 'report.json', rerun: 'npm.cmd run fast' },
@@ -111,6 +112,13 @@ const RULE_PLANS = [
 		inspectFiles: ['project_rule_report.json'],
 		nextCommand: 'npm.cmd run contract:rules',
 		repairHint: 'Restore missing core rules instead of weakening the project contract.',
+	}],
+	[/^PP/, {
+		area: 'project-pack',
+		editFiles: ['project_assembly.json', 'circuit_packs/registry.mjs', 'circuit_packs/aihwdebugger/pack.mjs'],
+		inspectFiles: ['project_pack_report.json', 'circuit_packs/aihwdebugger/cell_manifest.json'],
+		nextCommand: 'npm.cmd run contract:pack',
+		repairHint: 'Keep the selected circuit pack registered and ensure it exposes id, cellBuilders, fallbackAnchors, library normalization, and matching cell manifest packId.',
 	}],
 	[/^CM/, {
 		area: 'cell-manifest',

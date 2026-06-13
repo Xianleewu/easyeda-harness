@@ -31,6 +31,7 @@ const specSchema = readJson('spec_schema_report.json');
 const spec = readJson('project_spec_report.json');
 const contract = readJson('project_contract_report.json');
 const projectRules = readJson('project_rule_report.json');
+const projectPack = readJson('project_pack_report.json');
 const cellManifest = readJson('cell_manifest_report.json');
 const projectAssembly = readJson('project_assembly_report.json');
 const projectLayout = readJson('project_layout_report.json');
@@ -90,6 +91,14 @@ const checks = {
 		registeredInterfaces: projectRules?.registeredInterfaces ?? null,
 		firstFinding: projectRules?.findings?.[0] || null,
 		evidence: 'project_rule_report.json',
+	},
+	projectPack: {
+		status: status(projectPack?.pass),
+		severity: projectPack?.severity || null,
+		circuitPack: projectPack?.circuitPack || null,
+		registeredPacks: projectPack?.registeredPacks || null,
+		firstFinding: projectPack?.findings?.[0] || null,
+		evidence: 'project_pack_report.json',
 	},
 	cellManifest: {
 		status: status(cellManifest?.pass),
@@ -255,6 +264,14 @@ if (checks.projectRules.status !== 'pass') {
 		action: 'Make harness rule registries cover project_contract.json. Update module registry, required parts, interface contracts, or rule registration before trusting template PASS.',
 		evidence: ['project_contract.json', 'harness/module_registry.mjs', 'engine/interface_contract.mjs', 'harness/rule_registry.mjs', 'project_rule_report.json'],
 		observed: checks.projectRules.firstFinding || checks.projectRules,
+	});
+}
+if (checks.projectPack.status !== 'pass') {
+	pushAction(actions, {
+		area: 'project-pack',
+		action: 'Fix the selected circuit pack before trusting generation. project_assembly.json must reference a registered pack with builders, fallback anchors, library normalization, and matching cell manifest.',
+		evidence: ['project_assembly.json', 'circuit_packs/registry.mjs', 'circuit_packs/aihwdebugger/pack.mjs', 'project_pack_report.json'],
+		observed: checks.projectPack.firstFinding || checks.projectPack,
 	});
 }
 if (checks.cellManifest.status !== 'pass') {
