@@ -586,6 +586,60 @@ try {
 		checks.partLibrarySnapshotRequiredParts,
 	);
 
+	const portBindingContract = {
+		...completeGenericContract,
+		modules: [{
+			...completeGenericContract.modules[0],
+			requiredParts: ['SW99', 'R99'],
+			requiredNets: ['SENSE_OUT', 'SYS_3V3', 'GND'],
+		}],
+	};
+	const missingPortBindingPlan = buildGsdPlan({
+		spec: {
+			schemaVersion: 1,
+			projectId: genericContract.projectId,
+			intent: 'Cell port binding smoke.',
+			circuitPack: 'aihwdebugger',
+			modules: [{ id: 'sensor_frontend', title: 'Sensor Frontend', requiredNets: ['SENSE_OUT', 'SYS_3V3', 'GND'] }],
+			interfaces: [],
+		},
+		contract: portBindingContract,
+		netlist: { schemaVersion: 1, projectId: genericContract.projectId, nets: [{ name: 'SENSE_OUT', requiredPins: [] }, { name: 'SYS_3V3', requiredPins: [] }, { name: 'GND', requiredPins: [] }] },
+		assembly: {
+			...genericAssembly,
+			cellManifest: 'circuit_packs/aihwdebugger/cell_manifest.json',
+			modules: [{
+				...genericAssembly.modules[0],
+				cell: 'buttonCell',
+				refs: { SW: 'SW99', Rpu: 'R99' },
+				netArgs: { SIG: 'SENSE_OUT' },
+				nets: ['SENSE_OUT', 'SYS_3V3'],
+			}],
+			layoutPolicy: {
+				...genericAssembly.layoutPolicy,
+				xProfiles: [{ sensorX: 300 }],
+			},
+		},
+		libraryManifest: { purpose: 'Cell port binding smoke.', parts: { SW99: { Symbol: 'S', Device: 'D', Footprint: 'F', name: 'SW99', value: 'SW', addIntoBom: true, addIntoPcb: true }, R99: { Symbol: 'S', Device: 'D', Footprint: 'F', name: 'R99', value: '10k', addIntoBom: true, addIntoPcb: true } } },
+		partLibSnapshot: { project: genericContract.projectId, components: [{ designator: 'SW99' }, { designator: 'R99' }] },
+		model: null,
+		specPath: '_tmp_workflow_smoke/missing_port_binding/project_spec.json',
+		assemblyPath: `${ROOT}/project_assembly.json`,
+		partLibPath: '_tmp_workflow_smoke/missing_port_binding/project_library_snapshot.json',
+	});
+	checks.cellPortsBoundToAssemblyNets = {
+		pass: missingPortBindingPlan.pass,
+		rules: (missingPortBindingPlan.findings || []).map(f => f.rule),
+		firstFinding: missingPortBindingPlan.findings?.[0] || null,
+	};
+	assertFinding(
+		findings,
+		hasRule(missingPortBindingPlan, 'GP19-cell-port-bound'),
+		'WS32-cell-ports-bound-to-assembly-nets',
+		'GSD plan must reject deterministic cell manifests whose declared electrical ports are not bound to concrete assembly nets before generation',
+		checks.cellPortsBoundToAssemblyNets,
+	);
+
 	const orphanSpecDir = `${TMP_DIR}/orphan_spec`;
 	mkdirSync(orphanSpecDir, { recursive: true });
 	writeFileSync(`${orphanSpecDir}/project_spec.json`, JSON.stringify(customSpec, null, 2) + '\n', 'utf8');

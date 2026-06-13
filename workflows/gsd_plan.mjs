@@ -3,7 +3,7 @@ import { asArray, validateSpecSchema } from '../contracts/spec_schema.mjs';
 import { validateModuleContract } from '../contracts/module_contract.mjs';
 import { validateNetContract } from '../contracts/net_contract.mjs';
 import { validateLibraryContract } from '../contracts/library_contract.mjs';
-import { asArray as cellArray, loadCellManifest, resolveCellManifestPath } from '../engine/cell_manifest.mjs';
+import { asArray as cellArray, cellContractMap, loadCellManifest, resolveCellManifestPath } from '../engine/cell_manifest.mjs';
 
 function hard(findings, rule, msg, where = {}) {
 	findings.push({ rule, severity: 'hard', category: 'gsd-plan', msg, where });
@@ -125,6 +125,7 @@ function validateExecutableCells(assembly, pack, assemblyPath = '') {
 	}
 	const manifestCells = new Set(cellArray(manifest.cells).map(cell => cell.id).filter(Boolean));
 	const builderCells = new Set(Object.keys(pack.cellBuilders || {}));
+	const cellContracts = cellContractMap(manifest);
 	for (const mod of asArray(assembly.modules)) {
 		if (!manifestCells.has(mod.cell)) {
 			hard(findings, 'GP16-assembly-cell-declared', `${mod.id} uses a cell not declared by the selected cell manifest`, {
@@ -142,6 +143,31 @@ function validateExecutableCells(assembly, pack, assemblyPath = '') {
 				circuitPack: pack.id,
 				implementedBuilders: [...builderCells],
 			});
+		}
+		const cell = cellContracts.get(mod.cell);
+		if (cell) {
+			const netArgs = mod.netArgs || {};
+			const mappedNets = new Set(asArray(mod.nets));
+			for (const port of cell.ports) {
+				const resolvedNet = netArgs[port] || (mappedNets.has(port) ? port : '');
+				if (!resolvedNet) {
+					hard(findings, 'GP19-cell-port-bound', `${mod.id} ${mod.cell} port ${port} must resolve to an assembly net through netArgs or nets before generation`, {
+						module: mod.id,
+						cell: mod.cell,
+						port,
+						netArgs,
+						nets: [...mappedNets],
+					});
+				} else if (!mappedNets.has(resolvedNet)) {
+					hard(findings, 'GP20-cell-port-net-declared', `${mod.id} ${mod.cell} port ${port} resolves to ${resolvedNet}, but that net is not declared in assembly nets`, {
+						module: mod.id,
+						cell: mod.cell,
+						port,
+						resolvedNet,
+						nets: [...mappedNets],
+					});
+				}
+			}
 		}
 	}
 	return findings;

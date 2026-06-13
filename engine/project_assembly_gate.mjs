@@ -93,6 +93,26 @@ function validateAssembly(contract, assembly, cellContracts) {
 		for (const net of values(netArgs)) {
 			if (!mappedNets.has(net)) hard(findings, 'PA14-netargs-declared', `${id} netArg ${net} must also be present in assembly nets`, { module: id, net });
 		}
+		for (const port of cell.ports) {
+			const resolvedNet = netArgs[port] || (mappedNets.has(port) ? port : '');
+			if (!resolvedNet) {
+				hard(findings, 'PA19-cell-port-bound', `${id} ${mapping.cell} port ${port} must resolve to an assembly net through netArgs or nets`, {
+					module: id,
+					cell: mapping.cell,
+					port,
+					netArgs,
+					nets: [...mappedNets],
+				});
+			} else if (!mappedNets.has(resolvedNet)) {
+				hard(findings, 'PA20-cell-port-net-declared', `${id} ${mapping.cell} port ${port} resolves to ${resolvedNet}, but that net is not declared in assembly nets`, {
+					module: id,
+					cell: mapping.cell,
+					port,
+					resolvedNet,
+					nets: [...mappedNets],
+				});
+			}
+		}
 	}
 
 	for (const id of assemblyModules.keys()) {
