@@ -18,6 +18,7 @@ EasyEDA Harness 是一套给 Codex、Claude Code 等编程 Agent 使用的原理
 
 - 确定性原理图组装：`engine/cells.mjs` 定义功能单元，`engine/assemble.mjs` 负责整图拼装。
 - 项目合同门禁：`project_contract.json` 定义模块、关键网络、接口、视觉证据区域和禁止自由绘图策略。
+- 合同兑现检查：生成 `full_model.json` 后，`contract:model` 会确认模型实际包含合同要求的模块、零件、网络和接口表达。
 - 快速离线检查：`npm run fast` 在本机 CPU 上完成核心模板校验，适合日常坐标和规则迭代。
 - 完整布局检查：`npm run pipeline` 运行布局搜索、结构审计、视觉节奏、文本覆盖、系统意图等检查。
 - 真实 EDA 闭环：通过 WebSocket 桥写回 EasyEDA，再用 `snapshot2.js` 拉取实图快照做 live 校验。
@@ -75,6 +76,7 @@ Agent 会通过 `apply:gated` 写回 EasyEDA。这个入口会先运行检查；
 ## 检查清单
 
 - 项目合同检查：`project_contract_report.json` 中 `HARD=0 SOFT=0 INFO=0`
+- 合同兑现检查：`project_model_report.json` 中 `HARD=0 SOFT=0 INFO=0`
 - 本地快速检查：`HARD=0 SOFT=0 INFO=0`
 - 完整布局检查：`HARD=0 SOFT=0 INFO=0`
 - 离线预览：至少生成 10 张全局/局部离线预览图，视觉审计 PASS

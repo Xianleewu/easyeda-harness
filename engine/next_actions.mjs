@@ -26,6 +26,7 @@ function pushAction(actions, item) {
 
 const acceptance = readJson('acceptance_report.json');
 const contract = readJson('project_contract_report.json');
+const projectModel = readJson('project_model_report.json');
 const template = readJson('report.json');
 const preview = readJson('visual_review_report.json');
 const drc = readJson('drc_report.json');
@@ -47,6 +48,14 @@ const checks = {
 		status: status(template?.pass),
 		severity: template?.severity || null,
 		evidence: 'report.json',
+	},
+	projectModel: {
+		status: status(projectModel?.pass),
+		severity: projectModel?.severity || null,
+		projectId: projectModel?.projectId || null,
+		modelStats: projectModel?.modelStats || null,
+		firstFinding: projectModel?.findings?.[0] || null,
+		evidence: 'project_model_report.json',
 	},
 	preview: {
 		status: status(preview?.pass),
@@ -110,6 +119,14 @@ if (checks.template.status !== 'pass') {
 		area: 'template',
 		action: 'Fix deterministic schematic model until report.json has HARD=0 SOFT=0 INFO=0.',
 		evidence: ['report.json'],
+	});
+}
+if (checks.projectModel.status !== 'pass') {
+	pushAction(actions, {
+		area: 'project-model',
+		action: 'Make full_model.json satisfy project_contract.json. Fix deterministic cells, assembly, or the contract so required modules, parts, nets, and interfaces match the generated model.',
+		evidence: ['project_contract.json', 'full_model.json', 'project_model_report.json'],
+		observed: checks.projectModel.firstFinding || checks.projectModel,
 	});
 }
 if (checks.preview.status !== 'pass' || checks.preview.screenshots < 10) {

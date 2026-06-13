@@ -18,6 +18,7 @@ A PASS on the current model only proves the current model. It does not validate 
 
 - Deterministic schematic assembly: functional cells live in `engine/cells.mjs`, and whole-sheet composition lives in `engine/assemble.mjs`.
 - Project contract gate: `project_contract.json` defines modules, key nets, interfaces, visual evidence regions, and the no-free-draw policy.
+- Contract realization check: after `full_model.json` is generated, `contract:model` proves the model actually expresses the contract modules, parts, nets, and interfaces.
 - Fast offline check: validates the schematic model on local CPU and is intended for daily coordinate and rule iteration.
 - Full layout check: `npm run pipeline` runs layout search, structure checks, visual rhythm checks, text clearance, and system-intent audits.
 - Real EasyEDA loop: write back through the WebSocket bridge, then pull a live schematic snapshot with `snapshot2.js`.
@@ -75,6 +76,7 @@ For handoff, review the global sheet and local crops for USB, LDO, RESET, BOOT, 
 ## Check List
 
 - Project contract check: `project_contract_report.json` has `HARD=0 SOFT=0 INFO=0`
+- Contract realization check: `project_model_report.json` has `HARD=0 SOFT=0 INFO=0`
 - Fast local check: `HARD=0 SOFT=0 INFO=0`
 - Full layout check: `HARD=0 SOFT=0 INFO=0`
 - Offline preview: at least 10 global/local screenshots generated and visual audit passes

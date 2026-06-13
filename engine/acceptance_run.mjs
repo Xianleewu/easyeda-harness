@@ -29,6 +29,7 @@ steps.push(runStep('entrypoints', 'node', ['engine/entrypoint_audit.mjs']));
 steps.push(runStep('contract', 'node', ['engine/project_contract_gate.mjs']));
 steps.push(runStep('fast', 'node', ['engine/pipeline_fast.mjs']));
 steps.push(runStep('pipeline', 'node', ['engine/pipeline.mjs']));
+steps.push(runStep('contract:model', 'node', ['engine/project_model_gate.mjs']));
 steps.push(runStep('preview', 'node', ['engine/visual_crops.mjs']));
 
 if (RUN_LIVE) {
