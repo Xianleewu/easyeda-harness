@@ -28,6 +28,7 @@ const acceptance = readJson('acceptance_report.json');
 const spec = readJson('project_spec_report.json');
 const contract = readJson('project_contract_report.json');
 const projectModel = readJson('project_model_report.json');
+const projectVisual = readJson('project_visual_report.json');
 const template = readJson('report.json');
 const preview = readJson('visual_review_report.json');
 const drc = readJson('drc_report.json');
@@ -66,6 +67,15 @@ const checks = {
 		modelStats: projectModel?.modelStats || null,
 		firstFinding: projectModel?.findings?.[0] || null,
 		evidence: 'project_model_report.json',
+	},
+	projectVisual: {
+		status: status(projectVisual?.pass),
+		severity: projectVisual?.severity || null,
+		projectId: projectVisual?.projectId || null,
+		requiredRegions: projectVisual?.requiredRegions || null,
+		availableRegions: projectVisual?.availableRegions || null,
+		firstFinding: projectVisual?.findings?.[0] || null,
+		evidence: 'project_visual_report.json',
 	},
 	preview: {
 		status: status(preview?.pass),
@@ -152,6 +162,14 @@ if (checks.preview.status !== 'pass' || checks.preview.screenshots < 10) {
 		area: 'offline-preview',
 		action: 'Fix offline preview renderer/model until visual_review_report.json passes with at least 10 screenshots.',
 		evidence: ['visual_review_report.json', 'visual_crops/'],
+	});
+}
+if (checks.projectVisual.status !== 'pass') {
+	pushAction(actions, {
+		area: 'project-visual',
+		action: 'Make visual_review_report.json cover every visualEvidenceRegions entry from project_contract.json. Add preview regions or fix failing crop inspection before delivery.',
+		evidence: ['project_contract.json', 'visual_review_report.json', 'project_visual_report.json'],
+		observed: checks.projectVisual.firstFinding || checks.projectVisual,
 	});
 }
 if (acceptance?.mode === 'full-with-live' && checks.drc.status !== 'pass') {

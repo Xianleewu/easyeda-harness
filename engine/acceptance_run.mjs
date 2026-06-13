@@ -32,6 +32,7 @@ steps.push(runStep('fast', 'node', ['engine/pipeline_fast.mjs']));
 steps.push(runStep('pipeline', 'node', ['engine/pipeline.mjs']));
 steps.push(runStep('contract:model', 'node', ['engine/project_model_gate.mjs']));
 steps.push(runStep('preview', 'node', ['engine/visual_crops.mjs']));
+steps.push(runStep('contract:visual', 'node', ['engine/project_visual_gate.mjs']));
 
 if (RUN_LIVE) {
 	steps.push(runStep('live:save', 'node', ['engine/bridge_exec.mjs', '--js', 'snapshot2.js', '--out', 'live.json']));
@@ -48,6 +49,7 @@ for (const [key, path] of Object.entries({
 	projectSpec: DIR + 'project_spec_report.json',
 	projectContract: DIR + 'project_contract_report.json',
 	projectModel: DIR + 'project_model_report.json',
+	projectVisual: DIR + 'project_visual_report.json',
 	visualReview: DIR + 'visual_review_report.json',
 	drc: DIR + 'drc_report.json',
 	liveShots: DIR + 'live_shots_report.json',
@@ -74,6 +76,7 @@ const acceptance = {
 			pipeline: steps.find(s => s.name === 'pipeline')?.pass === true,
 			projectModel: steps.find(s => s.name === 'contract:model')?.pass === true,
 			preview: steps.find(s => s.name === 'preview')?.pass === true,
+			projectVisual: steps.find(s => s.name === 'contract:visual')?.pass === true,
 		},
 		live: RUN_LIVE ? {
 			save: steps.find(s => s.name === 'live:save')?.pass === true,
@@ -88,6 +91,7 @@ const acceptance = {
 		projectSpec: artifacts.projectSpec ? { pass: artifacts.projectSpec.pass, severity: artifacts.projectSpec.severity, projectId: artifacts.projectSpec.projectId, modules: artifacts.projectSpec.modules, interfaces: artifacts.projectSpec.interfaces } : null,
 		projectContract: artifacts.projectContract ? { pass: artifacts.projectContract.pass, severity: artifacts.projectContract.severity, projectId: artifacts.projectContract.projectId, modules: artifacts.projectContract.modules, interfaces: artifacts.projectContract.interfaces } : null,
 		projectModel: artifacts.projectModel ? { pass: artifacts.projectModel.pass, severity: artifacts.projectModel.severity, projectId: artifacts.projectModel.projectId, modelStats: artifacts.projectModel.modelStats } : null,
+		projectVisual: artifacts.projectVisual ? { pass: artifacts.projectVisual.pass, severity: artifacts.projectVisual.severity, projectId: artifacts.projectVisual.projectId, requiredRegions: artifacts.projectVisual.requiredRegions, availableRegions: artifacts.projectVisual.availableRegions } : null,
 		visualReview: artifacts.visualReview ? { pass: artifacts.visualReview.pass, severity: artifacts.visualReview.severity, screenshots: artifacts.visualReview.screenshots, mode: artifacts.visualReview.mode } : null,
 		drc: artifacts.drc ? { pass: artifacts.drc.pass, severity: artifacts.drc.severity, drc: artifacts.drc.drc } : null,
 		liveShots: artifacts.liveShots ? {

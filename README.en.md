@@ -22,6 +22,7 @@ A PASS on the current model only proves the current model. It does not validate 
 - Project spec gate: `project_spec.json` defines user-level modules, nets, interfaces, and quality policy.
 - Project contract gate: `project_contract.json` defines modules, key nets, interfaces, visual evidence regions, and the no-free-draw policy.
 - Contract realization check: after `full_model.json` is generated, `contract:model` proves the model actually expresses the contract modules, parts, nets, and interfaces.
+- Visual evidence check: after offline previews are generated, `contract:visual` proves every contract visual evidence region exists and passes image inspection.
 - Fast offline check: validates the schematic model on local CPU and is intended for daily coordinate and rule iteration.
 - Full layout check: `npm run pipeline` runs layout search, structure checks, visual rhythm checks, text clearance, and system-intent audits.
 - Real EasyEDA loop: write back through the WebSocket bridge, then pull a live schematic snapshot with `snapshot2.js`.
@@ -84,6 +85,7 @@ For handoff, review the global sheet and local crops for USB, LDO, RESET, BOOT, 
 - Fast local check: `HARD=0 SOFT=0 INFO=0`
 - Full layout check: `HARD=0 SOFT=0 INFO=0`
 - Offline preview: at least 10 global/local screenshots generated and visual audit passes
+- Contract visual evidence check: `project_visual_report.json` has `HARD=0 SOFT=0 INFO=0`
 - EasyEDA live: pull `live.json` and review `live_canvas.png` captured from the real EasyEDA canvas
 - EasyEDA DRC: `0 error / 0 warning / 0 info`
 - EasyEDA live shots: at least 10 distinct module-level evidence images

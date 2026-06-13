@@ -70,17 +70,17 @@ function capRight(region, capX, pad = 18) {
 }
 
 const regions = [
-	{ name: '00_global_sheet', box: [0, 0, renderReport.width, renderReport.height], width: 1600, height: 920 },
-	regionFromModule('usb', '01_usb'),
-	regionFromModule('ldo', '02_ldo'),
-	regionFromModule('btn1', '03_reset'),
-	regionFromModule('btn2', '04_boot'),
-	splitRegion(regionFromModule('mcu', '05_mcu_left'), 'left'),
-	splitRegion({ ...regionFromModule('mcu', '06_mcu_right'), name: '06_mcu_right' }, 'right'),
-	capRight(regionFromModule('pmos', '07_pmos'), pxBoxFromModelBox(moduleByName.get('relay1').box)[0]),
-	regionFromModule('relay1', '08_relay1'),
-	regionFromModule('relay2', '09_relay2'),
-	{ name: '10_title_template', box: [
+	{ name: '00_global_sheet', evidenceId: 'global-sheet', box: [0, 0, renderReport.width, renderReport.height], width: 1600, height: 920 },
+	{ ...regionFromModule('usb', '01_usb'), evidenceId: 'usb' },
+	{ ...regionFromModule('ldo', '02_ldo'), evidenceId: 'ldo' },
+	{ ...regionFromModule('btn1', '03_reset'), evidenceId: 'reset' },
+	{ ...regionFromModule('btn2', '04_boot'), evidenceId: 'boot' },
+	{ ...splitRegion(regionFromModule('mcu', '05_mcu_left'), 'left'), evidenceId: 'mcu-left' },
+	{ ...splitRegion({ ...regionFromModule('mcu', '06_mcu_right'), name: '06_mcu_right' }, 'right'), evidenceId: 'mcu-right' },
+	{ ...capRight(regionFromModule('pmos', '07_pmos'), pxBoxFromModelBox(moduleByName.get('relay1').box)[0]), evidenceId: 'pmos' },
+	{ ...regionFromModule('relay1', '08_relay1'), evidenceId: 'relay1' },
+	{ ...regionFromModule('relay2', '09_relay2'), evidenceId: 'relay2' },
+	{ name: '10_title_template', evidenceId: 'title-template', box: [
 		Math.max(0, renderReport.titleBlockPx.x - 28),
 		Math.max(0, renderReport.titleBlockPx.y - 28),
 		Math.min(renderReport.width, renderReport.titleBlockPx.x + renderReport.titleBlockPx.width + 28),
@@ -105,7 +105,7 @@ for (const r of regions) {
 		minSchematicMarginRatio: 0,
 		minUniqueColors: 3,
 	});
-	cropReports.push({ region: r.name, path: out, pass: image.pass, metrics: image.metrics, findings: image.findings });
+	cropReports.push({ region: r.name, evidenceId: r.evidenceId || r.name, path: out, pass: image.pass, metrics: image.metrics, findings: image.findings });
 	console.log(out);
 }
 const findings = [];
@@ -118,6 +118,7 @@ if (!sheetGate.pass) {
 }
 const reviewSummary = cropReports.map(c => ({
 	region: c.region,
+	evidenceId: c.evidenceId,
 	pass: c.pass,
 	fileBytes: c.metrics.fileBytes,
 	inkRatio: c.metrics.inkRatio,
