@@ -684,6 +684,13 @@ try {
 		severity: { hard: 1, soft: 0, info: 0 },
 		findings: [{ rule: 'ACCEPT-context-smoke', severity: 'hard', msg: 'external spec context smoke' }],
 	}, null, 2), 'utf8');
+	writeFileSync(`${repairContextDir}/cell_manifest_report.json`, JSON.stringify({
+		generatedAt: new Date().toISOString(),
+		pass: false,
+		packId: CUSTOM_PACK,
+		severity: { hard: 1, soft: 0, info: 0 },
+		findings: [{ rule: 'CM11-builder-exists', severity: 'hard', msg: 'cell builder missing in custom pack' }],
+	}, null, 2), 'utf8');
 	writeFileSync(`${repairContextDir}/final_evidence_report.json`, JSON.stringify({
 		generatedAt: new Date().toISOString(),
 		pass: false,
@@ -692,6 +699,10 @@ try {
 		severity: { hard: 1, soft: 0, info: 0 },
 		findings: [{ rule: 'FE9-acceptance-context-match', severity: 'hard', msg: 'external spec context smoke' }],
 	}, null, 2), 'utf8');
+	writeFileSync(`${TMP_DIR}/custom_project/project_assembly.json`, JSON.stringify({
+		...readJson(`${customDir}/project_assembly.json`),
+		circuitPack: CUSTOM_PACK,
+	}, null, 2) + '\n', 'utf8');
 	const customRepairActions = spawnSync(process.execPath, [`${ROOT}/engine/repair_actions.mjs`], {
 		cwd: repairContextDir,
 		stdio: 'pipe',
@@ -705,10 +716,14 @@ try {
 	});
 	const customRepairReport = existsSync(`${repairContextDir}/repair_actions.json`) ? readJson(`${repairContextDir}/repair_actions.json`) : null;
 	const customRepairCommands = (customRepairReport?.actions || []).map(a => a.nextCommand);
+	const customRepairText = existsSync(`${repairContextDir}/repair_actions.json`) ? readFileSync(`${repairContextDir}/repair_actions.json`, 'utf8') : '';
 	checks.customRepairContext = {
 		status: customRepairActions.status,
 		actionCount: customRepairReport?.actionCount ?? null,
 		commands: customRepairCommands,
+		circuitPack: customRepairReport?.context?.circuitPack || null,
+		hasPackPlaceholder: customRepairText.includes('<pack>'),
+		hasConcretePackPath: customRepairText.includes(`circuit_packs/${CUSTOM_PACK}/pack.mjs`),
 	};
 	assertFinding(
 		findings,
@@ -722,6 +737,51 @@ try {
 			stdout: customRepairActions.stdout,
 			stderr: customRepairActions.stderr,
 			report: checks.customRepairContext,
+		},
+	);
+	assertFinding(
+		findings,
+		checks.customRepairContext.circuitPack === CUSTOM_PACK
+			&& checks.customRepairContext.hasPackPlaceholder === false
+			&& checks.customRepairContext.hasConcretePackPath === true,
+		'WS28-repair-actions-resolve-pack-placeholder',
+		'repair actions for external projects must resolve <pack> placeholders to the active circuit pack id',
+		checks.customRepairContext,
+	);
+
+	const customNextActions = spawnSync(process.execPath, [`${ROOT}/engine/next_actions.mjs`], {
+		cwd: repairContextDir,
+		stdio: 'pipe',
+		shell: false,
+		env: {
+			...process.env,
+			EASYEDA_WORKDIR: repairContextDir,
+			EASYEDA_NEXT_ACTIONS: `${repairContextDir}/next_actions.json`,
+		},
+		encoding: 'utf8',
+	});
+	const customNextReport = existsSync(`${repairContextDir}/next_actions.json`) ? readJson(`${repairContextDir}/next_actions.json`) : null;
+	const customNextText = existsSync(`${repairContextDir}/next_actions.json`) ? readFileSync(`${repairContextDir}/next_actions.json`, 'utf8') : '';
+	checks.customNextActionsPackTargets = {
+		status: customNextActions.status,
+		actionCount: (customNextReport?.actions || []).length,
+		circuitPack: customNextReport?.context?.circuitPack || null,
+		hasPackPlaceholder: customNextText.includes('<pack>'),
+		hasConcretePackPath: customNextText.includes(`circuit_packs/${CUSTOM_PACK}/pack.mjs`),
+	};
+	assertFinding(
+		findings,
+		customNextActions.status !== 0
+			&& checks.customNextActionsPackTargets.circuitPack === CUSTOM_PACK
+			&& checks.customNextActionsPackTargets.hasPackPlaceholder === false
+			&& checks.customNextActionsPackTargets.hasConcretePackPath === true,
+		'WS29-next-actions-resolve-pack-placeholder',
+		'next actions for external projects must resolve <pack> placeholders before handing instructions to an agent',
+		{
+			status: customNextActions.status,
+			stdout: customNextActions.stdout,
+			stderr: customNextActions.stderr,
+			report: checks.customNextActionsPackTargets,
 		},
 	);
 

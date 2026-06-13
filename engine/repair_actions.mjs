@@ -31,7 +31,8 @@ const REPORTS = [
 ];
 
 function readJson(name) {
-	const path = DIR + name;
+	const normalized = normalizePath(name);
+	const path = /^[A-Za-z]:[\\/]/.test(name) || normalized.startsWith('/') ? normalized : DIR + name;
 	if (!existsSync(path)) return null;
 	try {
 		return JSON.parse(readFileSync(path, 'utf8').replace(/^\uFEFF/, ''));
@@ -59,6 +60,26 @@ function currentSpecArg() {
 	const normalized = normalizePath(spec);
 	if (normalized.startsWith(`${root}/`)) return normalized.slice(root.length + 1);
 	return normalized;
+}
+
+function currentAssemblyPath() {
+	const acceptance = readJson('acceptance_report.json');
+	return acceptance?.context?.assemblyPath || process.env.EASYEDA_PROJECT_ASSEMBLY || DIR + 'project_assembly.json';
+}
+
+function currentCircuitPack() {
+	const assemblyPath = normalizePath(currentAssemblyPath());
+	const assembly = assemblyPath ? readJson(assemblyPath) : null;
+	return assembly?.circuitPack || 'aihwdebugger';
+}
+
+const CURRENT_CIRCUIT_PACK = currentCircuitPack();
+
+function resolvePackPlaceholder(value) {
+	if (typeof value === 'string') return value.replaceAll('<pack>', CURRENT_CIRCUIT_PACK);
+	if (Array.isArray(value)) return value.map(resolvePackPlaceholder);
+	if (value && typeof value === 'object') return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, resolvePackPlaceholder(v)]));
+	return value;
 }
 
 function isExternalSpec(spec) {
@@ -356,8 +377,8 @@ const actions = rawFindings.map((item, index) => {
 		rule: item.finding.rule || 'unknown-rule',
 		severity: item.finding.severity || 'hard',
 		message: item.finding.msg || '',
-		editFiles: uniq(plan.editFiles || []),
-		inspectFiles: uniq([...(plan.inspectFiles || []), item.report]),
+		editFiles: uniq(resolvePackPlaceholder(plan.editFiles || [])),
+		inspectFiles: uniq(resolvePackPlaceholder([...(plan.inspectFiles || []), item.report])),
 		nextCommand: commandForAction(plan, report.rerun),
 		repairHint: plan.repairHint,
 		where: item.finding.where || {},
@@ -386,6 +407,11 @@ const result = {
 	generatedAt: new Date().toISOString(),
 	pass: actions.length === 0,
 	severity: { hard: actions.length, soft: 0, info: 0 },
+	context: {
+		spec: currentSpecArg(),
+		assemblyPath: normalizePath(currentAssemblyPath()),
+		circuitPack: CURRENT_CIRCUIT_PACK,
+	},
 	actionCount: actions.length,
 	areas: Object.values(grouped).sort((a, b) => b.count - a.count || a.area.localeCompare(b.area)),
 	actions,

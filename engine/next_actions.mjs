@@ -5,7 +5,8 @@ const DIR = (process.env.EASYEDA_WORKDIR || process.cwd()).replace(/\\/g, '/') +
 const OUT = process.env.EASYEDA_NEXT_ACTIONS || DIR + 'next_actions.json';
 
 function readJson(name) {
-	const path = DIR + name;
+	const normalized = String(name || '').replace(/\\/g, '/');
+	const path = /^[A-Za-z]:[\\/]/.test(name) || normalized.startsWith('/') ? normalized : DIR + name;
 	if (!existsSync(path)) return null;
 	try {
 		return JSON.parse(readFileSync(path, 'utf8').replace(/^\uFEFF/, ''));
@@ -21,8 +22,30 @@ function status(pass) {
 function pushAction(actions, item) {
 	actions.push({
 		priority: actions.length + 1,
-		...item,
+		...resolvePackPlaceholder(item),
 	});
+}
+
+function normalizePath(path) {
+	return String(path || '').replace(/\\/g, '/');
+}
+
+function currentAssemblyPath() {
+	return acceptance?.context?.assemblyPath || process.env.EASYEDA_PROJECT_ASSEMBLY || DIR + 'project_assembly.json';
+}
+
+function currentCircuitPack() {
+	const assemblyPath = normalizePath(currentAssemblyPath());
+	const assembly = assemblyPath ? readJson(assemblyPath) : null;
+	return assembly?.circuitPack || gsdPlan?.circuitPack || projectPack?.circuitPack || cellManifest?.packId || 'aihwdebugger';
+}
+
+function resolvePackPlaceholder(value) {
+	const pack = currentCircuitPack();
+	if (typeof value === 'string') return value.replaceAll('<pack>', pack);
+	if (Array.isArray(value)) return value.map(resolvePackPlaceholder);
+	if (value && typeof value === 'object') return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, resolvePackPlaceholder(v)]));
+	return value;
 }
 
 const acceptance = readJson('acceptance_report.json');
@@ -488,6 +511,11 @@ if (checks.repairActions.status === 'fail') {
 const result = {
 	generatedAt: new Date().toISOString(),
 	pass: actions.length === 0,
+	context: {
+		spec: acceptance?.context?.spec || process.env.EASYEDA_PROJECT_SPEC || 'project_spec.json',
+		assemblyPath: normalizePath(currentAssemblyPath()),
+		circuitPack: currentCircuitPack(),
+	},
 	checks,
 	actions,
 };

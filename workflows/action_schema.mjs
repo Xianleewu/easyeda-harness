@@ -58,6 +58,7 @@ export function normalizeNextActions(result) {
 		generatedAt: result.generatedAt,
 		pass: actions.length === 0,
 		mode: result.mode || result.checks?.acceptance?.mode || 'local-only',
+		context: result.context || null,
 		checks: normalizeChecks(result.checks || {}),
 		actions,
 	};
