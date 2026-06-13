@@ -23,6 +23,7 @@ const BAD_SPEC = `${TMP_DIR}/bad_project_spec.json`;
 const SCAFFOLD_DIR = `${TMP_DIR}/scaffold`;
 const BAD_MANIFEST = `${TMP_DIR}/bad_cell_manifest.json`;
 const BAD_MANIFEST_ASSEMBLY = `${TMP_DIR}/bad_manifest_project_assembly.json`;
+const GENERIC_RULE_DIR = `${TMP_DIR}/generic_rule_project`;
 const CUSTOM_PACK = 'workflow_smoke_pack';
 const CUSTOM_PACK_DIR = `${ROOT}/circuit_packs/${CUSTOM_PACK}`;
 
@@ -281,6 +282,109 @@ try {
 		'WS10-generic-layout-variants',
 		'layout planner must support generic anchorVariants for new project scaffolds instead of only AIHWDEBUGER-specific coordinate fields',
 		checks.genericLayoutCandidates,
+	);
+
+	mkdirSync(GENERIC_RULE_DIR, { recursive: true });
+	const genericContract = {
+		schemaVersion: 1,
+		projectId: 'workflow-smoke-generic-rules',
+		status: 'test',
+		intent: 'Generic project rule coverage smoke.',
+		agentWorkflow: {
+			freeDrawAllowed: false,
+			authoritativeEditPath: 'project contract -> deterministic cells -> gates -> gated write-back',
+			requiredEntrypoints: ['accept', 'accept:live', 'apply:gated'],
+		},
+		modules: [{
+			id: 'sensor_frontend',
+			title: 'Sensor Frontend',
+			requiredParts: ['U99', 'R99'],
+			requiredNets: ['SENSE_OUT', 'GND'],
+			visualEvidence: 'sensor-frontend',
+			drawingRules: ['orthogonal-wiring', 'real-net-labels'],
+		}],
+		interfaces: [],
+		visualEvidenceRegions: ['global-sheet', 'sensor-frontend', 'title-template'],
+		qualityPolicy: {
+			severityMustBeZero: true,
+			drcErrors: 0,
+			drcWarnings: 0,
+			drcInfo: 0,
+			singleSheetNoNetPortsByDefault: true,
+			fakeTextNetLabelsAllowed: false,
+			wireNameLeftAlignMode: 6,
+			wireNameRightAlignMode: 8,
+		},
+	};
+	const genericAssembly = {
+		schemaVersion: 1,
+		projectId: genericContract.projectId,
+		circuitPack: 'aihwdebugger',
+		cellManifest: '_tmp_workflow_smoke/generic_rule_project/cell_manifest.json',
+		anchors: { sensor_frontend: { x: 300, y: 600 } },
+		layoutPolicy: {
+			candidateSource: 'project_assembly.layoutPolicy',
+			flow: 'left-to-right generic smoke',
+			columns: [{ id: 'input', modules: ['sensor_frontend'] }],
+			baseAnchors: { sensor_frontend: { x: 300, y: 600 } },
+			anchorVariants: [{ id: 'shift', anchors: { sensor_frontend: { dx: 40, dy: 0 } } }],
+		},
+		modules: [{
+			id: 'sensor_frontend',
+			order: 10,
+			registryModule: 'sensor_frontend',
+			cell: 'genericSensorCell',
+			anchor: 'sensor_frontend',
+			refs: { U: 'U99', R: 'R99' },
+			netArgs: {},
+			nets: ['SENSE_OUT', 'GND'],
+		}],
+	};
+	const genericManifest = {
+		schemaVersion: 1,
+		packId: 'aihwdebugger',
+		cells: [{
+			id: 'genericSensorCell',
+			moduleType: 'sensor_frontend',
+			refs: ['U', 'R'],
+			netArgs: [],
+			ports: ['SENSE_OUT', 'GND'],
+			layoutIntent: 'generic project rule smoke cell',
+			qualityRules: ['orthogonal-wiring', 'real-net-labels'],
+		}],
+	};
+	writeFileSync(`${GENERIC_RULE_DIR}/project_contract.json`, JSON.stringify(genericContract, null, 2) + '\n', 'utf8');
+	writeFileSync(`${GENERIC_RULE_DIR}/project_assembly.json`, JSON.stringify(genericAssembly, null, 2) + '\n', 'utf8');
+	writeFileSync(`${GENERIC_RULE_DIR}/cell_manifest.json`, JSON.stringify(genericManifest, null, 2) + '\n', 'utf8');
+	const genericRuleGate = spawnSync(process.execPath, ['engine/project_rule_gate.mjs'], {
+		cwd: ROOT,
+		stdio: 'pipe',
+		shell: false,
+		env: {
+			...process.env,
+			EASYEDA_PROJECT_CONTRACT: `${GENERIC_RULE_DIR}/project_contract.json`,
+			EASYEDA_PROJECT_ASSEMBLY: `${GENERIC_RULE_DIR}/project_assembly.json`,
+			EASYEDA_PROJECT_RULE_REPORT: `${GENERIC_RULE_DIR}/project_rule_report.json`,
+		},
+		encoding: 'utf8',
+	});
+	const genericRuleReport = existsSync(`${GENERIC_RULE_DIR}/project_rule_report.json`) ? readJson(`${GENERIC_RULE_DIR}/project_rule_report.json`) : null;
+	checks.genericProjectRules = {
+		status: genericRuleGate.status,
+		pass: genericRuleReport?.pass ?? null,
+		rules: (genericRuleReport?.findings || []).map(f => f.rule),
+	};
+	assertFinding(
+		findings,
+		genericRuleGate.status === 0 && genericRuleReport?.pass === true,
+		'WS21-project-rules-use-project-contract',
+		'project rule gate must accept non-AIHWDEBUGER module ids when contract, assembly refs/nets, and selected cell manifest qualityRules cover the project',
+		{
+			status: genericRuleGate.status,
+			stdout: genericRuleGate.stdout,
+			stderr: genericRuleGate.stderr,
+			report: checks.genericProjectRules,
+		},
 	);
 
 	const customPackReport = writePackScaffold({ root: ROOT, packId: CUSTOM_PACK });

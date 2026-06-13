@@ -130,24 +130,24 @@ const RULE_PLANS = [
 	}],
 	[/^PR1|^PR2|^PR3|^PR4/, {
 		area: 'project-rules',
-		editFiles: ['harness/module_registry.mjs', 'project_contract.json'],
+		editFiles: ['project_contract.json', 'project_assembly.json', 'circuit_packs/<pack>/cell_manifest.json'],
 		inspectFiles: ['project_rule_report.json'],
 		nextCommand: 'npm.cmd run contract:rules',
-		repairHint: 'Make module registry and required parts exactly cover the contract modules without stale refs.',
+		repairHint: 'Make project_assembly.json refs/nets and the selected cell manifest cover every project_contract.json module instead of relying on global reference-design registries.',
 	}],
 	[/^PR5/, {
 		area: 'project-rules',
-		editFiles: ['engine/interface_contract.mjs', 'project_contract.json'],
+		editFiles: ['project_contract.json', 'project_assembly.json', 'circuit_packs/<pack>/cell_manifest.json'],
 		inspectFiles: ['project_rule_report.json'],
 		nextCommand: 'npm.cmd run contract:rules',
-		repairHint: 'Register each cross-module interface contract with the same normalized source/target module ids.',
+		repairHint: 'Make each deterministic cell qualityRules cover the owning module drawingRules before generation is trusted.',
 	}],
-	[/^PR6/, {
+	[/^PR6|^PR7|^PR8/, {
 		area: 'project-rules',
-		editFiles: ['harness/rule_registry.mjs', 'harness/rules/'],
+		editFiles: ['project_contract.json', 'project_assembly.json', 'harness/rule_registry.mjs', 'harness/rules/'],
 		inspectFiles: ['project_rule_report.json'],
 		nextCommand: 'npm.cmd run contract:rules',
-		repairHint: 'Restore missing core rules instead of weakening the project contract.',
+		repairHint: 'Keep assembly modules, interfaces, and core reusable rules in sync with the project contract.',
 	}],
 	[/^PP/, {
 		area: 'project-pack',

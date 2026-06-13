@@ -1,10 +1,11 @@
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
-import { INTERFACE_CONTRACTS } from './interface_contract.mjs';
 import { HARNESS_RULES } from '../harness/rule_registry.mjs';
-import { MODULES, REQUIRED_PARTS } from '../harness/module_registry.mjs';
+import { asArray } from '../contracts/module_contract.mjs';
+import { cellContractMap, loadCellManifest, resolveCellManifestPath } from './cell_manifest.mjs';
 
 const DIR = (process.env.EASYEDA_WORKDIR || process.cwd()).replace(/\\/g, '/') + '/';
 const CONTRACT = process.env.EASYEDA_PROJECT_CONTRACT || DIR + 'project_contract.json';
+const ASSEMBLY = process.env.EASYEDA_PROJECT_ASSEMBLY || DIR + 'project_assembly.json';
 const REPORT = process.env.EASYEDA_PROJECT_RULE_REPORT || DIR + 'project_rule_report.json';
 
 function readJson(path) {
@@ -15,84 +16,108 @@ function hard(findings, rule, msg, where = {}) {
 	findings.push({ rule, severity: 'hard', category: 'project-rule', msg, where });
 }
 
-function asArray(value) {
-	return Array.isArray(value) ? value : [];
-}
-
 function ifaceKey(x) {
 	return `${x?.net || ''}:${x?.from || ''}:${x?.to || ''}`;
 }
 
-const MODULE_ALIASES = new Map([
-	['reset', 'btn1'],
-	['boot', 'btn2'],
-]);
-
-function registryModuleId(contractId) {
-	return MODULE_ALIASES.get(contractId) || contractId;
+function values(obj) {
+	return Object.values(obj || {}).filter(Boolean);
 }
 
-function validateRuleCoverage(contract) {
+function validateProjectRuleCoverage(contract, assembly, manifest) {
 	const findings = [];
-	const registryModules = new Map(MODULES.map(mod => [mod.name, mod]));
-	const requiredParts = new Set(REQUIRED_PARTS);
-	const ifaceRegistry = new Set(INTERFACE_CONTRACTS.map(ifaceKey));
+	const contractModules = new Map(asArray(contract.modules).map(mod => [mod.id, mod]));
+	const assemblyModules = new Map(asArray(assembly.modules).map(mod => [mod.id, mod]));
+	const cellContracts = cellContractMap(manifest);
 	const ruleIds = new Set(HARNESS_RULES.map(rule => rule.id));
 
-	for (const mod of asArray(contract.modules)) {
-		const registryId = registryModuleId(mod.id);
-		const registry = registryModules.get(registryId);
-		if (!registry) {
-			hard(findings, 'PR1-module-registered', `${mod.id} contract module is not represented in harness/module_registry.mjs`, { module: mod.id, registryId });
+	for (const [id, mod] of contractModules) {
+		const mapping = assemblyModules.get(id);
+		if (!mapping) {
+			hard(findings, 'PR1-module-mapped', `${id} contract module must be represented in project_assembly.json`, { module: id });
 			continue;
 		}
-		const registryRefs = new Set(asArray(registry.refs));
-		const missingRefs = asArray(mod.requiredParts).filter(ref => !registryRefs.has(ref));
-		if (missingRefs.length) hard(findings, 'PR2-module-parts-covered', `${mod.id} required parts are missing from module registry`, { module: mod.id, registryId, missingRefs });
+		const mappedRefs = new Set(values(mapping.refs));
+		const missingRefs = asArray(mod.requiredParts).filter(ref => !mappedRefs.has(ref));
+		if (missingRefs.length) hard(findings, 'PR2-module-parts-covered', `${id} required parts are missing from project assembly refs`, { module: id, missingRefs });
+
+		const mappedNets = new Set(asArray(mapping.nets));
+		const missingNets = asArray(mod.requiredNets).filter(net => !mappedNets.has(net));
+		if (missingNets.length) hard(findings, 'PR3-module-nets-covered', `${id} required nets are missing from project assembly nets`, { module: id, missingNets });
+
+		const cell = cellContracts.get(mapping.cell);
+		if (!cell) {
+			hard(findings, 'PR4-cell-rule-contract', `${id} deterministic cell must be declared in the selected cell manifest`, { module: id, cell: mapping.cell });
+			continue;
+		}
+		const manifestCell = asArray(manifest.cells).find(c => c.id === mapping.cell) || {};
+		const qualityRules = new Set(asArray(manifestCell.qualityRules));
+		const missingQualityRules = asArray(mod.drawingRules).filter(rule => !qualityRules.has(rule));
+		if (missingQualityRules.length) {
+			hard(findings, 'PR5-cell-quality-rules-cover-module', `${id} cell qualityRules must cover module drawingRules`, {
+				module: id,
+				cell: mapping.cell,
+				missingQualityRules,
+			});
+		}
 	}
 
-	const contractParts = new Set(asArray(contract.modules).flatMap(mod => asArray(mod.requiredParts)));
-	const missingRequired = [...contractParts].filter(ref => !requiredParts.has(ref));
-	if (missingRequired.length) hard(findings, 'PR3-required-parts-covered', 'contract required parts are missing from REQUIRED_PARTS', { missingRequired });
-	const staleRequired = [...requiredParts].filter(ref => !contractParts.has(ref));
-	if (staleRequired.length) hard(findings, 'PR4-required-parts-no-stale', 'REQUIRED_PARTS contains parts not present in project_contract.json', { staleRequired });
+	for (const id of assemblyModules.keys()) {
+		if (!contractModules.has(id)) hard(findings, 'PR6-no-stale-assembly-modules', `${id} assembly module is not present in project_contract.json`, { module: id });
+	}
 
+	const assemblyInterfaceNets = new Set();
 	for (const iface of asArray(contract.interfaces)) {
-		const normalized = {
-			...iface,
-			from: registryModuleId(iface.from),
-			to: registryModuleId(iface.to),
-		};
-		const key = ifaceKey(normalized);
-		if (!ifaceRegistry.has(key)) {
-			hard(findings, 'PR5-interface-registered', `${iface.net} contract interface is missing from engine/interface_contract.mjs`, { interface: iface, expectedRegistryKey: key });
+		const from = assemblyModules.get(iface.from);
+		const to = assemblyModules.get(iface.to);
+		const key = ifaceKey(iface);
+		if (!from || !to) continue;
+		if (asArray(from.nets).includes(iface.net) && asArray(to.nets).includes(iface.net)) assemblyInterfaceNets.add(key);
+	}
+	for (const iface of asArray(contract.interfaces)) {
+		if (!assemblyInterfaceNets.has(ifaceKey(iface))) {
+			hard(findings, 'PR7-interface-covered-by-assembly', `${iface.net} interface must be represented in source and target assembly nets`, { interface: iface });
 		}
 	}
 
 	for (const expected of ['C8', 'C10', 'C20', 'C21']) {
-		if (!ruleIds.has(expected)) hard(findings, 'PR6-core-rule-present', `core harness rule ${expected} must be registered`, { expected });
+		if (!ruleIds.has(expected)) hard(findings, 'PR8-core-rule-present', `core harness rule ${expected} must be registered`, { expected });
 	}
 	return findings;
 }
 
 const findings = [];
 let contract = null;
-if (!existsSync(CONTRACT)) {
-	hard(findings, 'PR0-contract-file', 'project_contract.json is required before rule coverage audit', { path: CONTRACT });
-} else {
+let assembly = null;
+let manifest = null;
+let manifestPath = null;
+
+if (!existsSync(CONTRACT)) hard(findings, 'PR0-contract-file', 'project_contract.json is required before rule coverage audit', { path: CONTRACT });
+if (!existsSync(ASSEMBLY)) hard(findings, 'PR0-assembly-file', 'project_assembly.json is required before project rule coverage audit', { path: ASSEMBLY });
+if (!findings.length) {
 	try { contract = readJson(CONTRACT); } catch (e) { hard(findings, 'PR0-contract-parse', 'project_contract.json must parse as JSON', { error: e.message }); }
+	try { assembly = readJson(ASSEMBLY); } catch (e) { hard(findings, 'PR0-assembly-parse', 'project_assembly.json must parse as JSON', { error: e.message }); }
 }
-if (contract) findings.push(...validateRuleCoverage(contract));
+if (assembly) {
+	manifestPath = resolveCellManifestPath(assembly);
+	if (!existsSync(manifestPath)) hard(findings, 'PR0-cell-manifest-file', 'project_assembly.json must point to an existing cell manifest', { manifestPath });
+	else {
+		try { manifest = loadCellManifest(manifestPath); } catch (e) { hard(findings, 'PR0-cell-manifest-parse', 'cell manifest must parse as JSON', { manifestPath, error: e.message }); }
+	}
+}
+if (contract && assembly && manifest) findings.push(...validateProjectRuleCoverage(contract, assembly, manifest));
 
 const report = {
 	generatedAt: new Date().toISOString(),
 	pass: findings.length === 0,
 	severity: { hard: findings.length, soft: 0, info: 0 },
 	projectId: contract?.projectId || null,
-	moduleAliases: Object.fromEntries(MODULE_ALIASES),
+	circuitPack: assembly?.circuitPack || null,
+	cellManifest: manifestPath,
 	registeredRules: HARNESS_RULES.length,
-	registeredModules: MODULES.length,
-	registeredInterfaces: INTERFACE_CONTRACTS.length,
+	contractModules: asArray(contract?.modules).length,
+	assemblyModules: asArray(assembly?.modules).length,
+	cellManifestCells: asArray(manifest?.cells).length,
 	findings,
 };
 
