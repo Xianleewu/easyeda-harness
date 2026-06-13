@@ -1,6 +1,7 @@
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { HARNESS_RULES } from '../harness/rule_registry.mjs';
 import { asArray } from '../contracts/module_contract.mjs';
+import { DRAWING_RULE_BINDINGS, validateDrawingRuleBindings } from '../contracts/drawing_rule_registry.mjs';
 import { cellContractMap, loadCellManifest, resolveCellManifestPath } from './cell_manifest.mjs';
 
 const DIR = (process.env.EASYEDA_WORKDIR || process.cwd()).replace(/\\/g, '/') + '/';
@@ -52,6 +53,13 @@ function validateProjectRuleCoverage(contract, assembly, manifest) {
 		}
 		const manifestCell = asArray(manifest.cells).find(c => c.id === mapping.cell) || {};
 		const qualityRules = new Set(asArray(manifestCell.qualityRules));
+		const drawingRuleBindings = validateDrawingRuleBindings({
+			drawingRules: mod.drawingRules,
+			registeredRuleIds: [...ruleIds],
+		});
+		for (const finding of drawingRuleBindings) {
+			hard(findings, `PR-${finding.rule}`, finding.msg, { module: id, cell: mapping.cell, ...finding.where });
+		}
 		const missingQualityRules = asArray(mod.drawingRules).filter(rule => !qualityRules.has(rule));
 		if (missingQualityRules.length) {
 			hard(findings, 'PR5-cell-quality-rules-cover-module', `${id} cell qualityRules must cover module drawingRules`, {
@@ -82,6 +90,12 @@ function validateProjectRuleCoverage(contract, assembly, manifest) {
 
 	for (const expected of ['C8', 'C10', 'C20', 'C21']) {
 		if (!ruleIds.has(expected)) hard(findings, 'PR8-core-rule-present', `core harness rule ${expected} must be registered`, { expected });
+	}
+	for (const finding of validateDrawingRuleBindings({
+		drawingRules: asArray(manifest.requiredQualityRules),
+		registeredRuleIds: [...ruleIds],
+	})) {
+		hard(findings, `PR-${finding.rule}`, finding.msg, { scope: 'manifest.requiredQualityRules', ...finding.where });
 	}
 	return findings;
 }
@@ -118,6 +132,7 @@ const report = {
 	contractModules: asArray(contract?.modules).length,
 	assemblyModules: asArray(assembly?.modules).length,
 	cellManifestCells: asArray(manifest?.cells).length,
+	drawingRuleBindings: DRAWING_RULE_BINDINGS,
 	findings,
 };
 

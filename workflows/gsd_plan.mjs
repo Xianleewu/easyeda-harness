@@ -3,7 +3,9 @@ import { asArray, validateSpecSchema } from '../contracts/spec_schema.mjs';
 import { validateModuleContract } from '../contracts/module_contract.mjs';
 import { validateNetContract } from '../contracts/net_contract.mjs';
 import { validateLibraryContract } from '../contracts/library_contract.mjs';
+import { validateDrawingRuleBindings } from '../contracts/drawing_rule_registry.mjs';
 import { asArray as cellArray, cellContractMap, loadCellManifest, resolveCellManifestPath } from '../engine/cell_manifest.mjs';
+import { HARNESS_RULES } from '../harness/rule_registry.mjs';
 
 function hard(findings, rule, msg, where = {}) {
 	findings.push({ rule, severity: 'hard', category: 'gsd-plan', msg, where });
@@ -246,6 +248,42 @@ function validateExecutableCells(assembly, pack, assemblyPath = '') {
 	return findings;
 }
 
+function validateExecutableDrawingRules(contract, assembly, assemblyPath = '') {
+	const findings = [];
+	if (!contract || !assembly) return findings;
+	let manifest = null;
+	try {
+		manifest = loadCellManifest(resolveCellManifestPath(assembly, assemblyPath));
+	} catch {
+		return findings;
+	}
+	const registeredRuleIds = HARNESS_RULES.map(rule => rule.id);
+	const modules = moduleById(contract);
+	for (const mod of asArray(contract.modules)) {
+		for (const finding of validateDrawingRuleBindings({ drawingRules: mod.drawingRules, registeredRuleIds })) {
+			hard(findings, `GP-${finding.rule}`, finding.msg, { module: mod.id, ...finding.where });
+		}
+	}
+	for (const finding of validateDrawingRuleBindings({ drawingRules: manifest.requiredQualityRules, registeredRuleIds })) {
+		hard(findings, `GP-${finding.rule}`, finding.msg, { scope: 'manifest.requiredQualityRules', ...finding.where });
+	}
+	for (const mod of asArray(assembly.modules)) {
+		const contractMod = modules.get(mod.id);
+		if (!contractMod) continue;
+		const manifestCell = cellArray(manifest.cells).find(cell => cell.id === mod.cell) || {};
+		const qualityRules = new Set(cellArray(manifestCell.qualityRules));
+		const missing = asArray(contractMod.drawingRules).filter(rule => !qualityRules.has(rule));
+		if (missing.length) {
+			hard(findings, 'GP-PR5-cell-quality-rules-cover-module', `${mod.id} cell qualityRules must cover module drawingRules before generation`, {
+				module: mod.id,
+				cell: mod.cell,
+				missingQualityRules: missing,
+			});
+		}
+	}
+	return findings;
+}
+
 function validatePartLibrarySnapshot(contract, partLibSnapshot, partLibPath = '') {
 	const findings = [];
 	if (!contract || !partLibSnapshot) return findings;
@@ -304,6 +342,7 @@ export function buildGsdPlan({ spec, contract, netlist, assembly, libraryManifes
 		hard(findings, 'GP13-pack-registered', 'spec/assembly circuitPack must be registered', { circuitPack: packId, registeredPacks: circuitPackIds(), error: e.message });
 	}
 	if (assembly && pack) findings.push(...validateExecutableCells(assembly, pack, assemblyPath));
+	if (contract && assembly) findings.push(...validateExecutableDrawingRules(contract, assembly, assemblyPath));
 	findings.push(...validatePartLibrarySnapshot(contract, partLibSnapshot, partLibPath));
 
 	if (contract && netlist && assembly) findings.push(...validateSpecRealization(spec, contract, netlist, assembly, modelEvidence.used ? model : null));

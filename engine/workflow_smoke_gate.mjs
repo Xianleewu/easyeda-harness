@@ -932,6 +932,76 @@ try {
 			report: checks.genericProjectRules,
 		},
 	);
+	const unknownDrawingRuleContract = clone(genericContract);
+	unknownDrawingRuleContract.modules[0].drawingRules = [
+		...unknownDrawingRuleContract.modules[0].drawingRules,
+		'pretty-but-not-executable',
+	];
+	const unknownDrawingRuleManifest = clone(genericManifest);
+	unknownDrawingRuleManifest.requiredQualityRules = ['orthogonal-wiring', 'real-net-labels', 'pretty-but-not-executable'];
+	unknownDrawingRuleManifest.cells[0].qualityRules = ['orthogonal-wiring', 'real-net-labels', 'pretty-but-not-executable'];
+	const unknownDrawingRulePlan = buildGsdPlan({
+		spec: {
+			schemaVersion: 1,
+			projectId: genericContract.projectId,
+			intent: 'Unknown drawing rule smoke.',
+			circuitPack: 'aihwdebugger',
+			modules: [{ id: 'sensor_frontend', title: 'Sensor Frontend', requiredNets: ['SENSE_OUT', 'GND'] }],
+			interfaces: [],
+		},
+		contract: unknownDrawingRuleContract,
+		netlist: { schemaVersion: 1, projectId: genericContract.projectId, nets: [{ name: 'SENSE_OUT', requiredPins: [] }, { name: 'GND', requiredPins: [] }] },
+		assembly: genericAssembly,
+		libraryManifest: {
+			purpose: 'Unknown drawing rule smoke.',
+			parts: {
+				U99: { Symbol: 'S', Device: 'D', Footprint: 'F', name: 'U99', value: 'IC', addIntoBom: true, addIntoPcb: true },
+				R99: { Symbol: 'S', Device: 'D', Footprint: 'F', name: 'R99', value: '10k', addIntoBom: true, addIntoPcb: true },
+			},
+		},
+		partLibSnapshot: { project: genericContract.projectId, components: [{ designator: 'U99' }, { designator: 'R99' }] },
+		model: null,
+		specPath: '_tmp_workflow_smoke/unknown_drawing_rule/project_spec.json',
+		assemblyPath: `${GENERIC_RULE_DIR}/project_assembly.json`,
+		partLibPath: '_tmp_workflow_smoke/unknown_drawing_rule/project_library_snapshot.json',
+	});
+	writeFileSync(`${GENERIC_RULE_DIR}/unknown_rule_contract.json`, JSON.stringify(unknownDrawingRuleContract, null, 2) + '\n', 'utf8');
+	writeFileSync(`${GENERIC_RULE_DIR}/unknown_rule_manifest.json`, JSON.stringify(unknownDrawingRuleManifest, null, 2) + '\n', 'utf8');
+	writeFileSync(`${GENERIC_RULE_DIR}/unknown_rule_assembly.json`, JSON.stringify({
+		...genericAssembly,
+		cellManifest: '_tmp_workflow_smoke/generic_rule_project/unknown_rule_manifest.json',
+	}, null, 2) + '\n', 'utf8');
+	const unknownDrawingRuleGate = spawnSync(process.execPath, ['engine/project_rule_gate.mjs'], {
+		cwd: ROOT,
+		stdio: 'pipe',
+		shell: false,
+		env: {
+			...process.env,
+			EASYEDA_PROJECT_CONTRACT: `${GENERIC_RULE_DIR}/unknown_rule_contract.json`,
+			EASYEDA_PROJECT_ASSEMBLY: `${GENERIC_RULE_DIR}/unknown_rule_assembly.json`,
+			EASYEDA_PROJECT_RULE_REPORT: `${GENERIC_RULE_DIR}/unknown_rule_project_rule_report.json`,
+		},
+		encoding: 'utf8',
+	});
+	const unknownDrawingRuleReport = existsSync(`${GENERIC_RULE_DIR}/unknown_rule_project_rule_report.json`)
+		? readJson(`${GENERIC_RULE_DIR}/unknown_rule_project_rule_report.json`)
+		: null;
+	checks.unknownDrawingRulesRejected = {
+		planPass: unknownDrawingRulePlan.pass,
+		planRules: (unknownDrawingRulePlan.findings || []).map(f => f.rule),
+		gateStatus: unknownDrawingRuleGate.status,
+		gateRules: (unknownDrawingRuleReport?.findings || []).map(f => f.rule),
+	};
+	assertFinding(
+		findings,
+		unknownDrawingRulePlan.pass === false
+			&& hasRule(unknownDrawingRulePlan, 'GP-DR1-drawing-rule-known')
+			&& unknownDrawingRuleGate.status !== 0
+			&& (unknownDrawingRuleReport?.findings || []).some(f => f.rule === 'PR-DR1-drawing-rule-known'),
+		'WS47-drawing-rules-bind-to-executable-rules',
+		'contract drawingRules and manifest qualityRules must map to executable harness rules instead of passing as unchecked prose strings',
+		checks.unknownDrawingRulesRejected,
+	);
 
 	const genericColumnRegistry = {
 		source: `${GENERIC_RULE_DIR}/project_assembly.json`,
