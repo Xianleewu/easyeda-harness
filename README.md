@@ -6,6 +6,8 @@ EasyEDA Harness 是一套给 Codex、Claude Code 等编程 Agent 使用的原理
 
 用户最简单的用法是：把这个仓库交给 Agent，并要求它按 `AGENTS.md` 或 `CLAUDE.md` 执行。Agent 应自动安装依赖、确认官方 EasyEDA API Skill/Bridge、运行门禁、生成截图证据，并在 PASS 后再写回 EasyEDA。
 
+中立工作流入口是 `node bin/easyeda-gsd.mjs`；Agent 规则见 `docs/agent-runner-guide.md`。
+
 ## 适用边界
 
 这个仓库是可执行工作流，不是让 Agent 在 EasyEDA 里自由画图的提示词集合。用于新项目时，Agent 必须先建立项目级合同：功能模块、引脚、关键网络、模块矩形空间、允许的符号和截图验收区域；然后再实现或修改确定性模板和规则。
@@ -62,6 +64,14 @@ EasyEDA Harness 是一套给 Codex、Claude Code 等编程 Agent 使用的原理
 ```
 
 Agent 会自动运行本地检查、生成预览图，并写出 `acceptance_report.json`、`next_actions.json` 和 `repair_actions.json`。如果检查未通过，`next_actions.json` 是接手摘要，`repair_actions.json` 会把每条 finding 映射到编辑目标、检查文件和下一条复跑命令。
+
+推荐给 Agent 的入口：
+
+```bash
+node bin/easyeda-gsd.mjs accept
+node bin/easyeda-gsd.mjs live-check
+node bin/easyeda-gsd.mjs apply --gated
+```
 
 新项目的第一步不是画图，而是让 Agent 修改 `project_spec.json`，再把它落实到 `project_contract.json`，用 `project_netlist.json` 定义必连端点，选择或声明 `circuit_packs/*/cell_manifest.json`，随后用 `project_assembly.json` 定义可执行装配映射和布局策略；通过这些门禁后再实现项目自己的 deterministic cells 和规则覆盖。
 
@@ -121,6 +131,8 @@ Agent 会通过 `apply:gated` 写回 EasyEDA。这个入口会先运行检查；
 ## 目录结构
 
 - `engine/`：模板组装、布局搜索、写回、渲染、DRC/live 辅助。
+- `bin/easyeda-gsd.mjs`：面向 Agent runner 和 CI 的中立工作流包装入口。
+- `docs/agent-runner-guide.md`：给 Codex、Claude Code 和其它 Agent 的简明 runner 合同。
 - `harness/`：统一规则门禁、模型归一化、模块注册。
 - `project_spec.json` / `project_contract.json` / `project_netlist.json` / `project_assembly.json`：用户意图、设计合同、结构化电气端点、可执行装配映射和布局策略。
 - `circuit_packs/*/cell_manifest.json`：电路包确定性 cell 能力合同。

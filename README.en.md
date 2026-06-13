@@ -6,6 +6,8 @@ EasyEDA Harness is a schematic generation and checking tool intended for coding 
 
 The simplest user workflow is to hand this repository to an agent and ask it to follow `AGENTS.md` or `CLAUDE.md`. The agent should install dependencies, verify the official EasyEDA API Skill/Bridge, run the gates, generate visual evidence, and only write back to EasyEDA after every gate passes.
 
+The neutral runner entrypoint is `node bin/easyeda-gsd.mjs`; see `docs/agent-runner-guide.md`.
+
 ## Scope
 
 This repository is an executable workflow, not a prompt pack for free-form drawing inside EasyEDA. For a new project, the agent must first create a project contract: functional modules, pins, required nets, module rectangles, allowed symbols, and visual evidence regions. Only then should it implement or modify deterministic templates and rules.
@@ -62,6 +64,14 @@ Follow AGENTS.md for this repository. For a new project, create the project cont
 ```
 
 The agent runs the local checks, generates preview evidence, and writes `acceptance_report.json`, `next_actions.json`, and `repair_actions.json`. If a check fails, `next_actions.json` is the handoff summary and `repair_actions.json` maps each finding to edit targets, inspection files, and the next command to rerun.
+
+Preferred agent commands:
+
+```bash
+node bin/easyeda-gsd.mjs accept
+node bin/easyeda-gsd.mjs live-check
+node bin/easyeda-gsd.mjs apply --gated
+```
 
 For a new project, the first implementation step is updating `project_spec.json`, realizing it in `project_contract.json`, defining required endpoints in `project_netlist.json`, declaring/choosing a circuit-pack `cell_manifest.json`, then mapping the contract and layout policy in `project_assembly.json`. Only then should the agent implement project-specific deterministic cells and rules.
 
@@ -121,6 +131,8 @@ For handoff, review the global sheet and local crops for USB, LDO, RESET, BOOT, 
 ## Repository Layout
 
 - `engine/`: template assembly, layout search, write-back, rendering, DRC and live helpers.
+- `bin/easyeda-gsd.mjs`: neutral workflow wrapper for agent runners and CI.
+- `docs/agent-runner-guide.md`: concise runner contract for Codex, Claude Code, and other agents.
 - `harness/`: normalized model, module registry, and rule gates.
 - `project_spec.json` / `project_contract.json` / `project_netlist.json` / `project_assembly.json`: user intent, design contract, structured electrical endpoints, executable assembly mapping, and layout policy.
 - `circuit_packs/*/cell_manifest.json`: circuit-pack deterministic cell capability contracts.
