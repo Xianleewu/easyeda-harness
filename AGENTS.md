@@ -22,7 +22,7 @@ A PASS on the bundled model only proves that the bundled model passes. It does n
 
 Every cell manifest entry must include `qualityRules` for the reusable drawing contracts it is designed to satisfy: orthogonal wiring, real net labels, text clearance, module box isolation, no fake net text, and no unnecessary single-sheet net ports. Missing `qualityRules` is a pre-generation failure, not a visual polish note.
 
-Every `project_assembly.json` layoutPolicy must include a readable `layoutPolicy.flow` string and ordered `layoutPolicy.columns` that place each assembly module into the intended left-to-right schematic reading order. Missing columns or reversed anchor X order is a layout-contract failure.
+Every `project_assembly.json` layoutPolicy must include a readable `layoutPolicy.flow` string and ordered `layoutPolicy.columns` that place each assembly module into the intended left-to-right schematic reading order. New projects should use generic `layoutPolicy.anchorVariants` for candidate generation instead of AIHWDEBUGER-specific fields such as `usbX`, `mcuX`, or `relayX`. Missing columns or reversed anchor X order is a layout-contract failure.
 
 ## Required External Skill
 

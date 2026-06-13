@@ -83,8 +83,8 @@ export function validateLayoutContract(assembly, layout, structure, options = {}
 
 	const stats = layout.policyStats || {};
 	if ((stats.baseAnchors ?? 0) < expectedAnchors.size) hard(findings, 'PL6-policy-stats-base-anchors', 'planner policy stats show incomplete base anchor coverage', { stats, expectedAnchors: expectedAnchors.size }, category);
-	if ((stats.inputRows ?? 0) < 1 || (stats.outputRows ?? 0) < 1 || (stats.xProfiles ?? 0) < 1) {
-		hard(findings, 'PL7-policy-search-space', 'layoutPolicy must define inputRows, outputRows, and xProfiles so layout search is project-driven', { stats }, category);
+	if ((stats.anchorVariants ?? 0) < 1 && ((stats.inputRows ?? 0) < 1 || (stats.outputRows ?? 0) < 1 || (stats.xProfiles ?? 0) < 1)) {
+		hard(findings, 'PL7-policy-search-space', 'layoutPolicy must define anchorVariants or inputRows/outputRows/xProfiles so layout search is project-driven', { stats }, category);
 	}
 	if ((layout.totalCandidates ?? 0) < 10) {
 		hard(findings, 'PL8-candidate-count', 'layout planner must evaluate multiple project-policy candidates, not a single fixed coordinate set', {

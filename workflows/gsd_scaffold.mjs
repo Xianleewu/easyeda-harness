@@ -100,6 +100,16 @@ export function buildScaffold(spec, { pack = 'aihwdebugger' } = {}) {
 			maxModuleWireIntrusions: 0,
 			requireNoLaneInterlocks: true,
 			baseAnchors: anchors,
+			anchorVariants: [
+				{
+					id: 'compact-right',
+					anchors: Object.fromEntries(modules.map((mod, index) => [mod.id, { dx: index * 20, dy: 0 }])),
+				},
+				{
+					id: 'lower-row',
+					anchors: Object.fromEntries(modules.map(mod => [mod.id, { dx: 0, dy: 80 }])),
+				},
+			],
 			inputRows: [{ y: 600 }],
 			outputRows: [{ y: 600 }],
 			xProfiles: [{ scaffold: true }],

@@ -52,10 +52,57 @@ function chooseThreshold(thresholds, usbY) {
 	return (thresholds || []).find(x => usbY <= x.maxUsbY) || thresholds?.[thresholds.length - 1] || {};
 }
 
-function familyAnchors(assembly = loadProjectAssembly()) {
+function applyAnchorVariant(base, variant = {}) {
+	const a = cloneAnchors(base);
+	for (const [anchor, patch] of Object.entries(variant.anchors || {})) {
+		const current = a[anchor] || { x: 0, y: 0 };
+		a[anchor] = {
+			x: Number.isFinite(patch.x) ? patch.x : current.x + (patch.dx || 0),
+			y: Number.isFinite(patch.y) ? patch.y : current.y + (patch.dy || 0),
+		};
+	}
+	return a;
+}
+
+function genericAnchors(policy, base) {
+	const candidates = [];
+	const seen = new Set();
+	const add = (a) => {
+		const key = JSON.stringify(a);
+		if (!seen.has(key)) {
+			seen.add(key);
+			candidates.push(a);
+		}
+	};
+	add(cloneAnchors(base));
+	for (const alt of policy.alternateAnchors || []) add(completeAnchors(base, alt));
+	for (const variant of policy.anchorVariants || []) add(applyAnchorVariant(base, variant));
+	return candidates;
+}
+
+export function buildAnchorFamily(assembly = loadProjectAssembly()) {
 	const policy = assembly.layoutPolicy || {};
 	const base = policy.baseAnchors || assembly.anchors || {};
 	if (!Object.keys(base).length) throw new Error('project_assembly.json layoutPolicy.baseAnchors or anchors is required for layout planning');
+	const generic = genericAnchors(policy, base);
+	if ((policy.anchorVariants || []).length) {
+		return {
+			candidateSource: policy.candidateSource || 'project_assembly.layoutPolicy',
+			projectId: assembly.projectId || null,
+			layoutProfile: assembly.layoutProfile || null,
+			candidates: generic,
+			policyStats: {
+				mode: 'generic-anchor-variants',
+				baseAnchors: Object.keys(base).length,
+				alternateAnchors: (policy.alternateAnchors || []).length,
+				anchorVariants: (policy.anchorVariants || []).length,
+				inputRows: (policy.inputRows || []).length,
+				outputRows: (policy.outputRows || []).length,
+				xProfiles: (policy.xProfiles || []).length,
+				columns: (policy.columns || []).length,
+			},
+		};
+	}
 	const candidates = [];
 	const seen = new Set();
 	const add = (a) => {
@@ -418,9 +465,9 @@ async function evaluateQuickCandidates(partLib, anchorsList) {
 
 export async function planLayout(opts = {}) {
 	const started = performance.now();
-	const assembly = loadProjectAssembly();
+	const assembly = opts.assemblyPath ? readJson(opts.assemblyPath) : loadProjectAssembly();
 	const { snap, byDes } = loadPartLib(PART_LIB);
-	const anchorFamily = familyAnchors(assembly);
+	const anchorFamily = buildAnchorFamily(assembly);
 	const anchorsList = anchorFamily.candidates;
 	const maxCandidates = opts.maxCandidates ?? Number(process.env.EASYEDA_LAYOUT_MAX_CANDIDATES ?? DEFAULT_MAX_CANDIDATES);
 	const plannedAnchors = maxCandidates > 0 ? anchorsList.slice(0, maxCandidates) : anchorsList;

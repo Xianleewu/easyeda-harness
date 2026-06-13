@@ -34,7 +34,7 @@ A PASS on the current model only proves the current model. It does not validate 
 - Cell manifest gate: `circuit_packs/*/cell_manifest.json` declares circuit-pack cell roles, required refs, net args, ports, layout intent, and `qualityRules`, moving basic drawing rules such as orthogonal wiring, real net labels, text clearance, and module isolation into cell design before assembly can use those cells.
 - Rule coverage check: `contract:rules` proves module registry, required parts, interface contracts, and core rules cover the project contract.
 - Assembly coverage check: `contract:assembly` proves every contract module is mapped to a deterministic cell, anchor, refs, and nets before generation.
-- Layout policy check: `contract:layout` proves layout search is driven by `project_assembly.json` and that `layoutPolicy.flow`, ordered `layoutPolicy.columns`, module spacing, no interlock, and no unrelated wire intrusion requirements are satisfied.
+- Layout policy check: `contract:layout` proves layout search is driven by `project_assembly.json` and that `layoutPolicy.flow`, ordered `layoutPolicy.columns`, generic `anchorVariants` or project search space, module spacing, no interlock, and no unrelated wire intrusion requirements are satisfied.
 - Contract realization check: after `full_model.json` is generated, `contract:model` proves the model actually expresses the contract modules, parts, nets, and interfaces.
 - Visual evidence check: after offline previews are generated, `contract:visual` proves every contract visual evidence region exists and passes image inspection.
 - Fast offline check: validates the schematic model on local CPU and is intended for daily coordinate and rule iteration.
@@ -85,7 +85,7 @@ node bin/easyeda-gsd.mjs apply --gated
 ```
 
 For a new project, the first implementation step is updating `project_spec.json`, realizing it in `project_contract.json`, defining required endpoints in `project_netlist.json`, declaring/choosing a circuit-pack `cell_manifest.json`, then mapping the contract and layout policy in `project_assembly.json`. Only then should the agent implement project-specific deterministic cells and rules.
-For a new project directory, `node bin/easyeda-gsd.mjs init --pack <pack> --out <project-dir>` writes scaffold versions of those files plus `approved_library_manifest.json` and `gsd_scaffold_report.json`. If `<pack>` does not exist, it also creates `circuit_packs/<pack>/pack.mjs`, `circuit_packs/<pack>/cell_manifest.json`, and updates the pack registry. The scaffold is intentionally incomplete and must not be treated as ready for generation until pack builders, cell manifest, contracts, netlist, library bindings, and assembly mappings make `plan` pass.
+For a new project directory, `node bin/easyeda-gsd.mjs init --pack <pack> --out <project-dir>` writes scaffold versions of those files plus `approved_library_manifest.json` and `gsd_scaffold_report.json`. If `<pack>` does not exist, it also creates `circuit_packs/<pack>/pack.mjs`, `circuit_packs/<pack>/cell_manifest.json`, and updates the pack registry. The scaffold emits generic `layoutPolicy.anchorVariants` so new projects do not depend on the bundled USB/MCU/relay coordinate fields. The scaffold is intentionally incomplete and must not be treated as ready for generation until pack builders, cell manifest, contracts, netlist, library bindings, and assembly mappings make `plan` pass.
 
 ## Write Back To EasyEDA
 

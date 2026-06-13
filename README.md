@@ -34,7 +34,7 @@ EasyEDA Harness 是一套给 Codex、Claude Code 等编程 Agent 使用的原理
 - Cell manifest 门禁：`circuit_packs/*/cell_manifest.json` 在装配前声明电路包 cell 的 ref role、netArg、端口、布局意图和 `qualityRules`，把正交走线、真实网标、文字 clearance、模块隔离等基础绘图规则前置到 cell 设计。
 - 规则覆盖检查：`contract:rules` 会确认模块注册、必备零件、接口合同和核心规则覆盖了项目合同。
 - 装配覆盖检查：`contract:assembly` 会确认每个合同模块都映射到了确定性 cell、anchor、refs 和 nets。
-- 布局策略检查：`contract:layout` 会确认布局搜索来自 `project_assembly.json`，并验证 `layoutPolicy.flow`、有序 `layoutPolicy.columns`、最终模块间距、无榫卯穿插、无无关导线侵入。
+- 布局策略检查：`contract:layout` 会确认布局搜索来自 `project_assembly.json`，并验证 `layoutPolicy.flow`、有序 `layoutPolicy.columns`、通用 `anchorVariants` 或项目搜索空间、最终模块间距、无榫卯穿插、无无关导线侵入。
 - 合同兑现检查：生成 `full_model.json` 后，`contract:model` 会确认模型实际包含合同要求的模块、零件、网络和接口表达。
 - 视觉证据检查：生成离线预览后，`contract:visual` 会确认合同要求的截图区域都存在且通过图像检查。
 - 快速离线检查：`npm run fast` 在本机 CPU 上完成核心模板校验，适合日常坐标和规则迭代。
@@ -84,7 +84,7 @@ node bin/easyeda-gsd.mjs apply --gated
 ```
 
 新项目的第一步不是画图，而是让 Agent 修改 `project_spec.json`，再把它落实到 `project_contract.json`，用 `project_netlist.json` 定义必连端点，选择或声明 `circuit_packs/*/cell_manifest.json`，随后用 `project_assembly.json` 定义可执行装配映射和布局策略；通过这些门禁后再实现项目自己的 deterministic cells 和规则覆盖。
-对于新项目目录，`node bin/easyeda-gsd.mjs init --pack <pack> --out <project-dir>` 会写出这些 scaffold 文件、`approved_library_manifest.json` 和 `gsd_scaffold_report.json`。如果 `<pack>` 还不存在，它也会创建 `circuit_packs/<pack>/pack.mjs`、`circuit_packs/<pack>/cell_manifest.json` 并更新 pack registry。scaffold 故意是不完整的，必须补齐 pack builders、cell manifest、合同、网表、库绑定和装配映射到 `plan` 通过后才能进入生成。
+对于新项目目录，`node bin/easyeda-gsd.mjs init --pack <pack> --out <project-dir>` 会写出这些 scaffold 文件、`approved_library_manifest.json` 和 `gsd_scaffold_report.json`。如果 `<pack>` 还不存在，它也会创建 `circuit_packs/<pack>/pack.mjs`、`circuit_packs/<pack>/cell_manifest.json` 并更新 pack registry。scaffold 会生成通用 `layoutPolicy.anchorVariants`，避免新项目依赖内置样例的 USB/MCU/relay 坐标字段；scaffold 故意是不完整的，必须补齐 pack builders、cell manifest、合同、网表、库绑定和装配映射到 `plan` 通过后才能进入生成。
 
 ## 写回 EasyEDA
 

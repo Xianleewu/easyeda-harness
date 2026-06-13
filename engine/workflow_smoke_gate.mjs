@@ -6,6 +6,7 @@ import { runGsdGenerate } from '../workflows/gsd_generate.mjs';
 import { writeScaffold } from '../workflows/gsd_scaffold.mjs';
 import { buildMinimalSpec, syncPackRegistry, writePackScaffold } from '../workflows/pack_scaffold.mjs';
 import { validateLibraryContract } from '../contracts/library_contract.mjs';
+import { buildAnchorFamily } from './layout_planner.mjs';
 
 const ROOT = (process.env.EASYEDA_WORKDIR || process.cwd()).replace(/\\/g, '/');
 const REPORT = process.env.EASYEDA_WORKFLOW_SMOKE_REPORT || `${ROOT}/workflow_smoke_report.json`;
@@ -232,6 +233,19 @@ try {
 			observedRules: checks.scaffold.rules,
 		});
 	}
+	const genericAnchorFamily = buildAnchorFamily(scaffoldAssembly);
+	checks.genericLayoutCandidates = {
+		mode: genericAnchorFamily.policyStats?.mode || null,
+		availableCandidates: genericAnchorFamily.candidates.length,
+		anchorVariants: genericAnchorFamily.policyStats?.anchorVariants || 0,
+	};
+	assertFinding(
+		findings,
+		genericAnchorFamily.policyStats?.mode === 'generic-anchor-variants' && genericAnchorFamily.candidates.length > 1,
+		'WS10-generic-layout-variants',
+		'layout planner must support generic anchorVariants for new project scaffolds instead of only AIHWDEBUGER-specific coordinate fields',
+		checks.genericLayoutCandidates,
+	);
 
 	const customPackReport = writePackScaffold({ root: ROOT, packId: CUSTOM_PACK });
 	const customSpec = buildMinimalSpec(CUSTOM_PACK);
