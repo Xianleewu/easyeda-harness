@@ -8,6 +8,8 @@ const REPORTS = [
 	{ gate: 'agent-instructions', file: 'agent_instruction_report.json', rerun: 'npm.cmd run agent:instructions' },
 	{ gate: 'workflow-smoke', file: 'workflow_smoke_report.json', rerun: 'npm.cmd run workflow:smoke' },
 	{ gate: 'action-schema', file: 'action_schema_report.json', rerun: 'npm.cmd run action:schema' },
+	{ gate: 'gsd-plan', file: 'gsd_plan_report.json', rerun: 'node bin/easyeda-gsd.mjs plan project_spec.json' },
+	{ gate: 'gsd-generate', file: 'gsd_generate_report.json', rerun: 'node bin/easyeda-gsd.mjs generate project_spec.json' },
 	{ gate: 'spec-schema', file: 'spec_schema_report.json', rerun: 'npm.cmd run spec:schema' },
 	{ gate: 'project-spec', file: 'project_spec_report.json', rerun: 'npm.cmd run spec' },
 	{ gate: 'project-contract', file: 'project_contract_report.json', rerun: 'npm.cmd run contract' },
@@ -25,6 +27,7 @@ const REPORTS = [
 	{ gate: 'preview', file: 'visual_review_report.json', rerun: 'npm.cmd run preview' },
 	{ gate: 'project-visual', file: 'project_visual_report.json', rerun: 'npm.cmd run contract:visual' },
 	{ gate: 'drc', file: 'drc_report.json', rerun: 'npm.cmd run drc' },
+	{ gate: 'apply-gated', file: 'apply_report.json', rerun: 'npm.cmd run apply:gated' },
 	{ gate: 'live-shots', file: 'live_shots_report.json', rerun: 'npm.cmd run live:shots' },
 	{ gate: 'final-evidence', file: 'final_evidence_report.json', rerun: 'npm.cmd run final:evidence' },
 	{ gate: 'acceptance', file: 'acceptance_report.json', rerun: 'npm.cmd run accept' },
@@ -89,6 +92,15 @@ function isExternalSpec(spec) {
 function contextAwareCommand(command) {
 	const spec = currentSpecArg();
 	if (!isExternalSpec(spec)) return command;
+	if (/easyeda-gsd\.mjs plan|gsd:plan/.test(command || '')) {
+		return `node bin/easyeda-gsd.mjs plan ${spec}`;
+	}
+	if (/easyeda-gsd\.mjs generate|gsd:generate/.test(command || '')) {
+		return `node bin/easyeda-gsd.mjs generate ${spec}`;
+	}
+	if (/apply:gated|apply --gated/.test(command || '')) {
+		return `node bin/easyeda-gsd.mjs apply --gated --context-only ${spec}`;
+	}
 	if (/(accept:live|live:|drc|final:evidence:live)/.test(command || '')) {
 		return `node bin/easyeda-gsd.mjs live-check ${spec}`;
 	}
@@ -163,6 +175,13 @@ const RULE_PLANS = [
 		nextCommand: 'npm.cmd run contract:rules',
 		repairHint: 'Make each deterministic cell qualityRules cover the owning module drawingRules before generation is trusted.',
 	}],
+	[/^(GP-)?DR|^PR-DR/, {
+		area: 'drawing-rule-bindings',
+		editFiles: ['contracts/drawing_rule_registry.mjs', 'harness/rule_registry.mjs', 'project_contract.json', 'circuit_packs/<pack>/cell_manifest.json'],
+		inspectFiles: ['gsd_plan_report.json', 'project_rule_report.json', 'contracts/drawing_rule_registry.mjs', 'harness/rule_registry.mjs'],
+		nextCommand: 'node bin/easyeda-gsd.mjs plan project_spec.json',
+		repairHint: 'Bind every contract drawingRules and manifest qualityRules string to executable harness rules; do not let prose-only drawing rules pass generation.',
+	}],
 	[/^PR6|^PR7|^PR8/, {
 		area: 'project-rules',
 		editFiles: ['project_contract.json', 'project_assembly.json', 'harness/rule_registry.mjs', 'harness/rules/'],
@@ -197,6 +216,13 @@ const RULE_PLANS = [
 		inspectFiles: ['gsd_plan_report.json', 'project_assembly.json', 'cell_manifest_report.json'],
 		nextCommand: 'node bin/easyeda-gsd.mjs plan project_spec.json',
 		repairHint: 'Make every assembly cell declared in the selected manifest and implemented by the selected circuit pack before generation runs.',
+	}],
+	[/^CB/, {
+		area: 'cell-builder-output',
+		editFiles: ['circuit_packs/<pack>/pack.mjs', 'circuit_packs/<pack>/cell_manifest.json', 'project_assembly.json', 'project_contract.json'],
+		inspectFiles: ['gsd_plan_report.json', 'cell_manifest_report.json', 'project_assembly.json', 'full_model.json'],
+		nextCommand: 'node bin/easyeda-gsd.mjs plan project_spec.json',
+		repairHint: 'Fix deterministic cell builder output before model generation: return real place/wires/flags arrays, use orthogonal segments, declare output nets, and avoid fake text labels.',
 	}],
 	[/^PA/, {
 		area: 'project-assembly',
@@ -302,6 +328,13 @@ const RULE_PLANS = [
 		inspectFiles: ['drc_report.json', 'live.json', 'live_canvas.png'],
 		nextCommand: 'npm.cmd run accept:live',
 		repairHint: 'Fix the deterministic source and re-apply through apply:gated; do not clear DRC by manual EasyEDA edits.',
+	}],
+	[/^AW/, {
+		area: 'apply-writer',
+		editFiles: ['circuit_packs/<pack>/pack.mjs', 'circuit_packs/<pack>/apply_writer.mjs', 'circuit_packs/<pack>/apply_run.mjs', 'engine/apply_gated.mjs'],
+		inspectFiles: ['apply_report.json', 'project_assembly.json', 'circuit_packs/<pack>/pack.mjs'],
+		nextCommand: 'npm.cmd run apply:gated',
+		repairHint: 'Declare and implement an explicit pack writer before external write-back; apply:gated must never reuse the bundled AIHWDEBUGER writer for another circuit pack.',
 	}],
 	[/^LS/, {
 		area: 'live-capture',

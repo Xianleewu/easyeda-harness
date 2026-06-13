@@ -1675,6 +1675,39 @@ export const pack = { id: '${NO_WRITER_PACK}', fallbackAnchors, cellBuilders, no
 		severity: { hard: 1, soft: 0, info: 0 },
 		findings: [{ rule: 'CM11-builder-exists', severity: 'hard', msg: 'cell builder missing in custom pack' }],
 	}, null, 2), 'utf8');
+	writeFileSync(`${repairContextDir}/gsd_plan_report.json`, JSON.stringify({
+		generatedAt: new Date().toISOString(),
+		pass: false,
+		spec: '_tmp_workflow_smoke/custom_project/project_spec.json',
+		circuitPack: CUSTOM_PACK,
+		severity: { hard: 2, soft: 0, info: 0 },
+		findings: [
+			{ rule: 'GP-DR1-drawing-rule-known', severity: 'hard', msg: 'unknown drawing rule smoke', where: { drawingRule: 'pretty-but-not-executable' } },
+			{ rule: 'CB8-wire-orthogonal', severity: 'hard', msg: 'cell builder diagonal wire smoke', where: { module: 'sensor_frontend', cell: 'sensorCell' } },
+		],
+	}, null, 2), 'utf8');
+	writeFileSync(`${repairContextDir}/project_rule_report.json`, JSON.stringify({
+		generatedAt: new Date().toISOString(),
+		pass: false,
+		projectId: 'workflow_smoke_pack-project',
+		severity: { hard: 1, soft: 0, info: 0 },
+		findings: [{ rule: 'PR-DR1-drawing-rule-known', severity: 'hard', msg: 'unknown project drawing rule smoke', where: { drawingRule: 'pretty-but-not-executable' } }],
+	}, null, 2), 'utf8');
+	writeFileSync(`${repairContextDir}/apply_report.json`, JSON.stringify({
+		generatedAt: new Date().toISOString(),
+		pass: false,
+		mode: 'preflight',
+		writeBack: false,
+		applyWriter: {
+			pass: false,
+			mode: 'external-pack-writer',
+			writer: null,
+			severity: { hard: 1, soft: 0, info: 0 },
+			findings: [{ rule: 'AW1-pack-writer-declared', severity: 'hard', msg: 'external pack writer missing smoke', where: { circuitPack: CUSTOM_PACK } }],
+		},
+		severity: { hard: 1, soft: 0, info: 0 },
+		findings: [{ rule: 'AW1-pack-writer-declared', severity: 'hard', msg: 'external pack writer missing smoke', where: { circuitPack: CUSTOM_PACK } }],
+	}, null, 2), 'utf8');
 	writeFileSync(`${repairContextDir}/final_evidence_report.json`, JSON.stringify({
 		generatedAt: new Date().toISOString(),
 		pass: false,
@@ -1708,12 +1741,20 @@ export const pack = { id: '${NO_WRITER_PACK}', fallbackAnchors, cellBuilders, no
 		circuitPack: customRepairReport?.context?.circuitPack || null,
 		hasPackPlaceholder: customRepairText.includes('<pack>'),
 		hasConcretePackPath: customRepairText.includes(`circuit_packs/${CUSTOM_PACK}/pack.mjs`),
+		areas: (customRepairReport?.actions || []).map(a => a.area),
+		hasDrawingRuleAction: (customRepairReport?.actions || []).some(a => a.area === 'drawing-rule-bindings' && (a.editFiles || []).includes('contracts/drawing_rule_registry.mjs')),
+		hasCellBuilderAction: (customRepairReport?.actions || []).some(a => a.area === 'cell-builder-output' && (a.editFiles || []).includes(`circuit_packs/${CUSTOM_PACK}/pack.mjs`)),
+		hasApplyWriterAction: (customRepairReport?.actions || []).some(a => a.area === 'apply-writer' && (a.editFiles || []).includes(`circuit_packs/${CUSTOM_PACK}/pack.mjs`) && /apply --gated --context-only/.test(a.nextCommand || '')),
 	};
 	assertFinding(
 		findings,
 		customRepairActions.status !== 0
 			&& customRepairCommands.length > 0
-			&& customRepairCommands.every(cmd => cmd === 'node bin/easyeda-gsd.mjs accept _tmp_workflow_smoke/custom_project/project_spec.json'),
+			&& customRepairCommands.every(cmd => [
+				'node bin/easyeda-gsd.mjs plan _tmp_workflow_smoke/custom_project/project_spec.json',
+				'node bin/easyeda-gsd.mjs accept _tmp_workflow_smoke/custom_project/project_spec.json',
+				'node bin/easyeda-gsd.mjs apply --gated --context-only _tmp_workflow_smoke/custom_project/project_spec.json',
+			].includes(cmd)),
 		'WS20-repair-actions-context-bound',
 		'repair actions for an external spec must rerun the context-aware GSD entrypoint instead of bare npm scripts that fall back to the root project',
 		{
@@ -1730,6 +1771,15 @@ export const pack = { id: '${NO_WRITER_PACK}', fallbackAnchors, cellBuilders, no
 			&& checks.customRepairContext.hasConcretePackPath === true,
 		'WS28-repair-actions-resolve-pack-placeholder',
 		'repair actions for external projects must resolve <pack> placeholders to the active circuit pack id',
+		checks.customRepairContext,
+	);
+	assertFinding(
+		findings,
+		checks.customRepairContext.hasDrawingRuleAction
+			&& checks.customRepairContext.hasCellBuilderAction
+			&& checks.customRepairContext.hasApplyWriterAction,
+		'WS50-repair-actions-cover-executable-failure-classes',
+		'repair actions must map drawing-rule, cell-builder, and apply-writer failures to concrete deterministic source files and context-aware rerun commands',
 		checks.customRepairContext,
 	);
 
@@ -1752,6 +1802,9 @@ export const pack = { id: '${NO_WRITER_PACK}', fallbackAnchors, cellBuilders, no
 		circuitPack: customNextReport?.context?.circuitPack || null,
 		hasPackPlaceholder: customNextText.includes('<pack>'),
 		hasConcretePackPath: customNextText.includes(`circuit_packs/${CUSTOM_PACK}/pack.mjs`),
+		areas: (customNextReport?.actions || []).map(a => a.area),
+		hasDrawingRuleAction: (customNextReport?.actions || []).some(a => a.area === 'drawing-rule-bindings' && (a.suggestedFix?.files || []).includes('contracts/drawing_rule_registry.mjs')),
+		hasApplyWriterAction: (customNextReport?.actions || []).some(a => a.area === 'apply-writer' && /apply --gated --context-only/.test(a.nextCommand || a.suggestedFix?.command || '')),
 	};
 	assertFinding(
 		findings,
@@ -1767,6 +1820,14 @@ export const pack = { id: '${NO_WRITER_PACK}', fallbackAnchors, cellBuilders, no
 			stderr: customNextActions.stderr,
 			report: checks.customNextActionsPackTargets,
 		},
+	);
+	assertFinding(
+		findings,
+		checks.customNextActionsPackTargets.hasDrawingRuleAction
+			&& checks.customNextActionsPackTargets.hasApplyWriterAction,
+		'WS51-next-actions-cover-executable-failure-classes',
+		'next actions must expose drawing-rule and apply-writer repair targets directly to agents instead of hiding them behind generic acceptance failure',
+		checks.customNextActionsPackTargets,
 	);
 
 	const restoreGenerate = runGsdGenerate({ root: ROOT, specPath: 'project_spec.json', command: ['engine/pipeline_fast.mjs'], draft: true });

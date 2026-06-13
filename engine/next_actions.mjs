@@ -26,6 +26,10 @@ function pushAction(actions, item) {
 	});
 }
 
+function ruleMatches(finding, pattern) {
+	return pattern.test(finding?.rule || '');
+}
+
 function normalizePath(path) {
 	return String(path || '').replace(/\\/g, '/');
 }
@@ -69,6 +73,7 @@ const projectVisual = readJson('project_visual_report.json');
 const template = readJson('report.json');
 const preview = readJson('visual_review_report.json');
 const drc = readJson('drc_report.json');
+const applyGated = readJson('apply_report.json');
 const liveShots = readJson('live_shots_report.json');
 const liveDiagnose = readJson('live_diagnose_report.json');
 const repair = readJson('repair_actions.json');
@@ -254,6 +259,20 @@ const checks = {
 		} : null,
 		evidence: 'drc_report.json',
 	},
+	applyGated: {
+		status: status(applyGated?.pass),
+		mode: applyGated?.mode || null,
+		writeBack: applyGated?.writeBack ?? null,
+		applyWriter: applyGated?.applyWriter ? {
+			pass: applyGated.applyWriter.pass ?? null,
+			mode: applyGated.applyWriter.mode || null,
+			writer: applyGated.applyWriter.writer || null,
+			firstFinding: applyGated.applyWriter.findings?.[0] || null,
+		} : null,
+		severity: applyGated?.severity || null,
+		firstFinding: applyGated?.findings?.[0] || applyGated?.applyWriter?.findings?.[0] || null,
+		evidence: 'apply_report.json',
+	},
 	liveShots: {
 		status: status(liveShots?.pass),
 		screenshots: liveShots?.screenshots || 0,
@@ -312,12 +331,33 @@ if (checks.workflowSmoke.status !== 'pass') {
 	});
 }
 if (checks.gsdPlan.status !== 'pass') {
-	pushAction(actions, {
-		area: 'gsd-plan',
-		action: 'Fix spec-to-contract realization before generation. gsd_plan_report.json must prove project_spec.json is covered by project_contract.json, project_netlist.json, project_assembly.json, and a registered circuit pack.',
-		evidence: ['project_spec.json', 'project_contract.json', 'project_netlist.json', 'project_assembly.json', 'gsd_plan_report.json'],
-		observed: checks.gsdPlan.firstFinding || checks.gsdPlan,
-	});
+	const finding = checks.gsdPlan.firstFinding;
+	if (ruleMatches(finding, /^(GP-)?DR/)) {
+		pushAction(actions, {
+			area: 'drawing-rule-bindings',
+			action: 'Bind every project drawingRules and manifest qualityRules entry to executable harness rules before generation; prose-only drawing rules must fail closed.',
+			evidence: ['gsd_plan_report.json', 'contracts/drawing_rule_registry.mjs', 'harness/rule_registry.mjs', 'project_contract.json', 'circuit_packs/<pack>/cell_manifest.json'],
+			observed: finding,
+			editFiles: ['contracts/drawing_rule_registry.mjs', 'harness/rule_registry.mjs', 'project_contract.json', 'circuit_packs/<pack>/cell_manifest.json'],
+			nextCommand: 'node bin/easyeda-gsd.mjs plan project_spec.json',
+		});
+	} else if (ruleMatches(finding, /^CB/)) {
+		pushAction(actions, {
+			area: 'cell-builder-output',
+			action: 'Fix deterministic cell builder output before generation: builders must return real place/wires/flags arrays, orthogonal wires, declared output nets, and no fake text labels.',
+			evidence: ['gsd_plan_report.json', 'circuit_packs/<pack>/pack.mjs', 'circuit_packs/<pack>/cell_manifest.json', 'project_assembly.json'],
+			observed: finding,
+			editFiles: ['circuit_packs/<pack>/pack.mjs', 'circuit_packs/<pack>/cell_manifest.json', 'project_assembly.json', 'project_contract.json'],
+			nextCommand: 'node bin/easyeda-gsd.mjs plan project_spec.json',
+		});
+	} else {
+		pushAction(actions, {
+			area: 'gsd-plan',
+			action: 'Fix spec-to-contract realization before generation. gsd_plan_report.json must prove project_spec.json is covered by project_contract.json, project_netlist.json, project_assembly.json, and a registered circuit pack.',
+			evidence: ['project_spec.json', 'project_contract.json', 'project_netlist.json', 'project_assembly.json', 'gsd_plan_report.json'],
+			observed: finding || checks.gsdPlan,
+		});
+	}
 }
 if (checks.gsdGenerate.status !== 'pass') {
 	pushAction(actions, {
@@ -352,12 +392,24 @@ if (checks.contract.status !== 'pass') {
 	});
 }
 if (checks.projectRules.status !== 'pass') {
-	pushAction(actions, {
-		area: 'project-rules',
-		action: 'Make harness rule registries cover project_contract.json. Update module registry, required parts, interface contracts, or rule registration before trusting template PASS.',
-		evidence: ['project_contract.json', 'harness/module_registry.mjs', 'engine/interface_contract.mjs', 'harness/rule_registry.mjs', 'project_rule_report.json'],
-		observed: checks.projectRules.firstFinding || checks.projectRules,
-	});
+	const finding = checks.projectRules.firstFinding;
+	if (ruleMatches(finding, /^PR-DR/)) {
+		pushAction(actions, {
+			area: 'drawing-rule-bindings',
+			action: 'Make every drawingRules and qualityRules string executable by binding it to registered harness rules; unknown rule prose is not accepted.',
+			evidence: ['project_rule_report.json', 'contracts/drawing_rule_registry.mjs', 'harness/rule_registry.mjs', 'project_contract.json', 'circuit_packs/<pack>/cell_manifest.json'],
+			observed: finding,
+			editFiles: ['contracts/drawing_rule_registry.mjs', 'harness/rule_registry.mjs', 'project_contract.json', 'circuit_packs/<pack>/cell_manifest.json'],
+			nextCommand: 'npm.cmd run contract:rules',
+		});
+	} else {
+		pushAction(actions, {
+			area: 'project-rules',
+			action: 'Make harness rule registries cover project_contract.json. Update module registry, required parts, interface contracts, or rule registration before trusting template PASS.',
+			evidence: ['project_contract.json', 'harness/module_registry.mjs', 'engine/interface_contract.mjs', 'harness/rule_registry.mjs', 'project_rule_report.json'],
+			observed: finding || checks.projectRules,
+		});
+	}
 }
 if (checks.projectPack.status !== 'pass') {
 	pushAction(actions, {
@@ -452,6 +504,28 @@ if (acceptance?.mode === 'full-with-live' && checks.drc.status !== 'pass') {
 		evidence: ['drc_report.json'],
 		observed: checks.drc.counts || checks.drc,
 	});
+}
+if (checks.applyGated.status === 'fail') {
+	const finding = checks.applyGated.firstFinding;
+	if (ruleMatches(finding, /^AW/)) {
+		pushAction(actions, {
+			area: 'apply-writer',
+			action: 'Declare and implement an explicit pack writer before external write-back. apply:gated must fail closed instead of reusing the bundled AIHWDEBUGER writer for another pack.',
+			evidence: ['apply_report.json', 'project_assembly.json', 'circuit_packs/<pack>/pack.mjs'],
+			observed: finding,
+			editFiles: ['circuit_packs/<pack>/pack.mjs', 'circuit_packs/<pack>/apply_writer.mjs', 'circuit_packs/<pack>/apply_run.mjs', 'engine/apply_gated.mjs'],
+			nextCommand: checks.acceptance.context?.spec
+				? `node bin/easyeda-gsd.mjs apply --gated --context-only ${checks.acceptance.context.spec}`
+				: 'npm.cmd run apply:gated',
+		});
+	} else {
+		pushAction(actions, {
+			area: 'apply-gated',
+			action: 'Fix apply:gated preflight before write-back. The apply report must prove context, writer, local gates, and target checks pass before EasyEDA is modified.',
+			evidence: ['apply_report.json', 'project_assembly.json', 'target_context_apply_gate.json'],
+			observed: finding || checks.applyGated,
+		});
+	}
 }
 if (checks.liveShots.status === 'fail') {
 	const first = checks.liveShots.firstFinding;
