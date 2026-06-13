@@ -1,20 +1,39 @@
 import { spawnSync } from 'node:child_process';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { generateContext } from '../workflows/gsd_generate.mjs';
+import { acquireRunLock } from '../workflows/run_lock.mjs';
 
 const DIR = (process.env.EASYEDA_WORKDIR || process.cwd()).replace(/\\/g, '/') + '/';
+let LOCK;
+try {
+	LOCK = acquireRunLock(DIR);
+} catch (e) {
+	console.error(e.message);
+	process.exit(1);
+}
 const REPORT = process.env.EASYEDA_ACCEPT_REPORT || DIR + 'acceptance_report.json';
 const RUN_LIVE = process.argv.includes('--live') || process.env.EASYEDA_ACCEPT_LIVE === '1';
 const SPEC_PATH = process.argv.slice(2).find(arg => !arg.startsWith('-')) || process.env.EASYEDA_PROJECT_SPEC || 'project_spec.json';
 const CONTEXT = generateContext(DIR.replace(/\/$/, ''), SPEC_PATH);
 const STEP_ENV = {
 	...process.env,
+	EASYEDA_GSD_LOCK_TOKEN: LOCK.token,
 	EASYEDA_PROJECT_SPEC: CONTEXT.specAbs,
 	EASYEDA_PROJECT_CONTRACT: CONTEXT.contractPath,
 	EASYEDA_PROJECT_NETLIST: CONTEXT.netlistPath,
 	EASYEDA_PROJECT_ASSEMBLY: CONTEXT.assemblyPath,
 	EASYEDA_APPROVED_LIBRARY_MANIFEST: CONTEXT.libraryManifestPath,
 };
+
+process.on('exit', () => LOCK.release());
+process.on('SIGINT', () => {
+	LOCK.release();
+	process.exit(130);
+});
+process.on('SIGTERM', () => {
+	LOCK.release();
+	process.exit(143);
+});
 
 function readJson(path) {
 	return JSON.parse(readFileSync(path, 'utf8').replace(/^\uFEFF/, ''));

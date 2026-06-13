@@ -9,6 +9,7 @@ import { runGsdGenerate } from '../workflows/gsd_generate.mjs';
 import { writeScaffold } from '../workflows/gsd_scaffold.mjs';
 import { buildMinimalSpec, validatePackId, writePackScaffold } from '../workflows/pack_scaffold.mjs';
 import { circuitPackIds } from '../circuit_packs/registry.mjs';
+import { acquireRunLock } from '../workflows/run_lock.mjs';
 
 const ROOT = resolve(new URL('..', import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1')).replace(/\\/g, '/');
 
@@ -43,6 +44,7 @@ Commands:
 Notes:
   - Do not free-draw in EasyEDA for delivery.
   - Local accept is not final delivery evidence; live-check is required before apply.
+  - Stateful commands share report artifacts and are protected by a workspace lock; run them serially.
   - Low-level writer scripts are debugging-only.`);
 }
 
@@ -65,28 +67,43 @@ function optionValue(args, name) {
 	return i >= 0 ? args[i + 1] : null;
 }
 
+function acquireCliLock() {
+	try {
+		return acquireRunLock(ROOT);
+	} catch (e) {
+		console.error(e.message);
+		process.exit(1);
+	}
+}
+
 function writeInit(args) {
-	const pack = validatePackId(optionValue(args, '--pack') || 'aihwdebugger');
-	const out = optionValue(args, '--out');
-	if (!out) {
-		console.error('init requires --out <file>');
-		process.exit(2);
+	const lock = acquireCliLock();
+	try {
+		const pack = validatePackId(optionValue(args, '--pack') || 'aihwdebugger');
+		const out = optionValue(args, '--out');
+		if (!out) {
+			console.error('init requires --out <file>');
+			return 2;
+		}
+		const spec = pack === 'aihwdebugger' && circuitPackIds().includes('aihwdebugger')
+			? readJson('project_spec.json')
+			: buildMinimalSpec(pack);
+		const packScaffold = circuitPackIds().includes(pack) ? null : writePackScaffold({ root: ROOT, packId: pack });
+		const target = resolve(ROOT, out).replace(/\\/g, '/');
+		if (!/\.[A-Za-z0-9]+$/.test(target)) {
+			const scaffold = writeScaffold({ outDir: target, spec, pack });
+			log(JSON.stringify({ pack: packScaffold, project: scaffold }, null, 2));
+			log(`${target}/gsd_scaffold_report.json`);
+			return 0;
+		}
+		mkdirSync(dirname(target), { recursive: true });
+		writeFileSync(target, JSON.stringify({ ...spec, circuitPack: pack }, null, 2) + '\n', 'utf8');
+		if (packScaffold) log(JSON.stringify({ pack: packScaffold }, null, 2));
+		log(`wrote ${target}`);
+		return 0;
+	} finally {
+		lock.release();
 	}
-	const spec = pack === 'aihwdebugger' && circuitPackIds().includes('aihwdebugger')
-		? readJson('project_spec.json')
-		: buildMinimalSpec(pack);
-	const packScaffold = circuitPackIds().includes(pack) ? null : writePackScaffold({ root: ROOT, packId: pack });
-	const target = resolve(ROOT, out).replace(/\\/g, '/');
-	if (!/\.[A-Za-z0-9]+$/.test(target)) {
-		const scaffold = writeScaffold({ outDir: target, spec, pack });
-		log(JSON.stringify({ pack: packScaffold, project: scaffold }, null, 2));
-		log(`${target}/gsd_scaffold_report.json`);
-		return;
-	}
-	mkdirSync(dirname(target), { recursive: true });
-	writeFileSync(target, JSON.stringify({ ...spec, circuitPack: pack }, null, 2) + '\n', 'utf8');
-	if (packScaffold) log(JSON.stringify({ pack: packScaffold }, null, 2));
-	log(`wrote ${target}`);
 }
 
 function companionPath(specAbs, name) {
@@ -96,23 +113,28 @@ function companionPath(specAbs, name) {
 }
 
 function plan(args) {
-	const spec = args.find(a => !a.startsWith('-')) || 'project_spec.json';
-	const specPath = resolve(ROOT, spec);
-	if (!existsSync(specPath)) {
-		console.error(`spec not found: ${spec}`);
-		process.exit(2);
+	const lock = acquireCliLock();
+	try {
+		const spec = args.find(a => !a.startsWith('-')) || 'project_spec.json';
+		const specPath = resolve(ROOT, spec);
+		if (!existsSync(specPath)) {
+			console.error(`spec not found: ${spec}`);
+			return 2;
+		}
+		const specDoc = readJson(specPath);
+		const assembly = readJson(companionPath(specPath, 'project_assembly.json'));
+		const contract = readJson(companionPath(specPath, 'project_contract.json'));
+		const netlist = readJson(companionPath(specPath, 'project_netlist.json'));
+		const libraryManifest = readJson(companionPath(specPath, 'approved_library_manifest.json'));
+		const model = existsSync(`${ROOT}/full_model.json`) ? readJson('full_model.json') : null;
+		const report = buildGsdPlan({ spec: specDoc, contract, netlist, assembly, libraryManifest, model, specPath: spec });
+		writeFileSync(`${ROOT}/gsd_plan_report.json`, JSON.stringify(report, null, 2), 'utf8');
+		log(JSON.stringify(report, null, 2));
+		log('report -> gsd_plan_report.json');
+		return report.pass ? 0 : 1;
+	} finally {
+		lock.release();
 	}
-	const specDoc = readJson(specPath);
-	const assembly = readJson(companionPath(specPath, 'project_assembly.json'));
-	const contract = readJson(companionPath(specPath, 'project_contract.json'));
-	const netlist = readJson(companionPath(specPath, 'project_netlist.json'));
-	const libraryManifest = readJson(companionPath(specPath, 'approved_library_manifest.json'));
-	const model = existsSync(`${ROOT}/full_model.json`) ? readJson('full_model.json') : null;
-	const report = buildGsdPlan({ spec: specDoc, contract, netlist, assembly, libraryManifest, model, specPath: spec });
-	writeFileSync(`${ROOT}/gsd_plan_report.json`, JSON.stringify(report, null, 2), 'utf8');
-	log(JSON.stringify(report, null, 2));
-	log('report -> gsd_plan_report.json');
-	process.exit(report.pass ? 0 : 1);
 }
 
 function report() {
@@ -144,18 +166,27 @@ function report() {
 }
 
 function repair(args) {
-	const maxIterations = Number(optionValue(args, '--max-iterations') || 1);
-	if (args.includes('--write')) {
-		console.error('automatic write repair is not implemented yet; inspect repair_actions.json and edit deterministic sources explicitly');
-		process.exit(2);
+	const lock = acquireCliLock();
+	try {
+		const maxIterations = Number(optionValue(args, '--max-iterations') || 1);
+		if (args.includes('--write')) {
+			console.error('automatic write repair is not implemented yet; inspect repair_actions.json and edit deterministic sources explicitly');
+			return 2;
+		}
+		const repairFile = `${ROOT}/repair_actions.json`;
+		if (!existsSync(repairFile)) {
+			const child = spawnSync(process.execPath, ['engine/repair_actions.mjs'], { cwd: ROOT, stdio: 'inherit', shell: false, env: { ...process.env, EASYEDA_GSD_LOCK_TOKEN: lock.token } });
+			if (child.error) console.error(child.error.message);
+			if (child.status !== 0) return child.status ?? 1;
+		}
+		const plan = loadRepairLoopPlan(ROOT, { maxIterations });
+		writeFileSync(`${ROOT}/repair_loop_report.json`, JSON.stringify(plan, null, 2), 'utf8');
+		log(JSON.stringify(plan, null, 2));
+		log('report -> repair_loop_report.json');
+		return plan.pass ? 0 : 1;
+	} finally {
+		lock.release();
 	}
-	const repairFile = `${ROOT}/repair_actions.json`;
-	if (!existsSync(repairFile)) runNode(['engine/repair_actions.mjs']);
-	const plan = loadRepairLoopPlan(ROOT, { maxIterations });
-	writeFileSync(`${ROOT}/repair_loop_report.json`, JSON.stringify(plan, null, 2), 'utf8');
-	log(JSON.stringify(plan, null, 2));
-	log('report -> repair_loop_report.json');
-	process.exit(plan.pass ? 0 : 1);
 }
 
 function generate(args) {
@@ -175,10 +206,10 @@ switch (cmd) {
 		usage();
 		break;
 	case 'init':
-		writeInit(args);
+		process.exit(writeInit(args));
 		break;
 	case 'plan':
-		plan(args);
+		process.exit(plan(args));
 		break;
 	case 'generate':
 		generate(args);
@@ -197,7 +228,7 @@ switch (cmd) {
 		runNode(['engine/apply_gated.mjs']);
 		break;
 	case 'repair':
-		repair(args);
+		process.exit(repair(args));
 		break;
 	case 'report':
 		report();

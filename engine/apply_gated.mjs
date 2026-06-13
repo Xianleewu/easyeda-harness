@@ -12,14 +12,32 @@ import { auditLibraryManifest } from './library_manifest.mjs';
 import { auditSeverityPolicy, auditReportSeverityZero } from './severity_policy.mjs';
 import { auditDocumentStyleFromSnapshot } from './document_style_gate.mjs';
 import { auditPageComposition } from './page_composition.mjs';
+import { acquireRunLock } from '../workflows/run_lock.mjs';
 
 const DIR = (process.env.EASYEDA_WORKDIR || process.cwd()).replace(/\\/g, '/') + '/';
+let LOCK;
+try {
+	LOCK = acquireRunLock(DIR);
+} catch (e) {
+	console.error(e.message);
+	process.exit(1);
+}
 let TARGET_WINDOW_ID = process.env.EASYEDA_WINDOW_ID || '';
 const LIVE_SNAP = process.env.EASYEDA_LIVE_SNAP || DIR + 'live.json';
 const APPLY_REPORT = process.env.EASYEDA_APPLY_REPORT || DIR + 'apply_report.json';
 const LIVE_HARNESS_REPORT = process.env.EASYEDA_LIVE_HARNESS_REPORT || DIR + 'harness_live_report.json';
 const TARGET_CONTEXT_FILE = process.env.EASYEDA_TARGET_CONTEXT || DIR + 'target_context_apply_gate.json';
 const APPROVED_LIBRARY_MANIFEST = process.env.EASYEDA_APPROVED_LIBRARY_MANIFEST || DIR + 'approved_library_manifest.json';
+
+process.on('exit', () => LOCK.release());
+process.on('SIGINT', () => {
+	LOCK.release();
+	process.exit(130);
+});
+process.on('SIGTERM', () => {
+	LOCK.release();
+	process.exit(143);
+});
 
 async function requireEdaWindow() {
 	const { bridge, windows } = await listEdaWindows();
@@ -200,7 +218,7 @@ if (!process.exitCode) {
 		const liveAcceptance = spawnSync('node', ['engine/acceptance_run.mjs', '--live'], {
 			cwd: DIR,
 			stdio: 'inherit',
-			env: { ...process.env, EASYEDA_WINDOW_ID: TARGET_WINDOW_ID },
+			env: { ...process.env, EASYEDA_GSD_LOCK_TOKEN: LOCK.token, EASYEDA_WINDOW_ID: TARGET_WINDOW_ID },
 		});
 		if (liveAcceptance.status !== 0) {
 			console.error('ABORT: live acceptance gate failed after write-back');
@@ -209,7 +227,7 @@ if (!process.exitCode) {
 			const finalEvidence = spawnSync('node', ['engine/final_evidence_gate.mjs', '--live'], {
 				cwd: DIR,
 				stdio: 'inherit',
-				env: process.env,
+				env: { ...process.env, EASYEDA_GSD_LOCK_TOKEN: LOCK.token },
 			});
 			if (finalEvidence.status !== 0) {
 				console.error('ABORT: final evidence gate failed after write-back');

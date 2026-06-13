@@ -31,6 +31,7 @@ Use this repository as an executable schematic workflow, not as permission to dr
 - Inspect `next_actions.json` first when a gate fails.
 - Use `repair_actions.json` to find the owning files and rerun command for each finding.
 - Use `node bin/easyeda-gsd.mjs repair` for the read-only grouped repair plan.
+- Run stateful workflow commands serially. `plan`, `generate`, `accept`, `workflow:smoke`, `repair`, `live-check`, and `apply --gated` write shared report artifacts and are protected by a workspace lock.
 - Final delivery requires real EasyEDA live evidence and DRC `0 error / 0 warning / 0 info`.
 
 ## Commands

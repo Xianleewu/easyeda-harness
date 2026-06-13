@@ -7,8 +7,16 @@ import { writeScaffold } from '../workflows/gsd_scaffold.mjs';
 import { buildMinimalSpec, syncPackRegistry, writePackScaffold } from '../workflows/pack_scaffold.mjs';
 import { validateLibraryContract } from '../contracts/library_contract.mjs';
 import { buildAnchorFamily } from './layout_planner.mjs';
+import { acquireRunLock } from '../workflows/run_lock.mjs';
 
 const ROOT = (process.env.EASYEDA_WORKDIR || process.cwd()).replace(/\\/g, '/');
+let LOCK;
+try {
+	LOCK = acquireRunLock(ROOT);
+} catch (e) {
+	console.error(e.message);
+	process.exit(1);
+}
 const REPORT = process.env.EASYEDA_WORKFLOW_SMOKE_REPORT || `${ROOT}/workflow_smoke_report.json`;
 const TMP_DIR = `${ROOT}/_tmp_workflow_smoke`;
 const BAD_SPEC = `${TMP_DIR}/bad_project_spec.json`;
@@ -17,6 +25,16 @@ const BAD_MANIFEST = `${TMP_DIR}/bad_cell_manifest.json`;
 const BAD_MANIFEST_ASSEMBLY = `${TMP_DIR}/bad_manifest_project_assembly.json`;
 const CUSTOM_PACK = 'workflow_smoke_pack';
 const CUSTOM_PACK_DIR = `${ROOT}/circuit_packs/${CUSTOM_PACK}`;
+
+process.on('exit', () => LOCK.release());
+process.on('SIGINT', () => {
+	LOCK.release();
+	process.exit(130);
+});
+process.on('SIGTERM', () => {
+	LOCK.release();
+	process.exit(143);
+});
 
 function readJson(path) {
 	return JSON.parse(readFileSync(path, 'utf8').replace(/^\uFEFF/, ''));
@@ -294,6 +312,26 @@ try {
 		'WS14-generate-context-bound',
 		'GSD generate must record and pass the active project assembly path into deterministic generation',
 		checks.restoreGenerate,
+	);
+
+	const blockedConcurrent = spawnSync(process.execPath, ['bin/easyeda-gsd.mjs', 'plan', 'project_spec.json'], {
+		cwd: ROOT,
+		stdio: 'pipe',
+		shell: false,
+		env: { ...process.env, EASYEDA_GSD_LOCK_TOKEN: '' },
+		encoding: 'utf8',
+	});
+	checks.concurrentStatefulCommandBlocked = {
+		pass: blockedConcurrent.status !== 0,
+		status: blockedConcurrent.status,
+		stderr: (blockedConcurrent.stderr || '').slice(0, 240),
+	};
+	assertFinding(
+		findings,
+		blockedConcurrent.status !== 0 && /already running/.test(blockedConcurrent.stderr || ''),
+		'WS15-stateful-run-lock',
+		'stateful GSD commands must not run concurrently because they share report artifacts and temporary workflow directories',
+		checks.concurrentStatefulCommandBlocked,
 	);
 } catch (e) {
 	hard(findings, 'WS0-unhandled-error', 'workflow smoke gate crashed', { error: e.message, stack: e.stack });
