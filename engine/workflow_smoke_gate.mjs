@@ -170,6 +170,46 @@ try {
 		observedRules: checks.layoutColumnsRequired.rules,
 	});
 
+	const missingColumnCoverageAssembly = clone(assembly);
+	missingColumnCoverageAssembly.layoutPolicy.columns = clone(assembly.layoutPolicy.columns).map((column, index) => index === 0
+		? { ...column, modules: [] }
+		: column);
+	const missingColumnCoveragePlan = buildPlanForFiles({
+		spec,
+		contract,
+		netlist,
+		assembly: missingColumnCoverageAssembly,
+		libraryManifest,
+		specPath: '_tmp_workflow_smoke/missing_column_coverage_project_spec.json',
+	});
+	checks.layoutColumnsCoverModules = {
+		pass: !missingColumnCoveragePlan.pass && hasRule(missingColumnCoveragePlan, 'GP23-layout-column-covers-modules'),
+		rules: (missingColumnCoveragePlan.findings || []).map(f => f.rule),
+	};
+	assertFinding(findings, checks.layoutColumnsCoverModules.pass, 'WS33-layout-columns-cover-modules', 'GSD plan must reject layout policies whose columns do not cover every assembly module before generation', {
+		observedRules: checks.layoutColumnsCoverModules.rules,
+	});
+
+	const reversedColumnsAssembly = clone(assembly);
+	reversedColumnsAssembly.layoutPolicy.columns = clone(assembly.layoutPolicy.columns).reverse();
+	const reversedColumnsPlan = buildPlanForFiles({
+		spec,
+		contract,
+		netlist,
+		assembly: reversedColumnsAssembly,
+		libraryManifest,
+		specPath: '_tmp_workflow_smoke/reversed_columns_project_spec.json',
+	});
+	checks.layoutColumnsFollowAnchorOrder = {
+		pass: !reversedColumnsPlan.pass && hasRule(reversedColumnsPlan, 'GP25-layout-column-x-order'),
+		rules: (reversedColumnsPlan.findings || []).map(f => f.rule),
+		firstFinding: reversedColumnsPlan.findings?.[0] || null,
+	};
+	assertFinding(findings, checks.layoutColumnsFollowAnchorOrder.pass, 'WS34-layout-columns-follow-anchor-order', 'GSD plan must reject layout policies whose declared reading-flow columns contradict module anchor X order', {
+		observedRules: checks.layoutColumnsFollowAnchorOrder.rules,
+		firstFinding: checks.layoutColumnsFollowAnchorOrder.firstFinding,
+	});
+
 	const noDrawingRulesContract = clone(contract);
 	if (noDrawingRulesContract.modules?.[0]) delete noDrawingRulesContract.modules[0].drawingRules;
 	const noDrawingRulesPlan = buildPlanForFiles({

@@ -26,6 +26,78 @@ function netsByName(netlist) {
 	return new Map(asArray(netlist?.nets).map(net => [net.name, net]));
 }
 
+function finitePoint(point) {
+	return point && Number.isFinite(point.x) && Number.isFinite(point.y);
+}
+
+function validateStaticLayoutPolicy(assembly) {
+	const findings = [];
+	if (!assembly) return findings;
+	const policy = assembly.layoutPolicy || {};
+	const modules = asArray(assembly.modules);
+	const moduleIds = new Set(modules.map(mod => mod.id).filter(Boolean));
+	const columns = asArray(policy.columns);
+	const columnEntries = [];
+	const seen = new Map();
+	for (const [index, column] of columns.entries()) {
+		for (const id of asArray(column.modules)) {
+			columnEntries.push({ id, index, column: column.id || `column_${index + 1}` });
+			if (seen.has(id)) {
+				hard(findings, 'GP21-layout-column-unique-module', 'layoutPolicy.columns must assign each assembly module to exactly one ordered column', {
+					module: id,
+					firstColumn: seen.get(id).column,
+					duplicateColumn: column.id || `column_${index + 1}`,
+				});
+			} else {
+				seen.set(id, { index, column: column.id || `column_${index + 1}` });
+			}
+			if (!moduleIds.has(id)) {
+				hard(findings, 'GP22-layout-column-module-known', 'layoutPolicy.columns references a module not present in project_assembly.json', {
+					module: id,
+					column: column.id || `column_${index + 1}`,
+				});
+			}
+		}
+	}
+	const missingColumns = [...moduleIds].filter(id => !seen.has(id));
+	if (missingColumns.length) {
+		hard(findings, 'GP23-layout-column-covers-modules', 'layoutPolicy.columns must cover every assembly module before generation', { missingColumns });
+	}
+	const anchors = assembly.anchors || {};
+	const base = policy.baseAnchors || {};
+	const missingBase = modules.map(mod => mod.anchor).filter(Boolean).filter(anchor => !finitePoint(base[anchor]));
+	if (missingBase.length) {
+		hard(findings, 'GP24-layout-base-anchors-cover-modules', 'layoutPolicy.baseAnchors must define every module anchor used by project_assembly.json', {
+			missingBaseAnchors: [...new Set(missingBase)],
+		});
+	}
+	const ordered = modules
+		.filter(mod => seen.has(mod.id) && finitePoint(anchors[mod.anchor]))
+		.map(mod => ({ id: mod.id, x: anchors[mod.anchor].x, column: seen.get(mod.id) }));
+	const reversedPairs = [];
+	for (const left of ordered) {
+		for (const right of ordered) {
+			if (left.column.index >= right.column.index) continue;
+			if (left.x > right.x) {
+				reversedPairs.push({
+					left: left.id,
+					right: right.id,
+					leftColumn: left.column.column,
+					rightColumn: right.column.column,
+					leftX: left.x,
+					rightX: right.x,
+				});
+			}
+		}
+	}
+	if (reversedPairs.length) {
+		hard(findings, 'GP25-layout-column-x-order', 'module anchors must follow the declared left-to-right layoutPolicy.columns order before generation', {
+			reversedPairs,
+		});
+	}
+	return findings;
+}
+
 function validateSpecRealization(spec, contract, netlist, assembly, model = null) {
 	const findings = [];
 	const specModules = moduleById(spec);
@@ -99,6 +171,7 @@ function validateSpecRealization(spec, contract, netlist, assembly, model = null
 			xProfiles: asArray(policy.xProfiles).length,
 		});
 	}
+	findings.push(...validateStaticLayoutPolicy(assembly));
 
 	if (model) {
 		const netResult = validateNetContract(contract, netlist, model);
