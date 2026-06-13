@@ -15,7 +15,7 @@ function fileInfo(root, rel) {
 	return { exists: true, size: stat.size, mtime: stat.mtime.toISOString() };
 }
 
-function generateContext(root, specPath = 'project_spec.json') {
+export function generateContext(root, specPath = 'project_spec.json') {
 	const specAbs = resolve(root, specPath);
 	const specDir = dirname(specAbs).replace(/\\/g, '/');
 	const companion = name => existsSync(`${specDir}/${name}`) ? `${specDir}/${name}` : name;

@@ -34,8 +34,8 @@ Commands:
                                Write a spec file, or a full project + circuit-pack scaffold when <out> is a directory.
   plan [spec]                  Validate current project contracts and print selected pack data.
   generate [spec]              Plan-gated deterministic generation without write-back.
-  accept                       Run local acceptance gates.
-  live-check                   Run live EasyEDA snapshot, image, DRC, and live shot checks.
+  accept [spec]                Run local acceptance gates for the selected spec context.
+  live-check [spec]            Run live EasyEDA snapshot, image, DRC, and live shot checks.
   apply --gated                Write back through the fail-closed gated entrypoint.
   repair [--max-iterations N]  Write repair_loop_report.json from next_actions/repair_actions.
   report                       Summarize latest acceptance and repair artifacts.
@@ -184,10 +184,10 @@ switch (cmd) {
 		generate(args);
 		break;
 	case 'accept':
-		runNode(['engine/acceptance_run.mjs']);
+		runNode(['engine/acceptance_run.mjs', ...args]);
 		break;
 	case 'live-check':
-		runNode(['engine/acceptance_run.mjs', '--live']);
+		runNode(['engine/acceptance_run.mjs', '--live', ...args]);
 		break;
 	case 'apply':
 		if (!args.includes('--gated')) {

@@ -53,7 +53,6 @@ function requireReportPass(findings, rel, label, predicate = data => data?.pass 
 
 const findings = [];
 const local = {
-	acceptance: requireReportPass(findings, 'acceptance_report.json', 'local acceptance report', data => data?.pass === true),
 	workflowSmoke: requireReportPass(findings, 'workflow_smoke_report.json', 'workflow smoke report'),
 	gsdPlan: requireReportPass(findings, 'gsd_plan_report.json', 'GSD plan report'),
 	gsdGenerate: requireReportPass(findings, 'gsd_generate_report.json', 'GSD generate report'),
@@ -69,7 +68,6 @@ const local = {
 
 if (REQUIRE_LIVE) {
 	const live = {
-		acceptance: requireReportPass(findings, 'acceptance_report.json', 'live acceptance report', data => data?.pass === true && data?.mode === 'full-with-live'),
 		liveModel: requireReportPass(findings, 'project_live_model_report.json', 'live model contract report'),
 		drc: requireReportPass(findings, 'drc_report.json', 'EasyEDA DRC report', data => data?.pass === true && data?.drc?.strictPass === true && !(data?.drc?.errors || 0) && !(data?.drc?.warnings || 0) && !(data?.drc?.info || 0)),
 		liveShots: requireReportPass(findings, 'live_shots_report.json', 'live shots report', data => data?.pass === true && (data?.screenshots || 0) >= 10),

@@ -1,9 +1,20 @@
 import { spawnSync } from 'node:child_process';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { generateContext } from '../workflows/gsd_generate.mjs';
 
 const DIR = (process.env.EASYEDA_WORKDIR || process.cwd()).replace(/\\/g, '/') + '/';
 const REPORT = process.env.EASYEDA_ACCEPT_REPORT || DIR + 'acceptance_report.json';
 const RUN_LIVE = process.argv.includes('--live') || process.env.EASYEDA_ACCEPT_LIVE === '1';
+const SPEC_PATH = process.argv.slice(2).find(arg => !arg.startsWith('-')) || process.env.EASYEDA_PROJECT_SPEC || 'project_spec.json';
+const CONTEXT = generateContext(DIR.replace(/\/$/, ''), SPEC_PATH);
+const STEP_ENV = {
+	...process.env,
+	EASYEDA_PROJECT_SPEC: CONTEXT.specAbs,
+	EASYEDA_PROJECT_CONTRACT: CONTEXT.contractPath,
+	EASYEDA_PROJECT_NETLIST: CONTEXT.netlistPath,
+	EASYEDA_PROJECT_ASSEMBLY: CONTEXT.assemblyPath,
+	EASYEDA_APPROVED_LIBRARY_MANIFEST: CONTEXT.libraryManifestPath,
+};
 
 function readJson(path) {
 	return JSON.parse(readFileSync(path, 'utf8').replace(/^\uFEFF/, ''));
@@ -12,7 +23,7 @@ function readJson(path) {
 function runStep(name, command, args, { required = true } = {}) {
 	const started = Date.now();
 	console.log(`acceptance step: ${name}`);
-	const child = spawnSync(command, args, { cwd: DIR, stdio: 'inherit', shell: false, env: process.env });
+	const child = spawnSync(command, args, { cwd: DIR, stdio: 'inherit', shell: false, env: STEP_ENV });
 	return {
 		name,
 		command: [command, ...args].join(' '),
@@ -28,8 +39,8 @@ const steps = [];
 steps.push(runStep('entrypoints', 'node', ['engine/entrypoint_audit.mjs']));
 steps.push(runStep('agent:instructions', 'node', ['engine/agent_instruction_gate.mjs']));
 steps.push(runStep('workflow:smoke', 'node', ['engine/workflow_smoke_gate.mjs']));
-steps.push(runStep('gsd:plan', 'node', ['bin/easyeda-gsd.mjs', 'plan']));
-steps.push(runStep('gsd:generate', 'node', ['bin/easyeda-gsd.mjs', 'generate']));
+steps.push(runStep('gsd:plan', 'node', ['bin/easyeda-gsd.mjs', 'plan', SPEC_PATH]));
+steps.push(runStep('gsd:generate', 'node', ['bin/easyeda-gsd.mjs', 'generate', SPEC_PATH]));
 steps.push(runStep('spec:schema', 'node', ['engine/spec_schema_gate.mjs']));
 steps.push(runStep('spec', 'node', ['engine/project_spec_gate.mjs']));
 steps.push(runStep('contract', 'node', ['engine/project_contract_gate.mjs']));
@@ -91,6 +102,15 @@ const requiredFailed = steps.filter(s => s.required && !s.pass);
 const acceptance = {
 	generatedAt: new Date().toISOString(),
 	mode: RUN_LIVE ? 'full-with-live' : 'local-only',
+	context: {
+		spec: SPEC_PATH,
+		specAbs: CONTEXT.specAbs,
+		specDir: CONTEXT.specDir,
+		contractPath: CONTEXT.contractPath,
+		netlistPath: CONTEXT.netlistPath,
+		assemblyPath: CONTEXT.assemblyPath,
+		libraryManifestPath: CONTEXT.libraryManifestPath,
+	},
 	pass: requiredFailed.length === 0,
 	severity: { hard: requiredFailed.length, soft: 0, info: 0 },
 	steps,
@@ -130,7 +150,7 @@ const acceptance = {
 		agentInstructions: artifacts.agentInstructions ? { pass: artifacts.agentInstructions.pass, severity: artifacts.agentInstructions.severity, filesChecked: artifacts.agentInstructions.filesChecked } : null,
 		workflowSmoke: artifacts.workflowSmoke ? { pass: artifacts.workflowSmoke.pass, severity: artifacts.workflowSmoke.severity, checks: artifacts.workflowSmoke.checks } : null,
 		gsdPlan: artifacts.gsdPlan ? { pass: artifacts.gsdPlan.pass, severity: artifacts.gsdPlan.severity, projectId: artifacts.gsdPlan.projectId, circuitPack: artifacts.gsdPlan.circuitPack, modules: artifacts.gsdPlan.modules } : null,
-		gsdGenerate: artifacts.gsdGenerate ? { pass: artifacts.gsdGenerate.pass, severity: artifacts.gsdGenerate.severity, projectId: artifacts.gsdGenerate.projectId, circuitPack: artifacts.gsdGenerate.circuitPack, generated: artifacts.gsdGenerate.generated } : null,
+		gsdGenerate: artifacts.gsdGenerate ? { pass: artifacts.gsdGenerate.pass, severity: artifacts.gsdGenerate.severity, projectId: artifacts.gsdGenerate.projectId, circuitPack: artifacts.gsdGenerate.circuitPack, generationContext: artifacts.gsdGenerate.generationContext || null, generated: artifacts.gsdGenerate.generated } : null,
 		specSchema: artifacts.specSchema ? { pass: artifacts.specSchema.pass, severity: artifacts.specSchema.severity, projectId: artifacts.specSchema.projectId, modules: artifacts.specSchema.modules, interfaces: artifacts.specSchema.interfaces } : null,
 		projectSpec: artifacts.projectSpec ? { pass: artifacts.projectSpec.pass, severity: artifacts.projectSpec.severity, projectId: artifacts.projectSpec.projectId, modules: artifacts.projectSpec.modules, interfaces: artifacts.projectSpec.interfaces } : null,
 		projectContract: artifacts.projectContract ? { pass: artifacts.projectContract.pass, severity: artifacts.projectContract.severity, projectId: artifacts.projectContract.projectId, modules: artifacts.projectContract.modules, interfaces: artifacts.projectContract.interfaces } : null,
@@ -171,14 +191,14 @@ const acceptance = {
 };
 
 writeFileSync(REPORT, JSON.stringify(acceptance, null, 2), 'utf8');
-const repair = spawnSync('node', ['engine/repair_actions.mjs'], { cwd: DIR, stdio: 'inherit', shell: false, env: process.env });
+const repair = spawnSync('node', ['engine/repair_actions.mjs'], { cwd: DIR, stdio: 'inherit', shell: false, env: STEP_ENV });
 if (repair.error) console.warn(`repair actions failed: ${repair.error.message}`);
-const next = spawnSync('node', ['engine/next_actions.mjs'], { cwd: DIR, stdio: 'inherit', shell: false, env: process.env });
+const next = spawnSync('node', ['engine/next_actions.mjs'], { cwd: DIR, stdio: 'inherit', shell: false, env: STEP_ENV });
 if (next.error) console.warn(`next actions failed: ${next.error.message}`);
-const actionSchema = spawnSync('node', ['engine/action_schema_gate.mjs'], { cwd: DIR, stdio: 'inherit', shell: false, env: process.env });
+const actionSchema = spawnSync('node', ['engine/action_schema_gate.mjs'], { cwd: DIR, stdio: 'inherit', shell: false, env: STEP_ENV });
 if (actionSchema.error) console.warn(`action schema failed: ${actionSchema.error.message}`);
 const finalEvidenceArgs = RUN_LIVE ? ['engine/final_evidence_gate.mjs', '--live'] : ['engine/final_evidence_gate.mjs'];
-const finalEvidence = spawnSync('node', finalEvidenceArgs, { cwd: DIR, stdio: 'inherit', shell: false, env: process.env });
+const finalEvidence = spawnSync('node', finalEvidenceArgs, { cwd: DIR, stdio: 'inherit', shell: false, env: STEP_ENV });
 if (finalEvidence.error) console.warn(`final evidence failed: ${finalEvidence.error.message}`);
 const postSteps = [
 	{ name: 'repair:actions', status: repair.status, pass: repair.status === 0, required: true },

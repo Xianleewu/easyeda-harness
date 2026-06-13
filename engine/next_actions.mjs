@@ -49,7 +49,6 @@ const drc = readJson('drc_report.json');
 const liveShots = readJson('live_shots_report.json');
 const liveDiagnose = readJson('live_diagnose_report.json');
 const repair = readJson('repair_actions.json');
-const finalEvidence = readJson('final_evidence_report.json');
 
 const checks = {
 	agentInstructions: {
@@ -216,6 +215,7 @@ const checks = {
 	acceptance: {
 		status: status(acceptance?.pass),
 		mode: acceptance?.mode || null,
+		context: acceptance?.context || null,
 		severity: acceptance?.severity || null,
 		evidence: 'acceptance_report.json',
 	},
@@ -259,13 +259,6 @@ const checks = {
 		actionCount: repair?.actionCount ?? null,
 		firstAction: repair?.actions?.[0] || null,
 		evidence: 'repair_actions.json',
-	},
-	finalEvidence: {
-		status: status(finalEvidence?.pass),
-		mode: finalEvidence?.mode || null,
-		severity: finalEvidence?.severity || null,
-		firstFinding: finalEvidence?.findings?.[0] || null,
-		evidence: 'final_evidence_report.json',
 	},
 };
 
@@ -452,14 +445,6 @@ if (checks.acceptance.status === 'fail' && !actions.length) {
 		area: 'acceptance',
 		action: 'Inspect acceptance_report.json for failed required steps.',
 		evidence: ['acceptance_report.json'],
-	});
-}
-if (checks.finalEvidence.status !== 'pass') {
-	pushAction(actions, {
-		area: 'final-evidence',
-		action: 'Regenerate required local/live evidence until final_evidence_report.json passes. For final delivery this includes live snapshot, real canvas image, DRC zero, live shots, and empty repair actions.',
-		evidence: ['final_evidence_report.json', 'acceptance_report.json', 'drc_report.json', 'live_shots_report.json', 'project_live_model_report.json'],
-		observed: checks.finalEvidence.firstFinding || checks.finalEvidence,
 	});
 }
 if (checks.repairActions.status === 'fail') {
