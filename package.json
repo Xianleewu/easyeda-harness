@@ -12,6 +12,7 @@
     "agent:instructions": "node engine/agent_instruction_gate.mjs",
     "spec": "node engine/project_spec_gate.mjs",
     "contract": "node engine/project_contract_gate.mjs",
+    "contract:cells": "node engine/project_cell_manifest_gate.mjs",
     "contract:assembly": "node engine/project_assembly_gate.mjs",
     "contract:layout": "node engine/project_layout_gate.mjs",
     "contract:model": "node engine/project_model_gate.mjs",

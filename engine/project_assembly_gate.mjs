@@ -1,18 +1,10 @@
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { cellContractMap, loadCellManifest, resolveCellManifestPath } from './cell_manifest.mjs';
 
 const DIR = (process.env.EASYEDA_WORKDIR || process.cwd()).replace(/\\/g, '/') + '/';
 const CONTRACT = process.env.EASYEDA_PROJECT_CONTRACT || DIR + 'project_contract.json';
 const ASSEMBLY = process.env.EASYEDA_PROJECT_ASSEMBLY || DIR + 'project_assembly.json';
 const REPORT = process.env.EASYEDA_PROJECT_ASSEMBLY_REPORT || DIR + 'project_assembly_report.json';
-
-const CELL_CONTRACTS = {
-	usbCell: { refs: ['J', 'Rcc1', 'Rcc2', 'Rdn', 'Rdp', 'Cv'], netArgs: [] },
-	ldoCell: { refs: ['U', 'Co1', 'Co2'], netArgs: ['VIN', 'VOUT'] },
-	buttonCell: { refs: ['SW', 'Rpu'], optionalRefs: ['Cap'], netArgs: ['SIG'] },
-	mcuCell: { refs: ['U'], netArgs: [] },
-	pmosCell: { refs: ['Q1', 'Q2', 'D1', 'R1', 'R2', 'R3', 'R4', 'CN1', 'CN2'], netArgs: [] },
-	relayDriver: { refs: ['Q', 'Rs', 'Rpd', 'D', 'CN'], netArgs: ['EN', 'GATE', 'COILA', 'COILV'] },
-};
 
 function readJson(path) {
 	return JSON.parse(readFileSync(path, 'utf8').replace(/^\uFEFF/, ''));
@@ -34,7 +26,7 @@ function values(obj) {
 	return Object.values(obj || {}).filter(Boolean);
 }
 
-function validateAssembly(contract, assembly) {
+function validateAssembly(contract, assembly, cellContracts) {
 	const findings = [];
 	const contractModules = new Map(asArray(contract.modules).map(mod => [mod.id, mod]));
 	const assemblyModules = new Map(asArray(assembly.modules).map(mod => [mod.id, mod]));
@@ -60,9 +52,9 @@ function validateAssembly(contract, assembly) {
 			continue;
 		}
 
-		const cell = CELL_CONTRACTS[mapping.cell];
+		const cell = cellContracts.get(mapping.cell);
 		if (!cell) {
-			hard(findings, 'PA4-cell-known', `${id} uses an unknown deterministic cell`, { module: id, cell: mapping.cell, allowedCells: Object.keys(CELL_CONTRACTS) });
+			hard(findings, 'PA4-cell-known', `${id} uses an unknown deterministic cell`, { module: id, cell: mapping.cell, allowedCells: [...cellContracts.keys()] });
 			continue;
 		}
 
@@ -125,13 +117,22 @@ function validateAssembly(contract, assembly) {
 const findings = [];
 let contract = null;
 let assembly = null;
+let manifest = null;
+let manifestPath = null;
 if (!existsSync(CONTRACT)) hard(findings, 'PA0-contract-file', 'project_contract.json is required before assembly audit', { path: CONTRACT });
 if (!existsSync(ASSEMBLY)) hard(findings, 'PA0-assembly-file', 'project_assembly.json is required before deterministic assembly can be trusted', { path: ASSEMBLY });
 if (!findings.length) {
 	try { contract = readJson(CONTRACT); } catch (e) { hard(findings, 'PA0-contract-parse', 'project_contract.json must parse as JSON', { error: e.message }); }
 	try { assembly = readJson(ASSEMBLY); } catch (e) { hard(findings, 'PA0-assembly-parse', 'project_assembly.json must parse as JSON', { error: e.message }); }
 }
-if (contract && assembly) findings.push(...validateAssembly(contract, assembly));
+if (assembly) {
+	manifestPath = resolveCellManifestPath(assembly);
+	if (!existsSync(manifestPath)) hard(findings, 'PA0-cell-manifest-file', 'project_assembly.json must point to an existing cell manifest', { manifestPath });
+	else {
+		try { manifest = loadCellManifest(manifestPath); } catch (e) { hard(findings, 'PA0-cell-manifest-parse', 'cell manifest must parse as JSON', { manifestPath, error: e.message }); }
+	}
+}
+if (contract && assembly && manifest) findings.push(...validateAssembly(contract, assembly, cellContractMap(manifest)));
 
 const report = {
 	generatedAt: new Date().toISOString(),
@@ -139,6 +140,8 @@ const report = {
 	severity: { hard: findings.length, soft: 0, info: 0 },
 	projectId: contract?.projectId || null,
 	assemblyProjectId: assembly?.projectId || null,
+	circuitPack: assembly?.circuitPack || null,
+	cellManifest: manifestPath,
 	modules: asArray(assembly?.modules).length,
 	anchors: Object.keys(assembly?.anchors || {}).length,
 	cellTypes: [...new Set(asArray(assembly?.modules).map(mod => mod.cell).filter(Boolean))],

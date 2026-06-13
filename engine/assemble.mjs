@@ -19,7 +19,7 @@ const FALLBACK_ANCHORS = {
 	relay2:{ x: 1720, y: 475 },
 };
 
-const CELL_BUILDERS = {
+export const CELL_BUILDERS = {
 	usbCell,
 	ldoCell,
 	buttonCell,

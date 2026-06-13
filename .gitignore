@@ -20,6 +20,7 @@ next_actions.json
 repair_actions.json
 entrypoint_audit_report.json
 agent_instruction_report.json
+cell_manifest_report.json
 project_spec_report.json
 project_contract_report.json
 project_assembly_report.json

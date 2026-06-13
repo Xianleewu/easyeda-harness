@@ -29,6 +29,7 @@ const agentInstructions = readJson('agent_instruction_report.json');
 const spec = readJson('project_spec_report.json');
 const contract = readJson('project_contract_report.json');
 const projectRules = readJson('project_rule_report.json');
+const cellManifest = readJson('cell_manifest_report.json');
 const projectAssembly = readJson('project_assembly_report.json');
 const projectLayout = readJson('project_layout_report.json');
 const projectModel = readJson('project_model_report.json');
@@ -78,6 +79,15 @@ const checks = {
 		registeredInterfaces: projectRules?.registeredInterfaces ?? null,
 		firstFinding: projectRules?.findings?.[0] || null,
 		evidence: 'project_rule_report.json',
+	},
+	cellManifest: {
+		status: status(cellManifest?.pass),
+		severity: cellManifest?.severity || null,
+		packId: cellManifest?.packId || null,
+		cellCount: cellManifest?.cellCount ?? null,
+		assemblyCells: cellManifest?.assemblyCells || null,
+		firstFinding: cellManifest?.findings?.[0] || null,
+		evidence: 'cell_manifest_report.json',
 	},
 	projectAssembly: {
 		status: status(projectAssembly?.pass),
@@ -226,6 +236,14 @@ if (checks.projectRules.status !== 'pass') {
 		action: 'Make harness rule registries cover project_contract.json. Update module registry, required parts, interface contracts, or rule registration before trusting template PASS.',
 		evidence: ['project_contract.json', 'harness/module_registry.mjs', 'engine/interface_contract.mjs', 'harness/rule_registry.mjs', 'project_rule_report.json'],
 		observed: checks.projectRules.firstFinding || checks.projectRules,
+	});
+}
+if (checks.cellManifest.status !== 'pass') {
+	pushAction(actions, {
+		area: 'cell-manifest',
+		action: 'Make the selected circuit-pack cell manifest declare every deterministic cell used by project_assembly.json and match the implemented builders before trusting assembly generation.',
+		evidence: ['circuit_packs/aihwdebugger/cell_manifest.json', 'project_assembly.json', 'engine/cells.mjs', 'engine/assemble.mjs', 'cell_manifest_report.json'],
+		observed: checks.cellManifest.firstFinding || checks.cellManifest,
 	});
 }
 if (checks.projectAssembly.status !== 'pass') {

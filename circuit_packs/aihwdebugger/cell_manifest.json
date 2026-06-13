@@ -1,0 +1,61 @@
+{
+  "schemaVersion": 1,
+  "packId": "aihwdebugger",
+  "purpose": "Deterministic cell contracts for the bundled AIHWDEBUGER circuit pack.",
+  "cells": [
+    {
+      "id": "usbCell",
+      "moduleType": "usb_c_input",
+      "refs": ["J", "Rcc1", "Rcc2", "Rdn", "Rdp", "Cv"],
+      "optionalRefs": [],
+      "netArgs": [],
+      "ports": ["SYS_5V", "GND", "USB_DP", "USB_DN", "USB_CC1", "USB_CC2"],
+      "layoutIntent": "left-side USB-C input with local CC pulldowns and USB data series resistors"
+    },
+    {
+      "id": "ldoCell",
+      "moduleType": "linear_regulator",
+      "refs": ["U", "Co1", "Co2"],
+      "optionalRefs": [],
+      "netArgs": ["VIN", "VOUT"],
+      "ports": ["VIN", "VOUT", "GND"],
+      "layoutIntent": "input rail from left, regulated output rail to right, local output capacitors"
+    },
+    {
+      "id": "buttonCell",
+      "moduleType": "pullup_button",
+      "refs": ["SW", "Rpu"],
+      "optionalRefs": ["Cap"],
+      "netArgs": ["SIG"],
+      "ports": ["SIG", "SYS_3V3", "GND"],
+      "layoutIntent": "pull-up and optional capacitor around a named signal line"
+    },
+    {
+      "id": "mcuCell",
+      "moduleType": "mcu_fanout",
+      "refs": ["U"],
+      "optionalRefs": [],
+      "netArgs": [],
+      "ports": ["SYS_3V3", "GND", "RESET_EN", "BOOT_IO9", "USB_DP", "USB_DN", "EXT_PWR_EN", "RELAY1_EN", "RELAY2_EN"],
+      "layoutIntent": "same-side aligned fanout labels around the MCU symbol"
+    },
+    {
+      "id": "pmosCell",
+      "moduleType": "high_side_pmos_switch",
+      "refs": ["Q1", "Q2", "D1", "R1", "R2", "R3", "R4", "CN1", "CN2"],
+      "optionalRefs": [],
+      "netArgs": [],
+      "ports": ["EXT_PWR_EN", "PMOS_GATE", "SYS_5V", "GND"],
+      "layoutIntent": "external high-side switch with readable gate drive and input/output connectors"
+    },
+    {
+      "id": "relayDriver",
+      "moduleType": "low_side_relay_driver",
+      "refs": ["Q", "Rs", "Rpd", "D", "CN"],
+      "optionalRefs": [],
+      "netArgs": ["EN", "GATE", "COILA", "COILV"],
+      "ports": ["EN", "GATE", "COILA", "COILV", "GND"],
+      "layoutIntent": "low-side relay driver with series gate resistor, pulldown, flyback diode, and coil connector"
+    }
+  ]
+}

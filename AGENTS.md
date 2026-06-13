@@ -15,7 +15,7 @@ For a new schematic project, do not draw directly in EasyEDA and then hope the g
 
 A PASS on the bundled model only proves that the bundled model passes. It does not validate another project, another schematic, or hand-drawn EasyEDA edits.
 
-`project_spec.json` is the first user-intent input. `project_contract.json` is the required machine contract derived from it. `project_netlist.json` records required electrical endpoints, and `project_assembly.json` maps each contract module to deterministic cells, refs, anchors, nets, and layout policy. Update all four before changing cells for a new project, then run `npm.cmd run spec`, `npm.cmd run contract`, `npm.cmd run contract:netlist`, `npm.cmd run contract:assembly`, and `npm.cmd run accept`. A failing spec, contract, netlist, assembly, or layout gate blocks all write-back and delivery claims.
+`project_spec.json` is the first user-intent input. `project_contract.json` is the required machine contract derived from it. `project_netlist.json` records required electrical endpoints. `circuit_packs/*/cell_manifest.json` declares the deterministic cell capabilities for the selected circuit pack, and `project_assembly.json` maps each contract module to those cells, refs, anchors, nets, and layout policy. Update all of them before changing cells for a new project, then run `npm.cmd run spec`, `npm.cmd run contract`, `npm.cmd run contract:netlist`, `npm.cmd run contract:cells`, `npm.cmd run contract:assembly`, and `npm.cmd run accept`. A failing spec, contract, netlist, cell-manifest, assembly, or layout gate blocks all write-back and delivery claims.
 
 ## Required External Skill
 
@@ -40,6 +40,7 @@ npm.cmd install
 npm.cmd run spec
 npm.cmd run contract
 npm.cmd run contract:netlist
+npm.cmd run contract:cells
 npm.cmd run contract:assembly
 npm.cmd run accept
 ```
@@ -51,6 +52,7 @@ Acceptance requires all local gates to pass:
 - `spec`: `project_contract.json` covers `project_spec.json`
 - `contract`: `HARD=0 SOFT=0 INFO=0`
 - `contract:netlist`: `project_netlist.json` covers contract nets and generated pin connectivity
+- `contract:cells`: the selected circuit-pack `cell_manifest.json` declares every deterministic cell used by `project_assembly.json` and matches implemented builders
 - `contract:rules`: harness registries and core rules cover `project_contract.json`
 - `contract:assembly`: `project_assembly.json` maps every contract module to deterministic cells, anchors, refs, and nets
 - `fast`: `HARD=0 SOFT=0 INFO=0`
