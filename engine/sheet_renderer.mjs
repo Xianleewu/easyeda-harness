@@ -1,7 +1,7 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import { Resvg } from '@resvg/resvg-js';
 import { MODULE_TITLES } from '../harness/document_style.mjs';
-import { MODULES } from '../harness/module_registry.mjs';
+import { loadProjectModuleRegistry } from '../harness/module_registry.mjs';
 
 const DIR = (process.env.EASYEDA_WORKDIR || process.cwd()).replace(/\\/g, '/') + '/';
 const DEFAULT_OUT = DIR + 'sheet_output.png';
@@ -395,8 +395,9 @@ function isSignalLabelFlag(f) {
 
 export function inferModuleRegions(snapshot, pad = 24) {
 	const byRef = new Map((snapshot?.components || []).map(c => [c.designator, c]));
+	const registry = loadProjectModuleRegistry();
 	const regions = [];
-	for (const mod of MODULES) {
+	for (const mod of registry.modules) {
 		const boxes = mod.refs.map(ref => normalizeBox(byRef.get(ref)?.bbox)).filter(Boolean);
 		const box = union(boxes);
 		if (!box) continue;
@@ -405,6 +406,7 @@ export function inferModuleRegions(snapshot, pad = 24) {
 			title: MODULE_TITLES[mod.name] || mod.name.toUpperCase(),
 			box: expand(box, pad),
 			parts: boxes.length,
+			source: registry.source,
 		});
 	}
 	return regions;

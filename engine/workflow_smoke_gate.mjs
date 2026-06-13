@@ -8,6 +8,8 @@ import { buildMinimalSpec, syncPackRegistry, writePackScaffold } from '../workfl
 import { validateLibraryContract } from '../contracts/library_contract.mjs';
 import { buildAnchorFamily } from './layout_planner.mjs';
 import { computeStructureMetricsFromSnapshot } from './structure_metrics.mjs';
+import { auditPageComposition } from './page_composition.mjs';
+import { inferModuleRegions } from './sheet_renderer.mjs';
 import { acquireRunLock } from '../workflows/run_lock.mjs';
 
 const ROOT = (process.env.EASYEDA_WORKDIR || process.cwd()).replace(/\\/g, '/');
@@ -301,6 +303,38 @@ try {
 		'WS37-structure-uses-project-assembly-modules',
 		'structure metrics must derive module regions from the active project_assembly.json instead of the bundled AIHWDEBUGER module registry',
 		checks.structureUsesProjectAssemblyModules,
+	);
+
+	const oldProjectAssemblyForVisual = process.env.EASYEDA_PROJECT_ASSEMBLY;
+	process.env.EASYEDA_PROJECT_ASSEMBLY = externalStructureAssemblyPath;
+	const externalVisualSnap = {
+		project: 'workflow-smoke-external-visual',
+		components: [
+			{ designator: 'U99', bbox: { minX: 100, minY: 100, maxX: 140, maxY: 140 }, pins: [] },
+			{ designator: 'R99', bbox: { minX: 170, minY: 105, maxX: 190, maxY: 135 }, pins: [] },
+		],
+		wires: [],
+		netflags: [],
+	};
+	const externalPage = auditPageComposition(externalVisualSnap);
+	const externalRegions = inferModuleRegions(externalVisualSnap);
+	if (oldProjectAssemblyForVisual === undefined) delete process.env.EASYEDA_PROJECT_ASSEMBLY;
+	else process.env.EASYEDA_PROJECT_ASSEMBLY = oldProjectAssemblyForVisual;
+	checks.visualUsesProjectAssemblyModules = {
+		pageRegistry: externalPage.moduleRegistry || null,
+		pageModules: externalPage.metrics?.moduleBoxes?.map(mod => mod.name) || [],
+		regionNames: externalRegions.map(region => region.name),
+	};
+	assertFinding(
+		findings,
+		checks.visualUsesProjectAssemblyModules.pageRegistry?.source === externalStructureAssemblyPath
+			&& checks.visualUsesProjectAssemblyModules.pageModules.length === 1
+			&& checks.visualUsesProjectAssemblyModules.pageModules.includes('sensor_frontend')
+			&& checks.visualUsesProjectAssemblyModules.regionNames.length === 1
+			&& checks.visualUsesProjectAssemblyModules.regionNames.includes('sensor_frontend'),
+		'WS38-visual-uses-project-assembly-modules',
+		'page composition and sheet module regions must derive visual evidence regions from active project_assembly.json instead of the bundled AIHWDEBUGER module registry',
+		checks.visualUsesProjectAssemblyModules,
 	);
 
 	const noDrawingRulesContract = clone(contract);

@@ -1,6 +1,6 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import { buildModel, rectsGap, round2 } from '../harness/model.mjs';
-import { MODULES } from '../harness/module_registry.mjs';
+import { loadProjectModuleRegistry } from '../harness/module_registry.mjs';
 import { CONFIG } from '../harness/config.mjs';
 
 const DIR = (process.env.EASYEDA_WORKDIR || process.cwd()).replace(/\\/g, '/') + '/';
@@ -83,9 +83,10 @@ function moduleRows(modules, tolerance = 95) {
 
 export function auditPageComposition(snap, opts = {}) {
 	const model = buildModel(snap);
+	const registry = loadProjectModuleRegistry();
 	const findings = [];
 	const parts = new Map(model.parts.map(p => [p.designator, p]));
-	const modules = MODULES.map(mod => ({ ...mod, box: boxOf(parts, mod.refs, opts.moduleMargin ?? 12) })).filter(m => m.box);
+	const modules = registry.modules.map(mod => ({ ...mod, box: boxOf(parts, mod.refs, opts.moduleMargin ?? 12) })).filter(m => m.box);
 	const byName = Object.fromEntries(modules.map(m => [m.name, m]));
 	const contentBox = union(modules.map(m => m.box));
 	const outputBox = union([byName.pmos?.box, byName.relay1?.box, byName.relay2?.box]);
@@ -228,6 +229,10 @@ export function auditPageComposition(snap, opts = {}) {
 		generatedAt: new Date().toISOString(),
 		pass: severity.hard === 0 && severity.soft === 0 && severity.info === 0,
 		severity,
+		moduleRegistry: {
+			source: registry.source,
+			modules: registry.modules.length,
+		},
 		stats: {
 			modules: modules.length,
 			minGap,
