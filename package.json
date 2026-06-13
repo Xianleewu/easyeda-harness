@@ -25,6 +25,8 @@
     "contract:live:model": "node engine/project_live_model_gate.mjs",
     "contract:visual": "node engine/project_visual_gate.mjs",
     "contract:rules": "node engine/project_rule_gate.mjs",
+    "final:evidence": "node engine/final_evidence_gate.mjs",
+    "final:evidence:live": "node engine/final_evidence_gate.mjs --live",
     "accept": "node engine/acceptance_run.mjs",
     "accept:live": "node engine/acceptance_run.mjs --live",
     "next:actions": "node engine/next_actions.mjs",

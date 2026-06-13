@@ -66,6 +66,8 @@ if (docs['AGENTS.md']) {
 		'contract:assembly',
 		'contract:layout',
 		'contract:live:model',
+		'final_evidence_report.json',
+		'final:evidence',
 		'apply:gated',
 		'accept:live',
 		'repair_actions.json',
@@ -94,6 +96,7 @@ if (docs['CLAUDE.md']) {
 		'contract:cells',
 		'contract:assembly',
 		'contract:layout',
+		'final_evidence_report.json',
 		'accept:live',
 		'apply:gated',
 	], 'Claude Code needs a complete short path, not only a pointer');

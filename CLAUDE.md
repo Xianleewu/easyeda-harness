@@ -15,6 +15,7 @@ In short:
 8. Use `node bin/easyeda-gsd.mjs repair` for the read-only grouped repair plan from `workflows/repair_loop.mjs`.
 9. Keep `next_actions.json` on the `action:schema` contract; see `reports/README.md`.
 10. Pull EasyEDA live evidence with `node bin/easyeda-gsd.mjs live-check` before final delivery.
-11. Write back with `node bin/easyeda-gsd.mjs apply --gated` only after all gates pass.
-12. `live-check` wraps `accept:live`; `apply --gated` wraps `apply:gated`.
-13. Never bypass the fail-closed gate with low-level writer scripts for delivery.
+11. Ensure `final_evidence_report.json` passes before final delivery; live delivery uses `npm.cmd run final:evidence:live`.
+12. Write back with `node bin/easyeda-gsd.mjs apply --gated` only after all gates pass.
+13. `live-check` wraps `accept:live`; `apply --gated` wraps `apply:gated`.
+14. Never bypass the fail-closed gate with low-level writer scripts for delivery.

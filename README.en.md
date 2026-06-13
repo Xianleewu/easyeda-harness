@@ -70,6 +70,7 @@ Follow AGENTS.md for this repository. For a new project, create the project cont
 The agent runs the local checks, generates preview evidence, and writes `acceptance_report.json`, `next_actions.json`, and `repair_actions.json`. If a check fails, `next_actions.json` is the handoff summary and `repair_actions.json` maps each finding to edit targets, inspection files, and the next command to rerun.
 `node bin/easyeda-gsd.mjs repair` builds a read-only grouped repair plan through `workflows/repair_loop.mjs` and writes `repair_loop_report.json`.
 `next_actions.json` is a validated `schemaVersion=1` action contract; `npm run action:schema` checks ids, normalized check statuses, targets, evidence, and pass/action consistency.
+`final:evidence` writes `final_evidence_report.json`, proving required evidence artifacts are present, fresh, passing, and free of open repair actions.
 
 Preferred agent commands:
 
@@ -125,6 +126,7 @@ For handoff, review the global sheet and local crops for USB, LDO, RESET, BOOT, 
 - `action_schema_report.json` proves `next_actions.json` follows the stable action schema
 - `repair_actions.json` has no finding-level repair actions
 - `repair_loop_report.json` has no grouped repair actions
+- `final_evidence_report.json` proves required local/live evidence is present, fresh, and passing
 - No fake text net labels
 - No unnecessary NET PORT symbols on a single-sheet schematic
 - Readable wire `Name` anchors: left-side labels use bottom-left origin, right-side labels use bottom-right origin
@@ -150,6 +152,7 @@ For handoff, review the global sheet and local crops for USB, LDO, RESET, BOOT, 
 - `contracts/spec_schema.mjs`: reusable schema validation for the first user-intent input.
 - `contracts/module_contract.mjs` / `contracts/net_contract.mjs` / `contracts/layout_contract.mjs`: reusable validators for functional modules, electrical endpoint intent, and project-driven layout policy.
 - `workflows/repair_loop.mjs`: read-only repair loop planner that groups `next_actions.json` and `repair_actions.json` into fix kinds, files, evidence, and rerun commands, then emits `repair_loop_report.json`.
+- `engine/final_evidence_gate.mjs`: fail-closed local/live evidence gate for freshness, zero DRC, live model proof, and empty repair actions.
 - `circuit_packs/*/cell_manifest.json`: circuit-pack deterministic cell capability contracts.
 - `circuit_packs/*/pack.mjs`: circuit-pack generation hooks and library normalization.
 - `snap2.json`: component snapshot input.

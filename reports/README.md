@@ -36,3 +36,9 @@ Project-contract, project-netlist, and project-layout findings should also point
 `repair_loop_report.json` follows `schemaVersion: 1` and is written by `node bin/easyeda-gsd.mjs repair`.
 
 It groups `next_actions.json` and `repair_actions.json` by `fixKind`, with the source files to edit, files to inspect, evidence files, and rerun commands. It is read-only: `automaticWriteSupported` must remain `false` until allowlisted repair operations are implemented.
+
+## `final_evidence_report.json`
+
+`final_evidence_report.json` follows the local or live evidence mode selected by `npm run final:evidence` or `npm run final:evidence:live`.
+
+It fails closed when required reports or images are missing, stale, failing, or when final live proof lacks zero DRC, live model contract PASS, real EasyEDA canvas evidence, distinct live shots, or empty repair actions.

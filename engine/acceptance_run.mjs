@@ -161,10 +161,14 @@ const next = spawnSync('node', ['engine/next_actions.mjs'], { cwd: DIR, stdio: '
 if (next.error) console.warn(`next actions failed: ${next.error.message}`);
 const actionSchema = spawnSync('node', ['engine/action_schema_gate.mjs'], { cwd: DIR, stdio: 'inherit', shell: false, env: process.env });
 if (actionSchema.error) console.warn(`action schema failed: ${actionSchema.error.message}`);
+const finalEvidenceArgs = RUN_LIVE ? ['engine/final_evidence_gate.mjs', '--live'] : ['engine/final_evidence_gate.mjs'];
+const finalEvidence = spawnSync('node', finalEvidenceArgs, { cwd: DIR, stdio: 'inherit', shell: false, env: process.env });
+if (finalEvidence.error) console.warn(`final evidence failed: ${finalEvidence.error.message}`);
 const postSteps = [
 	{ name: 'repair:actions', status: repair.status, pass: repair.status === 0, required: true },
 	{ name: 'next:actions', status: next.status, pass: next.status === 0, required: true },
 	{ name: 'action:schema', status: actionSchema.status, pass: actionSchema.status === 0, required: true },
+	{ name: 'final:evidence', status: finalEvidence.status, pass: finalEvidence.status === 0, required: true },
 ];
 steps.push(...postSteps.map(step => ({ ...step, command: step.name, durationMs: 0, error: '' })));
 const finalRequiredFailed = steps.filter(s => s.required && !s.pass);
@@ -173,6 +177,7 @@ acceptance.severity = { hard: finalRequiredFailed.length, soft: 0, info: 0 };
 acceptance.summary.local.repairActions = repair.status === 0;
 acceptance.summary.local.nextActions = next.status === 0;
 acceptance.summary.local.actionSchema = actionSchema.status === 0;
+acceptance.summary.local.finalEvidence = finalEvidence.status === 0;
 writeFileSync(REPORT, JSON.stringify(acceptance, null, 2), 'utf8');
 console.log(`acceptance ${acceptance.pass ? 'PASS' : 'FAIL'} mode=${acceptance.mode} hard=${acceptance.severity.hard}`);
 console.log(`report -> ${REPORT}`);

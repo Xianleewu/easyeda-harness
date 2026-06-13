@@ -69,6 +69,7 @@ EasyEDA Harness 是一套给 Codex、Claude Code 等编程 Agent 使用的原理
 
 Agent 会自动运行本地检查、生成预览图，并写出 `acceptance_report.json`、`next_actions.json` 和 `repair_actions.json`。如果检查未通过，`next_actions.json` 是接手摘要，`repair_actions.json` 会把每条 finding 映射到编辑目标、检查文件和下一条复跑命令。`node bin/easyeda-gsd.mjs repair` 会通过 `workflows/repair_loop.mjs` 生成只读的分组修复计划，并写出 `repair_loop_report.json`。
 `next_actions.json` 是经过校验的 `schemaVersion=1` action contract；`npm run action:schema` 会检查 action id、标准化检查状态、target、evidence，以及 pass/actions 一致性。
+`final:evidence` 会写出 `final_evidence_report.json`，证明所需证据产物存在、足够新、已通过，并且没有开放修复项。
 
 推荐给 Agent 的入口：
 
@@ -124,6 +125,7 @@ Agent 会通过 `apply:gated` 写回 EasyEDA。这个入口会先运行检查；
 - `action_schema_report.json` 证明 `next_actions.json` 符合稳定 action schema
 - `repair_actions.json` 无逐条 finding 修复项
 - `repair_loop_report.json` 无分组修复项
+- `final_evidence_report.json` 证明所需 local/live 证据存在、足够新并通过
 - 无普通文本伪装网络标签
 - 单页图纸不使用无必要的 NET PORT
 - wire `Name` 锚点可读：左侧标签使用左下角，右侧标签使用右下角
@@ -149,6 +151,7 @@ Agent 会通过 `apply:gated` 写回 EasyEDA。这个入口会先运行检查；
 - `contracts/spec_schema.mjs`：第一层用户意图输入的可复用 schema 校验。
 - `contracts/module_contract.mjs` / `contracts/net_contract.mjs` / `contracts/layout_contract.mjs`：功能模块、电气端点意图和项目驱动布局策略的可复用校验器。
 - `workflows/repair_loop.mjs`：只读修复循环计划器，把 `next_actions.json` 和 `repair_actions.json` 分组成修复类型、文件、证据和复跑命令，并写出 `repair_loop_report.json`。
+- `engine/final_evidence_gate.mjs`：fail-closed 的 local/live 证据门禁，检查新鲜度、DRC 归零、live model 证明和空修复项。
 - `circuit_packs/*/cell_manifest.json`：电路包确定性 cell 能力合同。
 - `circuit_packs/*/pack.mjs`：电路包生成 hook 和器件库归一化。
 - `snap2.json`：器件快照输入。

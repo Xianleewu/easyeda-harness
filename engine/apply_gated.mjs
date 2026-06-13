@@ -206,7 +206,17 @@ if (!process.exitCode) {
 			console.error('ABORT: live acceptance gate failed after write-back');
 			process.exitCode = 1;
 		} else {
-			console.log('gate OK: template PASS, write-back done, live acceptance PASS');
+			const finalEvidence = spawnSync('node', ['engine/final_evidence_gate.mjs', '--live'], {
+				cwd: DIR,
+				stdio: 'inherit',
+				env: process.env,
+			});
+			if (finalEvidence.status !== 0) {
+				console.error('ABORT: final evidence gate failed after write-back');
+				process.exitCode = 1;
+			} else {
+				console.log('gate OK: template PASS, write-back done, live acceptance PASS, final evidence PASS');
+			}
 		}
 	}
 }
