@@ -21,7 +21,79 @@ function wireSegments(wire) {
 	return segments;
 }
 
-function validateCellOutput(output, mod, manifestCell) {
+function resolvedPortNet(mod, port) {
+	return mod.netArgs?.[port] || (asArray(mod.nets).includes(port) ? port : '');
+}
+
+function portLayoutFor(manifestCell, port) {
+	return manifestCell?.portLayout?.[port] || null;
+}
+
+function matchingFlags(output, net) {
+	return asArray(output?.flags).filter(flag => flag?.net === net);
+}
+
+function validatePortFlagLayout(findings, flag, mod, manifestCell, port, net, layout, anchor) {
+	if (layout.kind && flag.kind !== layout.kind) {
+		hard(findings, 'CB15-port-flag-kind', `${mod.id} ${port} flag kind must match manifest portLayout`, {
+			module: mod.id,
+			cell: mod.cell,
+			port,
+			net,
+			expectedKind: layout.kind,
+			actualKind: flag.kind || null,
+			flag,
+		});
+	}
+	if (layout.kind === 'sig') {
+		if (layout.side === 'left' && flag.alignMode !== 6) {
+			hard(findings, 'CB16-port-sig-align', `${mod.id} ${port} left signal flag must use bottom-left alignMode=6`, {
+				module: mod.id,
+				cell: mod.cell,
+				port,
+				net,
+				side: layout.side,
+				alignMode: flag.alignMode ?? null,
+				flag,
+			});
+		}
+		if (layout.side === 'right' && flag.alignMode !== 8) {
+			hard(findings, 'CB16-port-sig-align', `${mod.id} ${port} right signal flag must use bottom-right alignMode=8`, {
+				module: mod.id,
+				cell: mod.cell,
+				port,
+				net,
+				side: layout.side,
+				alignMode: flag.alignMode ?? null,
+				flag,
+			});
+		}
+		if (layout.side === 'left' && finitePoint(anchor) && flag.x > anchor.x) {
+			hard(findings, 'CB17-port-side', `${mod.id} ${port} left signal flag must be placed left of the module anchor`, {
+				module: mod.id,
+				cell: mod.cell,
+				port,
+				net,
+				side: layout.side,
+				anchor,
+				flag,
+			});
+		}
+		if (layout.side === 'right' && finitePoint(anchor) && flag.x < anchor.x) {
+			hard(findings, 'CB17-port-side', `${mod.id} ${port} right signal flag must be placed right of the module anchor`, {
+				module: mod.id,
+				cell: mod.cell,
+				port,
+				net,
+				side: layout.side,
+				anchor,
+				flag,
+			});
+		}
+	}
+}
+
+function validateCellOutput(output, mod, manifestCell, anchor) {
 	const findings = [];
 	const refs = new Set(refValues(mod.refs));
 	if (!output || typeof output !== 'object') {
@@ -99,7 +171,7 @@ function validateCellOutput(output, mod, manifestCell) {
 		...asArray(output.flags).map(flag => flag?.net).filter(Boolean),
 	]);
 	const unresolvedPorts = [...declaredPorts].filter(port => {
-		const resolved = mod.netArgs?.[port] || (declaredNets.has(port) ? port : '');
+		const resolved = resolvedPortNet(mod, port);
 		return !resolved;
 	});
 	if (unresolvedPorts.length) {
@@ -118,6 +190,35 @@ function validateCellOutput(output, mod, manifestCell) {
 			declaredNets: [...declaredNets],
 		});
 	}
+	for (const port of declaredPorts) {
+		const layout = portLayoutFor(manifestCell, port);
+		if (!layout) continue;
+		const net = resolvedPortNet(mod, port);
+		if (!net) continue;
+		const flags = matchingFlags(output, net);
+		if (layout.label === 'required' && !flags.length) {
+			hard(findings, 'CB14-port-flag-required', `${mod.id} ${port} must emit a real netflag because manifest portLayout.label is required`, {
+				module: mod.id,
+				cell: mod.cell,
+				port,
+				net,
+				layout,
+			});
+			continue;
+		}
+		if (layout.label === 'forbidden' && flags.some(flag => flag.kind === 'sig')) {
+			hard(findings, 'CB18-port-label-forbidden', `${mod.id} ${port} must not emit a signal label because manifest portLayout.label is forbidden`, {
+				module: mod.id,
+				cell: mod.cell,
+				port,
+				net,
+				layout,
+				flags,
+			});
+			continue;
+		}
+		for (const flag of flags) validatePortFlagLayout(findings, flag, mod, manifestCell, port, net, layout, anchor);
+	}
 	return findings;
 }
 
@@ -129,10 +230,11 @@ export function validateCellBuilderDryRun({ assembly, manifest, pack, byDes = nu
 		const build = pack.cellBuilders[mod.cell];
 		const manifestCell = manifestCells.get(mod.cell);
 		if (!build || !manifestCell) continue;
+		const anchor = assembly.anchors?.[mod.anchor] || { x: 0, y: 0 };
 		const moduleByDes = byDes || new Map(refValues(mod.refs).map(ref => [ref, { designator: ref, pins: [], localBox: { minX: 0, minY: 0, maxX: 1, maxY: 1 } }]));
 		let output = null;
 		try {
-			output = build(moduleByDes, mod.refs || {}, assembly.anchors?.[mod.anchor] || { x: 0, y: 0 }, mod.netArgs || {});
+			output = build(moduleByDes, mod.refs || {}, anchor, mod.netArgs || {});
 		} catch (e) {
 			hard(findings, 'CB0-builder-dry-run', `${mod.id} builder threw during contract dry-run`, {
 				module: mod.id,
@@ -141,7 +243,7 @@ export function validateCellBuilderDryRun({ assembly, manifest, pack, byDes = nu
 			});
 			continue;
 		}
-		findings.push(...validateCellOutput(output, mod, manifestCell));
+		findings.push(...validateCellOutput(output, mod, manifestCell, anchor));
 	}
 	return findings;
 }

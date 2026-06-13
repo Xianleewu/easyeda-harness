@@ -79,6 +79,13 @@ function manifestSource(packId) {
 			'no-fake-net-text',
 			'no-unnecessary-net-ports',
 		],
+		cellTemplate: {
+			portLayout: {
+				EXAMPLE_INPUT: { side: 'left', kind: 'sig', label: 'required' },
+				EXAMPLE_OUTPUT: { side: 'right', kind: 'sig', label: 'required' },
+				GND: { side: 'local', kind: 'gnd', label: 'optional' },
+			},
+		},
 		cells: [],
 	}, null, 2)}\n`;
 }

@@ -24,6 +24,14 @@
         "USB_CC1",
         "USB_CC2"
       ],
+      "portLayout": {
+        "SYS_5V": { "side": "top", "kind": "power", "label": "optional" },
+        "GND": { "side": "local", "kind": "gnd", "label": "optional" },
+        "USB_DP": { "side": "left", "kind": "sig", "label": "required" },
+        "USB_DN": { "side": "left", "kind": "sig", "label": "required" },
+        "USB_CC1": { "side": "local", "kind": "sig", "label": "forbidden" },
+        "USB_CC2": { "side": "local", "kind": "sig", "label": "forbidden" }
+      },
       "layoutIntent": "left-side USB-C input with local CC pulldowns and USB data series resistors",
       "qualityRules": [
         "orthogonal-wiring",
@@ -52,6 +60,11 @@
         "VOUT",
         "GND"
       ],
+      "portLayout": {
+        "VIN": { "side": "top", "kind": "power", "label": "optional" },
+        "VOUT": { "side": "top", "kind": "power", "label": "optional" },
+        "GND": { "side": "local", "kind": "gnd", "label": "optional" }
+      },
       "layoutIntent": "input rail from left, regulated output rail to right, local output capacitors",
       "qualityRules": [
         "orthogonal-wiring",
@@ -80,6 +93,11 @@
         "SYS_3V3",
         "GND"
       ],
+      "portLayout": {
+        "SIG": { "side": "right", "kind": "sig", "label": "required" },
+        "SYS_3V3": { "side": "top", "kind": "power", "label": "optional" },
+        "GND": { "side": "local", "kind": "gnd", "label": "optional" }
+      },
       "layoutIntent": "pull-up and optional capacitor around a named signal line",
       "qualityRules": [
         "orthogonal-wiring",
@@ -109,6 +127,17 @@
         "RELAY1_EN",
         "RELAY2_EN"
       ],
+      "portLayout": {
+        "SYS_3V3": { "side": "top", "kind": "power", "label": "optional" },
+        "GND": { "side": "local", "kind": "gnd", "label": "optional" },
+        "RESET_EN": { "side": "left", "kind": "sig", "label": "required" },
+        "BOOT_IO9": { "side": "left", "kind": "sig", "label": "required" },
+        "USB_DP": { "side": "left", "kind": "sig", "label": "required" },
+        "USB_DN": { "side": "left", "kind": "sig", "label": "required" },
+        "EXT_PWR_EN": { "side": "left", "kind": "sig", "label": "required" },
+        "RELAY1_EN": { "side": "left", "kind": "sig", "label": "required" },
+        "RELAY2_EN": { "side": "left", "kind": "sig", "label": "required" }
+      },
       "layoutIntent": "same-side aligned fanout labels around the MCU symbol",
       "qualityRules": [
         "orthogonal-wiring",
@@ -141,6 +170,12 @@
         "SYS_5V",
         "GND"
       ],
+      "portLayout": {
+        "EXT_PWR_EN": { "side": "left", "kind": "sig", "label": "required" },
+        "PMOS_GATE": { "side": "local", "kind": "sig", "label": "optional" },
+        "SYS_5V": { "side": "top", "kind": "power", "label": "optional" },
+        "GND": { "side": "local", "kind": "gnd", "label": "optional" }
+      },
       "layoutIntent": "external high-side switch with readable gate drive and input/output connectors",
       "qualityRules": [
         "orthogonal-wiring",
@@ -175,6 +210,13 @@
         "COILV",
         "GND"
       ],
+      "portLayout": {
+        "EN": { "side": "left", "kind": "sig", "label": "required" },
+        "GATE": { "side": "local", "kind": "sig", "label": "optional" },
+        "COILA": { "side": "local", "kind": "sig", "label": "optional" },
+        "COILV": { "side": "local", "kind": "sig", "label": "optional" },
+        "GND": { "side": "local", "kind": "gnd", "label": "optional" }
+      },
       "layoutIntent": "low-side relay driver with series gate resistor, pulldown, flyback diode, and coil connector",
       "qualityRules": [
         "orthogonal-wiring",

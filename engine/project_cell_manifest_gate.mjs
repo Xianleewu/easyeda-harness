@@ -50,8 +50,30 @@ function validateManifest(manifest, assembly, manifestPath, pack) {
 		if (!cell?.moduleType) hard(findings, 'CM7-module-type', `${id} needs moduleType`, { cell: id });
 		if (!asArray(cell?.refs).length) hard(findings, 'CM8-ref-roles', `${id} must declare required ref roles`, { cell: id });
 		if (!asArray(cell?.ports).length) hard(findings, 'CM9-ports', `${id} must declare electrical ports`, { cell: id });
-		if (!cell?.layoutIntent) hard(findings, 'CM10-layout-intent', `${id} must declare layoutIntent so agents know the template purpose`, { cell: id });
 		const qualityRules = new Set(asArray(cell?.qualityRules));
+		if (qualityRules.has('real-net-labels')) {
+			if (!cell?.portLayout || typeof cell.portLayout !== 'object') {
+				hard(findings, 'CM16-port-layout', `${id} must declare portLayout for executable net-label placement checks`, { cell: id });
+			} else {
+				for (const port of asArray(cell?.ports)) {
+					const layout = cell.portLayout[port];
+					if (!layout || typeof layout !== 'object') {
+						hard(findings, 'CM17-port-layout-covers-ports', `${id} portLayout must cover every declared port`, { cell: id, port });
+						continue;
+					}
+					if (!['left', 'right', 'top', 'bottom', 'local'].includes(layout.side)) {
+						hard(findings, 'CM18-port-layout-side', `${id} ${port} portLayout.side must be left/right/top/bottom/local`, { cell: id, port, side: layout.side });
+					}
+					if (!['sig', 'power', 'gnd'].includes(layout.kind)) {
+						hard(findings, 'CM19-port-layout-kind', `${id} ${port} portLayout.kind must be sig/power/gnd`, { cell: id, port, kind: layout.kind });
+					}
+					if (!['required', 'optional', 'forbidden'].includes(layout.label || 'optional')) {
+						hard(findings, 'CM20-port-layout-label', `${id} ${port} portLayout.label must be required/optional/forbidden`, { cell: id, port, label: layout.label });
+					}
+				}
+			}
+		}
+		if (!cell?.layoutIntent) hard(findings, 'CM10-layout-intent', `${id} must declare layoutIntent so agents know the template purpose`, { cell: id });
 		const missingQualityRules = requiredQualityRules.filter(rule => !qualityRules.has(rule));
 		if (missingQualityRules.length) {
 			hard(findings, 'CM15-cell-quality-rules', `${id} must declare every required reusable quality rule it is designed to satisfy`, {

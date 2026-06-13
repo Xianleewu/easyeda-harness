@@ -842,6 +842,36 @@ try {
 		observedRules: checks.cellQualityRulesRejected.rules,
 	});
 
+	const noPortLayoutManifest = clone(readJson(`${ROOT}/circuit_packs/aihwdebugger/cell_manifest.json`));
+	if (noPortLayoutManifest.cells?.[0]) delete noPortLayoutManifest.cells[0].portLayout;
+	const noPortLayoutAssembly = { ...assembly, cellManifest: '_tmp_workflow_smoke/no_port_layout_manifest.json' };
+	writeFileSync(`${TMP_DIR}/no_port_layout_manifest.json`, JSON.stringify(noPortLayoutManifest, null, 2) + '\n', 'utf8');
+	writeFileSync(`${TMP_DIR}/no_port_layout_assembly.json`, JSON.stringify(noPortLayoutAssembly, null, 2) + '\n', 'utf8');
+	const noPortLayoutGate = spawnSync(process.execPath, ['engine/project_cell_manifest_gate.mjs'], {
+		cwd: ROOT,
+		stdio: 'pipe',
+		shell: false,
+		env: {
+			...process.env,
+			EASYEDA_PROJECT_ASSEMBLY: `${TMP_DIR}/no_port_layout_assembly.json`,
+			EASYEDA_CELL_MANIFEST_REPORT: `${TMP_DIR}/no_port_layout_report.json`,
+		},
+		encoding: 'utf8',
+	});
+	const noPortLayoutReport = existsSync(`${TMP_DIR}/no_port_layout_report.json`) ? readJson(`${TMP_DIR}/no_port_layout_report.json`) : null;
+	checks.cellPortLayoutRequired = {
+		status: noPortLayoutGate.status,
+		pass: noPortLayoutReport?.pass ?? null,
+		rules: (noPortLayoutReport?.findings || []).map(f => f.rule),
+	};
+	assertFinding(
+		findings,
+		noPortLayoutGate.status !== 0 && (noPortLayoutReport?.findings || []).some(f => f.rule === 'CM16-port-layout'),
+		'WS57-cell-port-layout-required',
+		'cell manifests that claim real-net-labels must declare executable portLayout contracts for every cell',
+		checks.cellPortLayoutRequired,
+	);
+
 	const scaffoldReport = writeScaffold({ outDir: SCAFFOLD_DIR, spec, pack: spec.circuitPack || 'aihwdebugger' });
 	const scaffoldFiles = [
 		'project_spec.json',
@@ -973,6 +1003,10 @@ try {
 			refs: ['U', 'R'],
 			netArgs: [],
 			ports: ['SENSE_OUT', 'GND'],
+			portLayout: {
+				SENSE_OUT: { side: 'right', kind: 'sig', label: 'required' },
+				GND: { side: 'local', kind: 'gnd', label: 'optional' },
+			},
 			layoutIntent: 'generic project rule smoke cell',
 			qualityRules: ['orthogonal-wiring', 'real-net-labels'],
 		}],
@@ -1169,6 +1203,10 @@ export const pack = { id: '${badBuilderPackId}', fallbackAnchors, cellBuilders, 
 			refs: ['U'],
 			netArgs: [],
 			ports: ['SENSE_OUT', 'GND'],
+			portLayout: {
+				SENSE_OUT: { side: 'right', kind: 'sig', label: 'required' },
+				GND: { side: 'local', kind: 'gnd', label: 'optional' },
+			},
 			layoutIntent: 'deliberately invalid builder output',
 			qualityRules: [
 				'orthogonal-wiring',
@@ -1255,6 +1293,13 @@ export const pack = { id: '${badBuilderPackId}', fallbackAnchors, cellBuilders, 
 			&& hasRule(badBuilderPlan, 'CB13-output-nets-declared'),
 		'WS48-cell-builder-output-contract',
 		'GSD plan must dry-run implemented cell builders and reject non-orthogonal wires, fake labels, or undeclared output nets before generation',
+		checks.badBuilderDryRunRejected,
+	);
+	assertFinding(
+		findings,
+		hasRule(badBuilderPlan, 'CB14-port-flag-required'),
+		'WS58-cell-builder-port-flags-required',
+		'cell builder dry-run must reject outputs that do not emit real netflags for ports whose portLayout.label is required',
 		checks.badBuilderDryRunRejected,
 	);
 
@@ -1351,6 +1396,9 @@ export const pack = { id: '${NO_WRITER_PACK}', fallbackAnchors, cellBuilders, no
 			refs: ['U'],
 			netArgs: [],
 			ports: ['SENSE_OUT'],
+			portLayout: {
+				SENSE_OUT: { side: 'right', kind: 'sig', label: 'required' },
+			},
 			layoutIntent: 'valid tiny deterministic sensor cell without apply writer',
 			qualityRules: [
 				'orthogonal-wiring',
@@ -1638,6 +1686,10 @@ export const pack = { id: '${NO_WRITER_PACK}', fallbackAnchors, cellBuilders, no
 			refs: ['U', 'R'],
 			netArgs: [],
 			ports: ['SENSE_OUT', 'GND'],
+			portLayout: {
+				SENSE_OUT: { side: 'right', kind: 'sig', label: 'required' },
+				GND: { side: 'local', kind: 'gnd', label: 'optional' },
+			},
 			layoutIntent: 'relative manifest path smoke',
 			qualityRules: ['orthogonal-wiring', 'real-net-labels'],
 		}],
