@@ -6,6 +6,7 @@ import { runGsdGenerate } from '../workflows/gsd_generate.mjs';
 import { writeScaffold } from '../workflows/gsd_scaffold.mjs';
 import { buildMinimalSpec, syncPackRegistry, writePackScaffold } from '../workflows/pack_scaffold.mjs';
 import { validateLibraryContract } from '../contracts/library_contract.mjs';
+import { validateLayoutContract } from '../contracts/layout_contract.mjs';
 import { buildAnchorFamily } from './layout_planner.mjs';
 import { measureProjectColumnRhythm } from './sheet_output_gate.mjs';
 import { computeStructureMetricsFromSnapshot } from './structure_metrics.mjs';
@@ -265,6 +266,60 @@ try {
 		observedRules: checks.layoutColumnsFollowAnchorOrder.rules,
 		firstFinding: checks.layoutColumnsFollowAnchorOrder.firstFinding,
 	});
+
+	const narrowColumnsAssembly = clone(assembly);
+	narrowColumnsAssembly.anchors = {
+		...narrowColumnsAssembly.anchors,
+		usb: { ...narrowColumnsAssembly.anchors.usb, x: 640 },
+		ldo: { ...narrowColumnsAssembly.anchors.ldo, x: 650 },
+		btn1: { ...narrowColumnsAssembly.anchors.btn1, x: 700 },
+		btn2: { ...narrowColumnsAssembly.anchors.btn2, x: 705 },
+		mcu: { ...narrowColumnsAssembly.anchors.mcu, x: 710 },
+		pmos: { ...narrowColumnsAssembly.anchors.pmos, x: 760 },
+		relay1: { ...narrowColumnsAssembly.anchors.relay1, x: 805 },
+		relay2: { ...narrowColumnsAssembly.anchors.relay2, x: 810 },
+	};
+	narrowColumnsAssembly.layoutPolicy.minColumnGap = 160;
+	const narrowColumnsPlan = buildPlanForFiles({
+		spec,
+		contract,
+		netlist,
+		assembly: narrowColumnsAssembly,
+		libraryManifest,
+		specPath: '_tmp_workflow_smoke/narrow_columns_project_spec.json',
+	});
+	checks.layoutColumnsNeedReadableGap = {
+		pass: !narrowColumnsPlan.pass && hasRule(narrowColumnsPlan, 'GP26-layout-column-gap'),
+		rules: (narrowColumnsPlan.findings || []).map(f => f.rule),
+		firstFinding: narrowColumnsPlan.findings?.[0] || null,
+	};
+	assertFinding(findings, checks.layoutColumnsNeedReadableGap.pass, 'WS55-layout-columns-need-readable-gap', 'GSD plan must reject layout policies whose adjacent declared columns are too close to read as separate module blocks', {
+		observedRules: checks.layoutColumnsNeedReadableGap.rules,
+		firstFinding: checks.layoutColumnsNeedReadableGap.firstFinding,
+	});
+
+	const narrowLayoutFindings = validateLayoutContract(
+		narrowColumnsAssembly,
+		{
+			candidateSource: narrowColumnsAssembly.layoutPolicy.candidateSource,
+			totalCandidates: 20,
+			availableCandidates: 20,
+			policyStats: { baseAnchors: Object.keys(narrowColumnsAssembly.layoutPolicy.baseAnchors || {}).length, anchorVariants: 1 },
+			best: { pass: true, score: 1 },
+		},
+		{
+			pass: true,
+			minModuleGap: 200,
+			laneInterlocks: [],
+			stats: { moduleWireIntrusions: 0 },
+			moduleWireIntrusions: [],
+		},
+	);
+	checks.layoutContractRejectsNarrowColumns = {
+		pass: narrowLayoutFindings.some(f => f.rule === 'PL21-column-gap'),
+		rules: narrowLayoutFindings.map(f => f.rule),
+	};
+	assertFinding(findings, checks.layoutContractRejectsNarrowColumns.pass, 'WS56-layout-contract-rejects-narrow-columns', 'project layout contract must reject final layouts whose adjacent columns are too close even if structure metrics otherwise pass', checks.layoutContractRejectsNarrowColumns);
 
 	const duplicateRefAssembly = clone(assembly);
 	if (duplicateRefAssembly.modules?.[0] && duplicateRefAssembly.modules?.[1]) {

@@ -125,6 +125,7 @@ export function buildScaffold(spec, { pack = 'aihwdebugger' } = {}) {
 				modules: [mod.id],
 			})),
 			minModuleGap: 90,
+			minColumnGap: 120,
 			maxModuleWireIntrusions: 0,
 			requireNoLaneInterlocks: true,
 			baseAnchors: anchors,

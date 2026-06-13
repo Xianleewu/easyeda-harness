@@ -22,6 +22,55 @@ function columnIndexByModule(policy) {
 	return result;
 }
 
+export function measureColumnAnchorGaps(assembly) {
+	const policy = assembly?.layoutPolicy || {};
+	const modules = asArray(assembly?.modules);
+	const anchors = assembly?.anchors || {};
+	const columns = asArray(policy.columns);
+	const moduleToAnchor = new Map(modules.map(mod => [mod.id, mod.anchor]));
+	const measured = [];
+	for (const [index, column] of columns.entries()) {
+		const points = asArray(column.modules)
+			.map(moduleId => ({ moduleId, anchor: moduleToAnchor.get(moduleId) }))
+			.filter(item => finitePoint(anchors[item.anchor]))
+			.map(item => ({ ...item, x: anchors[item.anchor].x }));
+		if (!points.length) {
+			measured.push({
+				index,
+				id: column.id || `column_${index + 1}`,
+				modules: asArray(column.modules),
+				centerX: null,
+				span: null,
+				points,
+			});
+			continue;
+		}
+		const minX = Math.min(...points.map(p => p.x));
+		const maxX = Math.max(...points.map(p => p.x));
+		measured.push({
+			index,
+			id: column.id || `column_${index + 1}`,
+			modules: asArray(column.modules),
+			centerX: Number(((minX + maxX) / 2).toFixed(3)),
+			span: Number((maxX - minX).toFixed(3)),
+			points,
+		});
+	}
+	const pairs = [];
+	for (let i = 0; i + 1 < measured.length; i++) {
+		const left = measured[i];
+		const right = measured[i + 1];
+		pairs.push({
+			leftColumn: left.id,
+			rightColumn: right.id,
+			leftCenterX: left.centerX,
+			rightCenterX: right.centerX,
+			gap: left.centerX == null || right.centerX == null ? null : Number((right.centerX - left.centerX).toFixed(3)),
+		});
+	}
+	return { columns: measured, pairs };
+}
+
 export function validateLayoutContract(assembly, layout, structure, options = {}) {
 	const category = options.category || 'project-layout';
 	const findings = [];
@@ -51,6 +100,13 @@ export function validateLayoutContract(assembly, layout, structure, options = {}
 
 	const columns = columnIndexByModule(policy);
 	const moduleIds = new Set(modules.map(mod => mod.id));
+	const columnIds = new Set();
+	for (const [index, column] of asArray(policy.columns).entries()) {
+		const id = column.id || `column_${index + 1}`;
+		if (columnIds.has(id)) hard(findings, 'PL19-column-id-unique', 'layoutPolicy.columns ids must be unique', { column: id }, category);
+		columnIds.add(id);
+		if (!asArray(column.modules).length) hard(findings, 'PL20-column-nonempty', 'layoutPolicy.columns entries must contain at least one module', { column: id }, category);
+	}
 	const missingColumns = [...moduleIds].filter(id => !columns.has(id));
 	if (missingColumns.length) {
 		hard(findings, 'PL16-module-column-covered', 'layoutPolicy.columns must place every assembly module in an ordered reading-flow column', { missingColumns }, category);
@@ -73,6 +129,16 @@ export function validateLayoutContract(assembly, layout, structure, options = {}
 	const reversedPairs = columnPairs.filter(pair => pair.leftX > pair.rightX);
 	if (reversedPairs.length) {
 		hard(findings, 'PL18-column-x-order', 'module anchors must follow the declared left-to-right layoutPolicy.columns order', { reversedPairs }, category);
+	}
+	const minColumnGap = policy.minColumnGap ?? 120;
+	const columnGaps = measureColumnAnchorGaps(assembly);
+	const narrowColumnGaps = columnGaps.pairs.filter(pair => pair.gap != null && pair.gap < minColumnGap);
+	if (narrowColumnGaps.length) {
+		hard(findings, 'PL21-column-gap', 'adjacent layoutPolicy.columns must have enough X separation for readable module blocks', {
+			minColumnGap,
+			narrowColumnGaps,
+			columns: columnGaps.columns.map(col => ({ id: col.id, centerX: col.centerX, modules: col.modules })),
+		}, category);
 	}
 
 	const expectedAnchors = new Set(modules.map(mod => mod.anchor).filter(Boolean));

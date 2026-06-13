@@ -28,6 +28,7 @@
       { "id": "outputs", "role": "external relay outputs", "modules": ["relay1", "relay2"] }
     ],
     "minModuleGap": 90,
+    "minColumnGap": 120,
     "maxModuleWireIntrusions": 0,
     "requireNoLaneInterlocks": true,
     "baseAnchors": {

@@ -5,6 +5,7 @@ import { validateNetContract } from '../contracts/net_contract.mjs';
 import { validateLibraryContract } from '../contracts/library_contract.mjs';
 import { validateDrawingRuleBindings } from '../contracts/drawing_rule_registry.mjs';
 import { validateCellBuilderDryRun } from '../contracts/cell_builder_contract.mjs';
+import { measureColumnAnchorGaps } from '../contracts/layout_contract.mjs';
 import { asArray as cellArray, cellContractMap, loadCellManifest, resolveCellManifestPath } from '../engine/cell_manifest.mjs';
 import { withLocalPins } from '../engine/transform.mjs';
 import { HARNESS_RULES } from '../harness/rule_registry.mjs';
@@ -97,6 +98,16 @@ function validateStaticLayoutPolicy(assembly) {
 	if (reversedPairs.length) {
 		hard(findings, 'GP25-layout-column-x-order', 'module anchors must follow the declared left-to-right layoutPolicy.columns order before generation', {
 			reversedPairs,
+		});
+	}
+	const minColumnGap = policy.minColumnGap ?? 120;
+	const columnGaps = measureColumnAnchorGaps(assembly);
+	const narrowColumnGaps = columnGaps.pairs.filter(pair => pair.gap != null && pair.gap < minColumnGap);
+	if (narrowColumnGaps.length) {
+		hard(findings, 'GP26-layout-column-gap', 'adjacent layoutPolicy.columns must have enough X separation before generation', {
+			minColumnGap,
+			narrowColumnGaps,
+			columns: columnGaps.columns.map(col => ({ id: col.id, centerX: col.centerX, modules: col.modules })),
 		});
 	}
 	return findings;
