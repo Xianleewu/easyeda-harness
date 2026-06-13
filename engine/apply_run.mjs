@@ -13,11 +13,11 @@ function valueAfter(name) {
 }
 
 if (process.env.EASYEDA_APPLY_RUN_AUTHORIZED !== '1') {
-	console.error('Manual apply_run.mjs is blocked. Use node engine/apply_gated.mjs so the full commercial gate is enforced.');
+	console.error('Manual apply_run.mjs is blocked. Use node engine/apply_gated.mjs so the full acceptance gate is enforced.');
 	process.exit(1);
 }
 if (!FORCE) {
-	console.error('apply_run.mjs requires an internal --force from apply_gated.mjs after commercial gate acceptance.');
+	console.error('apply_run.mjs requires an internal --force from apply_gated.mjs after acceptance gate approval.');
 	process.exit(1);
 }
 

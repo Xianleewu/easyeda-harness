@@ -6,11 +6,11 @@ param(
 $ErrorActionPreference = 'Stop'
 $Dir = Split-Path -Parent $MyInvocation.MyCommand.Path
 if ($env:EASYEDA_APPLY_RUN_AUTHORIZED -ne '1') {
-	Write-Error "Manual apply_run.ps1 is blocked. Use node engine/apply_gated.mjs so the full commercial gate is enforced."
+	Write-Error "Manual apply_run.ps1 is blocked. Use node engine/apply_gated.mjs so the full acceptance gate is enforced."
 	exit 1
 }
 if (-not $Force) {
-	Write-Error "apply_run.ps1 requires an internal -Force from apply_gated.mjs after commercial gate acceptance."
+	Write-Error "apply_run.ps1 requires an internal -Force from apply_gated.mjs after acceptance gate approval."
 	exit 1
 }
 function ChunkNames($Pattern) {

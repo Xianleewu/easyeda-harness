@@ -6,6 +6,12 @@ EasyEDA Harness 是一套给 Codex、Claude Code 等编程 Agent 使用的原理
 
 用户最简单的用法是：把这个仓库交给 Agent，并要求它按 `AGENTS.md` 或 `CLAUDE.md` 执行。Agent 应自动安装依赖、确认官方 EasyEDA API Skill/Bridge、运行门禁、生成截图证据，并在 PASS 后再写回 EasyEDA。
 
+## 适用边界
+
+这个仓库是可执行工作流，不是让 Agent 在 EasyEDA 里自由画图的提示词集合。用于新项目时，Agent 必须先建立项目级合同：功能模块、引脚、关键网络、模块矩形空间、允许的符号和截图验收区域；然后再实现或修改确定性模板和规则。
+
+当前模型 PASS 只证明当前模型 PASS，不能证明其它项目、其它原理图或手工绘制结果符合规则。
+
 ## 核心能力
 
 - 确定性原理图组装：`engine/cells.mjs` 定义功能单元，`engine/assemble.mjs` 负责整图拼装。
@@ -39,7 +45,7 @@ EasyEDA Harness 是一套给 Codex、Claude Code 等编程 Agent 使用的原理
 给 Agent 的一句话：
 
 ```text
-请按 AGENTS.md 接手这个仓库，安装依赖，确认 easyeda-api-skill/Bridge，运行 fast、pipeline、preview；写回前必须拉取 EasyEDA live snapshot/截图复核，只有全部 PASS 后才写回 EasyEDA。
+请按 AGENTS.md 接手这个仓库；如果是新项目，先建立项目合同、模块模板和规则覆盖，不要直接在 EasyEDA 里自由画。确认 easyeda-api-skill/Bridge，运行本地门禁；写回前必须拉取 EasyEDA live snapshot/截图/DRC 复核，只有全部 PASS 后才写回 EasyEDA。
 ```
 
 Agent 会自动运行本地检查、生成预览图，并写出 `acceptance_report.json` 和 `next_actions.json`。如果检查未通过，`next_actions.json` 是下一步修复清单。

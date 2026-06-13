@@ -1,5 +1,5 @@
 export function validateTargetContext(ctx, opts = {}) {
-	const expectedProject = opts.expectedProject || 'AIHWDEBUGER';
+	const expectedProject = opts.expectedProject || process.env.EASYEDA_EXPECTED_PROJECT || '';
 	const findings = [];
 	const projectName = ctx?.project?.friendlyName || ctx?.project?.name || '';
 	const projectUuid = ctx?.project?.uuid || '';
@@ -15,7 +15,7 @@ export function validateTargetContext(ctx, opts = {}) {
 		findings.push({ rule, severity: 'hard', category: 'target', msg, where });
 	}
 
-	if (projectName !== expectedProject) {
+	if (expectedProject && projectName !== expectedProject) {
 		hard('T1-target-project-name', `current project must be ${expectedProject}`, { expectedProject, projectName });
 	}
 	if (!projectUuid || !documentUuid || !schematicUuid || !pageUuid) {

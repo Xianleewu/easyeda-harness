@@ -6,6 +6,12 @@ EasyEDA Harness is a schematic generation and checking tool intended for coding 
 
 The simplest user workflow is to hand this repository to an agent and ask it to follow `AGENTS.md` or `CLAUDE.md`. The agent should install dependencies, verify the official EasyEDA API Skill/Bridge, run the gates, generate visual evidence, and only write back to EasyEDA after every gate passes.
 
+## Scope
+
+This repository is an executable workflow, not a prompt pack for free-form drawing inside EasyEDA. For a new project, the agent must first create a project contract: functional modules, pins, required nets, module rectangles, allowed symbols, and visual evidence regions. Only then should it implement or modify deterministic templates and rules.
+
+A PASS on the current model only proves the current model. It does not validate another project, another schematic, or manual EasyEDA edits.
+
 ## Capabilities
 
 - Deterministic schematic assembly: functional cells live in `engine/cells.mjs`, and whole-sheet composition lives in `engine/assemble.mjs`.
@@ -39,7 +45,7 @@ Then hand this repository to Codex, Claude Code, or a similar agent. Users do no
 One prompt for an agent:
 
 ```text
-Follow AGENTS.md for this repository. Install dependencies, verify easyeda-api-skill/Bridge, run fast, pipeline, and preview. Before write-back, pull a real EasyEDA live snapshot/screenshot and write back only after every check passes.
+Follow AGENTS.md for this repository. For a new project, create the project contract, module templates, and rule coverage first; do not free-draw in EasyEDA. Verify easyeda-api-skill/Bridge, run the local gates, and before write-back pull real EasyEDA live snapshot/screenshot/DRC evidence. Write back only after every check passes.
 ```
 
 The agent runs the local checks, generates preview evidence, and writes `acceptance_report.json` plus `next_actions.json`. If a check fails, `next_actions.json` is the handoff list for the next repair step.

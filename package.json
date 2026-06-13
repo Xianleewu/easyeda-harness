@@ -8,6 +8,7 @@
     "pipeline": "node engine/pipeline.mjs",
     "harness": "node harness/harness.mjs full_model.json harness_model_report.json",
     "apply:gated": "node engine/apply_gated.mjs",
+    "entrypoints": "node engine/entrypoint_audit.mjs",
     "accept": "node engine/acceptance_run.mjs",
     "accept:live": "node engine/acceptance_run.mjs --live",
     "next:actions": "node engine/next_actions.mjs",

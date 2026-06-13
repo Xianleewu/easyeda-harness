@@ -1,6 +1,6 @@
 // 写回硬闸门：pipeline 全 PASS 后才生成/执行写回脚本
 import { execSync, spawnSync } from 'node:child_process';
-import { readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { isAbsolute, join } from 'node:path';
 import { normalizeLiveWires, validateLive } from './validate.mjs';
 import { pullStableDrc } from './drc_pull.mjs';
@@ -60,6 +60,10 @@ async function runBridgeScript(jsFile) {
 }
 
 async function runBridgeBestEffort(jsFile) {
+	if (!existsSync(jsFile)) {
+		console.warn(`post-process helper skipped, file not found: ${jsFile}`);
+		return false;
+	}
 	try {
 		await runBridgeScript(jsFile);
 		return true;
@@ -92,9 +96,9 @@ function runHarness(snapPath, reportPath, label) {
 try {
 	const pipeline = process.env.EASYEDA_LAYOUT_SEARCH === '1' ? 'node engine/pipeline.mjs' : 'node engine/pipeline_fast.mjs';
 	execSync(pipeline, { cwd: DIR, stdio: 'inherit' });
-	execSync('node engine/commercial_gate.mjs --offline', { cwd: DIR, stdio: 'inherit' });
+	execSync('node engine/acceptance_run.mjs', { cwd: DIR, stdio: 'inherit' });
 } catch {
-	console.error('ABORT: offline commercial gate failed, write-back blocked');
+	console.error('ABORT: local acceptance gate failed, write-back blocked');
 	process.exit(1);
 }
 const rep = JSON.parse(readFileSync(DIR + 'report.json', 'utf8').replace(/^\uFEFF/, ''));
@@ -152,11 +156,9 @@ if (!process.exitCode) {
 	});
 	if (applyPs.status !== 0) throw new Error('apply_run.mjs failed');
 	const postProcess = {
-		clearStandardizationState: await runBridgeBestEffort(DIR + 'clear_standardization_state.js'),
-		hidePartNameAttrs: await runBridgeBestEffort(DIR + 'hide_part_name_attrs.js'),
-		normalizeVisibleAttrPlacement: await runBridgeBestEffort(DIR + 'normalize_visible_attr_placement.js'),
-		normalizeRepeatedPartAttrs: await runBridgeBestEffort(DIR + 'normalize_repeated_part_attrs.js'),
-		repairRepeatedLibraryBindings: await runBridgeBestEffort(DIR + 'repair_repeated_library_bindings_live.js'),
+		removeDuplicateTitleBlock: await runBridgeBestEffort(DIR + 'remove_duplicate_title_block.js'),
+		deleteFakeNetTexts: await runBridgeBestEffort(DIR + 'delete_fake_net_texts.js'),
+		fixWireNameAnchors: await runBridgeBestEffort(DIR + 'fix_wire_name_anchors.js'),
 	};
 	const liveSnap = await pullLive();
 	const liveHarness = runHarness(LIVE_SNAP, LIVE_HARNESS_REPORT, 'live');
@@ -195,17 +197,16 @@ if (!process.exitCode) {
 		console.error(`ABORT: live verification failed, hard=${hard}`);
 		process.exitCode = 1;
 	} else {
-		const liveCommercial = spawnSync('node', ['engine/commercial_gate.mjs'], {
+		const liveAcceptance = spawnSync('node', ['engine/acceptance_run.mjs', '--live'], {
 			cwd: DIR,
 			stdio: 'inherit',
 			env: { ...process.env, EASYEDA_WINDOW_ID: TARGET_WINDOW_ID },
 		});
-		if (liveCommercial.status !== 0) {
-			console.error('ABORT: live commercial gate failed after write-back');
+		if (liveAcceptance.status !== 0) {
+			console.error('ABORT: live acceptance gate failed after write-back');
 			process.exitCode = 1;
 		} else {
-			execSync('node engine/acceptance_audit.mjs', { cwd: DIR, stdio: 'inherit' });
-			console.log('gate OK: template PASS, write-back done, live commercial gate PASS');
+			console.log('gate OK: template PASS, write-back done, live acceptance PASS');
 		}
 	}
 }

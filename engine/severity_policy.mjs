@@ -34,7 +34,7 @@ export function auditSeverityLiterals(scanDirs = DEFAULT_SCAN_DIRS) {
 		for (const match of text.matchAll(SEVERITY_LITERAL)) {
 			const before = text.slice(0, match.index);
 			const line = before.split(/\r?\n/).length;
-			hard(findings, 'SP1-soft-info-literal', 'source code emits soft/info severity in a commercial gate path', {
+			hard(findings, 'SP1-soft-info-literal', 'source code emits soft/info severity in an acceptance gate path', {
 				file,
 				line,
 				severity: match[1],
@@ -68,7 +68,7 @@ export function auditReportSeverityZero(report) {
 	visitSeverity(report, 'report', offenders);
 	const findings = [];
 	for (const offender of offenders) {
-		hard(findings, 'SP2-nonzero-report-severity', 'commercial report contains non-zero hard/soft/info severity', offender);
+		hard(findings, 'SP2-nonzero-report-severity', 'acceptance report contains non-zero hard/soft/info severity', offender);
 	}
 	return {
 		pass: findings.length === 0,

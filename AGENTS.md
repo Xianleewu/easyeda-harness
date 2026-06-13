@@ -2,6 +2,19 @@
 
 This repository is a schematic generation and checking harness for Codex, Claude Code, and similar coding agents. It is not the EasyEDA API skill.
 
+## Scope Boundary
+
+This harness is an executable workflow, not a free-form schematic drawing assistant.
+
+For a new schematic project, do not draw directly in EasyEDA and then hope the gates catch the result. First create or update the project-specific structure that the gates can reason about:
+
+- module contracts: functional blocks, pins, required nets, and intended signal flow
+- deterministic cells/templates: component placement, fanout wires, labels, and local routing
+- assembly contract: block rectangles, spacing, inter-block net ownership, and sheet-template policy
+- rule coverage: project-specific required parts, required nets, allowed symbols, DRC policy, and visual evidence regions
+
+A PASS on the bundled model only proves that the bundled model passes. It does not validate another project, another schematic, or hand-drawn EasyEDA edits.
+
 ## Required External Skill
 
 Install and start the official EasyEDA API Skill first:
@@ -18,7 +31,7 @@ Follow the official skill Quick Start before attempting live write-back. The bri
 
 ## Agent Workflow
 
-Run these commands from the repository root:
+For an existing harnessed project, run these commands from the repository root:
 
 ```powershell
 npm.cmd install
@@ -79,3 +92,15 @@ Before claiming completion, produce or inspect:
 - Local module crops for USB, LDO, RESET, BOOT, MCU left/right, PMOS, RELAY1, RELAY2, and title/template area
 
 If a visual or DRC issue appears, update the deterministic template/rules first, then rerun the gates.
+
+## New Project Workflow
+
+When adapting this repository to a different schematic:
+
+1. Read the electrical spec and produce a machine-checkable module/net contract before placing symbols.
+2. Implement or update deterministic cells and assembly code for that contract.
+3. Add/adjust rules so the project-specific contract is enforced by `report.json`, `harness_model_report.json`, live DRC, and visual evidence.
+4. Iterate from `next_actions.json`; do not bypass failed findings with manual EasyEDA edits.
+5. Write back only through `apply:gated`, then validate using live snapshot, real canvas image, DRC, and live shots.
+
+Do not claim completion from offline preview images alone.

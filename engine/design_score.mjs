@@ -238,7 +238,7 @@ export function autoDesignReview(snap, opts = {}) {
 				requiredWidthRatio: referenceMinWidthRatio,
 				requiredHeightRatio: referenceMinHeightRatio,
 			}
-			: { evidence: 'offline review has no live screenshot; live commercial gate supplies pixel evidence' },
+			: { evidence: 'offline review has no live screenshot; live acceptance gate supplies pixel evidence' },
 	);
 
 	const referenceVisualBaseline = dim(
@@ -253,7 +253,7 @@ export function autoDesignReview(snap, opts = {}) {
 		'Rendered sheet should stay inside the approved reference PDF and screenshot baseline family.',
 		baselineSheet && baselineThresholds
 			? { sheet: baselineSheet, thresholds: baselineThresholds }
-			: { evidence: 'reference baseline supplied by commercial gate when available' },
+			: { evidence: 'reference baseline supplied by live acceptance evidence when available' },
 	);
 
 	const dimensions = [systemReadingFlow, functionalBlockCohesion, interfaceLanguage, repeatedChannelGrammar, moduleGridRhythm, visualDensity, referenceFootprint, referenceVisualBaseline];
@@ -265,7 +265,7 @@ export function autoDesignReview(snap, opts = {}) {
 		pass,
 		score,
 		summary: pass
-			? 'Automatic design score meets the commercial review threshold.'
+			? 'Automatic design score meets the schematic review threshold.'
 			: 'Automatic design score still sees a schematic that is electrically valid but not reference-PDF readable.',
 		stats: {
 			parts: model.parts.length,

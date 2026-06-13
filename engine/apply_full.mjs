@@ -3,7 +3,7 @@ import { edaNetFlagRot } from './eda_rot.mjs';
 import { physicalWireRoots, ptKey, pointOnSegment } from './wire_geom.mjs';
 
 if (process.env.EASYEDA_APPLY_FULL_AUTHORIZED !== '1') {
-	console.error('ABORT: apply_full.mjs is a low-level generator. Use node engine/apply_gated.mjs so the full commercial gate is enforced.');
+	console.error('ABORT: apply_full.mjs is a low-level generator. Use node engine/apply_gated.mjs so the full acceptance gate is enforced.');
 	process.exit(1);
 }
 
