@@ -397,6 +397,63 @@ try {
 			report: checks.customFinalEvidenceContext,
 		},
 	);
+	const repairContextDir = `${TMP_DIR}/repair_context`;
+	mkdirSync(repairContextDir, { recursive: true });
+	writeFileSync(`${repairContextDir}/acceptance_report.json`, JSON.stringify({
+		generatedAt: new Date().toISOString(),
+		pass: false,
+		mode: 'local-only',
+		context: {
+			spec: '_tmp_workflow_smoke/custom_project/project_spec.json',
+			specAbs: `${TMP_DIR}/custom_project/project_spec.json`,
+			contractPath: `${TMP_DIR}/custom_project/project_contract.json`,
+			netlistPath: `${TMP_DIR}/custom_project/project_netlist.json`,
+			assemblyPath: `${TMP_DIR}/custom_project/project_assembly.json`,
+			libraryManifestPath: `${TMP_DIR}/custom_project/approved_library_manifest.json`,
+		},
+		severity: { hard: 1, soft: 0, info: 0 },
+		findings: [{ rule: 'ACCEPT-context-smoke', severity: 'hard', msg: 'external spec context smoke' }],
+	}, null, 2), 'utf8');
+	writeFileSync(`${repairContextDir}/final_evidence_report.json`, JSON.stringify({
+		generatedAt: new Date().toISOString(),
+		pass: false,
+		mode: 'local-only',
+		context: { spec: '_tmp_workflow_smoke/custom_project/project_spec.json', projectId: 'workflow_smoke_pack-project' },
+		severity: { hard: 1, soft: 0, info: 0 },
+		findings: [{ rule: 'FE9-acceptance-context-match', severity: 'hard', msg: 'external spec context smoke' }],
+	}, null, 2), 'utf8');
+	const customRepairActions = spawnSync(process.execPath, [`${ROOT}/engine/repair_actions.mjs`], {
+		cwd: repairContextDir,
+		stdio: 'pipe',
+		shell: false,
+		env: {
+			...process.env,
+			EASYEDA_WORKDIR: repairContextDir,
+			EASYEDA_REPAIR_ACTIONS: `${repairContextDir}/repair_actions.json`,
+		},
+		encoding: 'utf8',
+	});
+	const customRepairReport = existsSync(`${repairContextDir}/repair_actions.json`) ? readJson(`${repairContextDir}/repair_actions.json`) : null;
+	const customRepairCommands = (customRepairReport?.actions || []).map(a => a.nextCommand);
+	checks.customRepairContext = {
+		status: customRepairActions.status,
+		actionCount: customRepairReport?.actionCount ?? null,
+		commands: customRepairCommands,
+	};
+	assertFinding(
+		findings,
+		customRepairActions.status !== 0
+			&& customRepairCommands.length > 0
+			&& customRepairCommands.every(cmd => cmd === 'node bin/easyeda-gsd.mjs accept _tmp_workflow_smoke/custom_project/project_spec.json'),
+		'WS20-repair-actions-context-bound',
+		'repair actions for an external spec must rerun the context-aware GSD entrypoint instead of bare npm scripts that fall back to the root project',
+		{
+			status: customRepairActions.status,
+			stdout: customRepairActions.stdout,
+			stderr: customRepairActions.stderr,
+			report: checks.customRepairContext,
+		},
+	);
 
 	const restoreGenerate = runGsdGenerate({ root: ROOT, specPath: 'project_spec.json', command: ['engine/pipeline_fast.mjs'] });
 	checks.restoreGenerate = {

@@ -26,6 +26,7 @@ const REPORTS = [
 	{ gate: 'project-visual', file: 'project_visual_report.json', rerun: 'npm.cmd run contract:visual' },
 	{ gate: 'drc', file: 'drc_report.json', rerun: 'npm.cmd run drc' },
 	{ gate: 'live-shots', file: 'live_shots_report.json', rerun: 'npm.cmd run live:shots' },
+	{ gate: 'final-evidence', file: 'final_evidence_report.json', rerun: 'npm.cmd run final:evidence' },
 	{ gate: 'acceptance', file: 'acceptance_report.json', rerun: 'npm.cmd run accept' },
 ];
 
@@ -45,6 +46,32 @@ function asArray(value) {
 
 function uniq(items) {
 	return [...new Set(items.filter(Boolean))];
+}
+
+function normalizePath(path) {
+	return String(path || '').replace(/\\/g, '/');
+}
+
+function currentSpecArg() {
+	const acceptance = readJson('acceptance_report.json');
+	const spec = acceptance?.context?.spec || process.env.EASYEDA_PROJECT_SPEC || 'project_spec.json';
+	const root = DIR.replace(/\/$/, '');
+	const normalized = normalizePath(spec);
+	if (normalized.startsWith(`${root}/`)) return normalized.slice(root.length + 1);
+	return normalized;
+}
+
+function isExternalSpec(spec) {
+	return normalizePath(spec || 'project_spec.json') !== 'project_spec.json';
+}
+
+function contextAwareCommand(command) {
+	const spec = currentSpecArg();
+	if (!isExternalSpec(spec)) return command;
+	if (/(accept:live|live:|drc|final:evidence:live)/.test(command || '')) {
+		return `node bin/easyeda-gsd.mjs live-check ${spec}`;
+	}
+	return `node bin/easyeda-gsd.mjs accept ${spec}`;
 }
 
 function firstMatch(rule, patterns) {
@@ -262,6 +289,13 @@ const RULE_PLANS = [
 		nextCommand: 'npm.cmd run accept',
 		repairHint: 'Keep acceptance gates fail-closed with hard-only severities and zero non-hard warning/info budgets.',
 	}],
+	[/^FE/, {
+		area: 'final-evidence',
+		editFiles: ['engine/final_evidence_gate.mjs', 'engine/acceptance_run.mjs', 'project_spec.json', 'project_contract.json', 'project_netlist.json', 'project_assembly.json'],
+		inspectFiles: ['final_evidence_report.json', 'acceptance_report.json', 'gsd_plan_report.json', 'gsd_generate_report.json', 'repair_actions.json', 'next_actions.json'],
+		nextCommand: 'npm.cmd run accept',
+		repairHint: 'Regenerate evidence for the active project spec context; stale or mismatched root-project reports must not be used as final proof.',
+	}],
 ];
 
 function defaultPlan(gate, report) {
@@ -301,7 +335,7 @@ function findingItems(report) {
 }
 
 function commandForAction(action, fallback) {
-	return action.nextCommand || fallback || 'npm.cmd run accept';
+	return contextAwareCommand(action.nextCommand || fallback || 'npm.cmd run accept');
 }
 
 const rawFindings = REPORTS.flatMap(findingItems);

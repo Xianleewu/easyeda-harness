@@ -115,6 +115,7 @@ function groupActions(actions) {
 export function buildRepairLoopPlan({ repairActions = null, nextActions = null, maxIterations = 1, write = false } = {}) {
 	const actions = collectActions(repairActions, nextActions);
 	const pass = actions.length === 0;
+	const nextCommand = actions.find(action => action.nextCommand)?.nextCommand || 'node bin/easyeda-gsd.mjs accept project_spec.json';
 	return {
 		schemaVersion: REPAIR_LOOP_SCHEMA_VERSION,
 		generatedAt: new Date().toISOString(),
@@ -128,7 +129,7 @@ export function buildRepairLoopPlan({ repairActions = null, nextActions = null, 
 		actions,
 		nextStep: pass
 			? 'no repair actions open'
-			: 'edit the listed contracts, deterministic sources, or rules; then run node bin/easyeda-gsd.mjs accept',
+			: `edit the listed contracts, deterministic sources, or rules; then run ${nextCommand}`,
 	};
 }
 
@@ -142,4 +143,3 @@ export function loadRepairLoopPlan(root, options = {}) {
 		write: options.write === true,
 	});
 }
-

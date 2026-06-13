@@ -49,6 +49,7 @@ const drc = readJson('drc_report.json');
 const liveShots = readJson('live_shots_report.json');
 const liveDiagnose = readJson('live_diagnose_report.json');
 const repair = readJson('repair_actions.json');
+const finalEvidence = readJson('final_evidence_report.json');
 
 const checks = {
 	agentInstructions: {
@@ -260,6 +261,14 @@ const checks = {
 		firstAction: repair?.actions?.[0] || null,
 		evidence: 'repair_actions.json',
 	},
+	finalEvidence: {
+		status: status(finalEvidence?.pass),
+		mode: finalEvidence?.mode || null,
+		context: finalEvidence?.context || null,
+		severity: finalEvidence?.severity || null,
+		firstFinding: finalEvidence?.findings?.[0] || null,
+		evidence: 'final_evidence_report.json',
+	},
 };
 
 const actions = [];
@@ -445,6 +454,17 @@ if (checks.acceptance.status === 'fail' && !actions.length) {
 		area: 'acceptance',
 		action: 'Inspect acceptance_report.json for failed required steps.',
 		evidence: ['acceptance_report.json'],
+	});
+}
+if (checks.finalEvidence.status !== 'pass') {
+	pushAction(actions, {
+		area: 'final-evidence',
+		action: 'Regenerate and inspect evidence for the active project spec context. Final evidence must not reuse stale reports from another spec or project.',
+		evidence: ['final_evidence_report.json', 'acceptance_report.json', 'gsd_plan_report.json', 'gsd_generate_report.json'],
+		observed: checks.finalEvidence.firstFinding || checks.finalEvidence,
+		nextCommand: checks.acceptance.context?.spec
+			? `node bin/easyeda-gsd.mjs accept ${checks.acceptance.context.spec}`
+			: 'node bin/easyeda-gsd.mjs accept',
 	});
 }
 if (checks.repairActions.status === 'fail') {
