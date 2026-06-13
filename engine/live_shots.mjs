@@ -4,11 +4,14 @@ import { join } from 'node:path';
 import { executeCode, saveJsonResult } from './bridge_client.mjs';
 import { inspectPng, readPngPixels } from './image_gate.mjs';
 import { inferModuleRegions } from './sheet_renderer.mjs';
+import { isBundledAihwdebuggerRegistry } from './project_mode.mjs';
 
 const DIR = (process.env.EASYEDA_WORKDIR || process.cwd()).replace(/\\/g, '/') + '/';
 const SNAP = process.env.EASYEDA_LIVE_SNAP || DIR + 'live.json';
 const OUT = process.env.EASYEDA_LIVE_SHOTS_OUT || DIR + 'live_region_shots/';
 const REPORT = process.env.EASYEDA_LIVE_SHOTS_REPORT || DIR + 'live_shots_report.json';
+const CONTRACT = process.env.EASYEDA_PROJECT_CONTRACT || DIR + 'project_contract.json';
+const ASSEMBLY = process.env.EASYEDA_PROJECT_ASSEMBLY || DIR + 'project_assembly.json';
 const WINDOW_ID = process.env.EASYEDA_WINDOW_ID || '';
 const MODE = process.env.EASYEDA_LIVE_SHOTS_MODE || 'auto';
 
@@ -19,6 +22,38 @@ for (const name of readdirSync(OUT)) {
 
 function readJson(path) {
 	return JSON.parse(readFileSync(path, 'utf8').replace(/^\uFEFF/, ''));
+}
+
+function asArray(value) {
+	return Array.isArray(value) ? value : [];
+}
+
+function normalizeId(value) {
+	return String(value || '').replace(/^\d+_/, '').replace(/_/g, '-');
+}
+
+function fileSlug(value) {
+	return normalizeId(value).replace(/[^a-zA-Z0-9-]+/g, '-').replace(/^-+|-+$/g, '') || 'region';
+}
+
+function regionName(index, evidenceId) {
+	return `${String(index).padStart(2, '0')}_${fileSlug(evidenceId).replace(/-/g, '_')}`;
+}
+
+function evidenceRequirements() {
+	const contract = existsSync(CONTRACT) ? readJson(CONTRACT) : null;
+	const assembly = existsSync(ASSEMBLY) ? readJson(ASSEMBLY) : null;
+	const contractModules = asArray(contract?.modules);
+	const requiredEvidence = [
+		'global-sheet',
+		...asArray(contract?.visualEvidenceRegions),
+		...contractModules.map(mod => mod.visualEvidence).filter(Boolean),
+		'title-template',
+	].map(normalizeId).filter(Boolean);
+	return {
+		isBundled: isBundledAihwdebuggerRegistry(assembly),
+		requiredEvidence: new Set(requiredEvidence),
+	};
 }
 
 function finite(v) {
@@ -131,6 +166,15 @@ function titleBox(snap) {
 
 function regionSpecs(snap) {
 	const modules = inferModuleRegions(snap, 34);
+	const contract = existsSync(CONTRACT) ? readJson(CONTRACT) : null;
+	const assembly = existsSync(ASSEMBLY) ? readJson(ASSEMBLY) : null;
+	const isBundled = isBundledAihwdebuggerRegistry(assembly);
+	const contractModules = asArray(contract?.modules);
+	const evidenceToModule = new Map();
+	for (const mod of contractModules) {
+		const evidence = normalizeId(mod.visualEvidence || mod.id);
+		if (evidence) evidenceToModule.set(evidence, mod.id);
+	}
 	const refsByModule = new Map();
 	for (const mod of [
 		['usb', ['J1', 'R9', 'R10', 'R11', 'R12']],
@@ -142,7 +186,7 @@ function regionSpecs(snap) {
 		['relay1', ['Q3', 'D2', 'R13', 'R15', 'CN3']],
 		['relay2', ['Q4', 'D3', 'R14', 'R16', 'CN4']],
 	]) refsByModule.set(mod[0], mod[1]);
-	const regions = modules.map(r => ({ ...r, refs: refsByModule.get(r.name) || [], box: moduleBoxWithWires(snap, { ...r, refs: refsByModule.get(r.name) || [] }) }));
+	const regions = modules.map(r => ({ ...r, refs: refsByModule.get(r.name) || r.refs || [], box: moduleBoxWithWires(snap, { ...r, refs: refsByModule.get(r.name) || r.refs || [] }) }));
 	const byName = new Map(regions.map(r => [r.name, r]));
 	const allElectrical = union([
 		...(snap.components || []).map(c => normalizeBox(c.bbox)),
@@ -150,7 +194,7 @@ function regionSpecs(snap) {
 		...(snap.wires || []).map(wireBox),
 	]);
 	const title = titleBox(snap);
-	const out = [
+	const defaultRegions = [
 		{ name: '00_global', box: expand(allElectrical, 130), kind: 'global' },
 		{ name: '01_usb', box: byName.get('usb')?.box, kind: 'module' },
 		{ name: '02_ldo', box: byName.get('ldo')?.box, kind: 'module' },
@@ -163,7 +207,24 @@ function regionSpecs(snap) {
 		{ name: '09_relay2', box: byName.get('relay2')?.box, kind: 'module' },
 		{ name: '10_title_template', box: title, kind: 'title' },
 	];
-	return out.filter(r => r.box);
+	const requiredEvidence = [
+		'global-sheet',
+		...asArray(contract?.visualEvidenceRegions),
+		...contractModules.map(mod => mod.visualEvidence).filter(Boolean),
+		'title-template',
+	].map(normalizeId).filter(Boolean);
+	const requiredEvidenceSet = new Set(requiredEvidence);
+	const genericRegions = [...requiredEvidenceSet].map((id, index) => {
+		if (id === 'global-sheet') return { name: regionName(index, id), evidenceId: id, box: allElectrical && expand(allElectrical, 130), kind: 'global' };
+		if (id === 'title-template') return { name: regionName(index, id), evidenceId: id, box: title, kind: 'title' };
+		const moduleId = evidenceToModule.get(id) || id;
+		const region = byName.get(moduleId) || [...byName.values()].find(r => normalizeId(r.name) === id);
+		return region ? { name: regionName(index, id), evidenceId: id, box: region.box, kind: 'module' } : null;
+	}).filter(Boolean);
+	const selected = isBundled && ['usb', 'ldo', 'btn1', 'btn2', 'mcu', 'pmos', 'relay1', 'relay2'].every(name => byName.has(name))
+		? defaultRegions
+		: genericRegions;
+	return selected.filter(r => r.box);
 }
 
 function splitBox(box, side) {
@@ -202,7 +263,7 @@ function cropModeIsAcceptable(regions, hashes, findings) {
 	const missingCrop = cropRegions.filter(r => !existsSync(join(OUT, `${r.name}.png`)));
 	const hasOutside = findings.some(f => f.rule === 'LS5-live-region-outside-current-canvas');
 	return {
-		acceptable: cropRegions.length >= 10 && !missingCrop.length && !hasOutside && uniqueCrops >= Math.min(10, cropRegions.length),
+		acceptable: cropRegions.length > 0 && !missingCrop.length && !hasOutside && uniqueCrops >= cropRegions.length,
 		cropRegions: cropRegions.length,
 		uniqueCrops,
 		missing: missingCrop.map(r => r.name),
@@ -385,9 +446,34 @@ async function ensureLiveSnap() {
 
 const snap = await ensureLiveSnap();
 const regions = regionSpecs(snap);
+const evidencePlan = evidenceRequirements();
+const plannedEvidence = new Set(regions.map(r => normalizeId(r.evidenceId || r.name)).filter(Boolean));
+const missingPlannedEvidence = evidencePlan.isBundled ? [] : [...evidencePlan.requiredEvidence].filter(id => !plannedEvidence.has(id));
+if (process.argv.includes('--regions-only') || process.env.EASYEDA_LIVE_SHOTS_REGIONS_ONLY === '1') {
+	const report = {
+		generatedAt: new Date().toISOString(),
+		mode: 'regions-only',
+		source: SNAP,
+		outputDir: OUT,
+		pass: regions.length > 0 && missingPlannedEvidence.length === 0,
+		severity: { hard: (regions.length > 0 && missingPlannedEvidence.length === 0) ? 0 : 1, soft: 0, info: 0 },
+		screenshots: 0,
+		plannedRegions: regions.map(r => ({ name: r.name, evidenceId: r.evidenceId || null, kind: r.kind, box: r.box })),
+		findings: [
+			...(regions.length > 0 ? [] : [{ rule: 'LS0-live-regions-empty', severity: 'hard', category: 'live-image', msg: 'live shot region planner did not produce any regions' }]),
+			...(missingPlannedEvidence.length ? [{ rule: 'LS7-live-contract-evidence-missing', severity: 'hard', category: 'live-image', msg: 'live shot region planner did not produce every contract visual evidence region', where: { missingEvidence: missingPlannedEvidence, plannedEvidence: [...plannedEvidence].sort() } }] : []),
+		],
+	};
+	writeFileSync(REPORT, JSON.stringify(report, null, 2), 'utf8');
+	console.log(`live shot regions ${report.pass ? 'PASS' : 'FAIL'} planned=${regions.length}`);
+	console.log(`report -> ${REPORT}`);
+	process.exit(report.pass ? 0 : 1);
+}
 const shotReports = [];
 const findings = [];
-if (regions.length < 10) findings.push({ rule: 'LS1-live-shot-count', severity: 'hard', category: 'live-image', msg: 'live evidence must include at least 10 EasyEDA canvas screenshots', where: { count: regions.length } });
+if (missingPlannedEvidence.length) findings.push({ rule: 'LS7-live-contract-evidence-missing', severity: 'hard', category: 'live-image', msg: 'live shot region planner did not produce every contract visual evidence region', where: { missingEvidence: missingPlannedEvidence, plannedEvidence: [...plannedEvidence].sort() } });
+const minLiveShots = Math.max(1, regions.length);
+if (regions.length < minLiveShots) findings.push({ rule: 'LS1-live-shot-count', severity: 'hard', category: 'live-image', msg: 'live evidence must include every planned EasyEDA canvas screenshot', where: { count: regions.length, required: minLiveShots } });
 
 let captureMode = 'zoomed-easyeda-canvas';
 let fallbackDiagnosticOnly = false;
@@ -453,7 +539,7 @@ for (const region of regions) {
 	for (const f of image.findings || []) findings.push({ ...f, rule: `LS2-${f.rule}`, where: { region: region.name, ...(f.where || {}) } });
 }
 const uniqueFinal = new Set(finalHashes).size;
-if (uniqueFinal < Math.min(8, regions.length)) findings.push({ rule: 'LS3-live-shot-unique', severity: 'hard', category: 'live-image', msg: 'live region evidence must contain visually distinct images', where: { unique: uniqueFinal, count: finalHashes.length } });
+if (uniqueFinal < regions.length) findings.push({ rule: 'LS3-live-shot-unique', severity: 'hard', category: 'live-image', msg: 'live region evidence must contain visually distinct images', where: { unique: uniqueFinal, count: finalHashes.length } });
 
 const liveReport = {
 	generatedAt: new Date().toISOString(),

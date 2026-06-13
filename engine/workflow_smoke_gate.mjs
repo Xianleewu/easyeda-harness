@@ -436,6 +436,7 @@ try {
 		],
 		wires: [{ id: 'W99', net: 'SENSE_OUT', line: [160, 130, 210, 130] }],
 		netflags: [{ net: 'SENSE_OUT', kind: 'sig', x: 250, y: 130, bbox: { minX: 250, minY: 120, maxX: 320, maxY: 138 } }],
+		texts: [{ content: 'Schematic1', bbox: { minX: 330, minY: 40, maxX: 430, maxY: 70 } }],
 	}, null, 2) + '\n', 'utf8');
 	const externalVisualCrop = spawnSync(process.execPath, ['engine/visual_crops.mjs'], {
 		cwd: ROOT,
@@ -469,6 +470,40 @@ try {
 		'WS41-visual-crops-use-contract-evidence',
 		'offline visual crops must be generated from the active project contract evidence regions instead of fixed AIHWDEBUGER crop names',
 		checks.visualCropsUseContractEvidence,
+	);
+
+	const externalLiveRegionsReportPath = `${TMP_DIR}/external_live_regions_report.json`;
+	const externalLiveRegions = spawnSync(process.execPath, ['engine/live_shots.mjs', '--regions-only'], {
+		cwd: ROOT,
+		stdio: 'pipe',
+		shell: false,
+		env: {
+			...process.env,
+			EASYEDA_PROJECT_ASSEMBLY: externalStructureAssemblyPath,
+			EASYEDA_PROJECT_CONTRACT: externalDocumentContractPath,
+			EASYEDA_LIVE_SNAP: externalVisualCropSnapPath,
+			EASYEDA_LIVE_SHOTS_REPORT: externalLiveRegionsReportPath,
+			EASYEDA_LIVE_SHOTS_OUT: `${TMP_DIR}/external_live_regions/`,
+		},
+		encoding: 'utf8',
+	});
+	const externalLiveRegionsReport = existsSync(externalLiveRegionsReportPath) ? readJson(externalLiveRegionsReportPath) : null;
+	checks.liveShotsUseContractEvidence = {
+		status: externalLiveRegions.status,
+		pass: externalLiveRegionsReport?.pass ?? null,
+		planned: (externalLiveRegionsReport?.plannedRegions || []).map(r => r.evidenceId || r.name),
+		findings: (externalLiveRegionsReport?.findings || []).map(f => f.rule),
+		stderr: externalLiveRegions.stderr,
+	};
+	assertFinding(
+		findings,
+		externalLiveRegions.status === 0
+			&& externalLiveRegionsReport?.pass === true
+			&& (externalLiveRegionsReport?.plannedRegions || []).some(r => r.evidenceId === 'sensor-frontend')
+			&& !(externalLiveRegionsReport?.plannedRegions || []).some(r => r.name === '01_usb' || r.evidenceId === 'usb'),
+		'WS44-live-shots-use-contract-evidence',
+		'live EasyEDA shot regions must be planned from the active project contract evidence regions instead of fixed AIHWDEBUGER crop names',
+		checks.liveShotsUseContractEvidence,
 	);
 
 	const oldProjectAssemblyForHarnessRules = process.env.EASYEDA_PROJECT_ASSEMBLY;

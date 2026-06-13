@@ -152,7 +152,7 @@ if (REQUIRE_LIVE) {
 	const live = {
 		liveModel: requireReportPass(findings, 'project_live_model_report.json', 'live model contract report'),
 		drc: requireReportPass(findings, 'drc_report.json', 'EasyEDA DRC report', data => data?.pass === true && data?.drc?.strictPass === true && !(data?.drc?.errors || 0) && !(data?.drc?.warnings || 0) && !(data?.drc?.info || 0)),
-		liveShots: requireReportPass(findings, 'live_shots_report.json', 'live shots report', data => data?.pass === true && (data?.screenshots || 0) >= 10),
+		liveShots: requireReportPass(findings, 'live_shots_report.json', 'live shots report', data => data?.pass === true && (data?.screenshots || 0) >= 1),
 		liveCanvas: requireFresh(findings, 'live_canvas.png', 'real EasyEDA canvas image'),
 		liveJson: requireFresh(findings, 'live.json', 'real EasyEDA snapshot'),
 	};
