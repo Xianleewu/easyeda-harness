@@ -34,6 +34,7 @@ steps.push(runStep('fast', 'node', ['engine/pipeline_fast.mjs']));
 steps.push(runStep('pipeline', 'node', ['engine/pipeline.mjs']));
 steps.push(runStep('contract:layout', 'node', ['engine/project_layout_gate.mjs']));
 steps.push(runStep('contract:model', 'node', ['engine/project_model_gate.mjs']));
+steps.push(runStep('contract:netlist', 'node', ['engine/project_netlist_gate.mjs']));
 steps.push(runStep('preview', 'node', ['engine/visual_crops.mjs']));
 steps.push(runStep('contract:visual', 'node', ['engine/project_visual_gate.mjs']));
 
@@ -56,6 +57,7 @@ for (const [key, path] of Object.entries({
 	projectAssembly: DIR + 'project_assembly_report.json',
 	projectLayout: DIR + 'project_layout_report.json',
 	projectModel: DIR + 'project_model_report.json',
+	projectNetlist: DIR + 'project_netlist_report.json',
 	projectLiveModel: DIR + 'project_live_model_report.json',
 	projectVisual: DIR + 'project_visual_report.json',
 	visualReview: DIR + 'visual_review_report.json',
@@ -86,6 +88,7 @@ const acceptance = {
 			pipeline: steps.find(s => s.name === 'pipeline')?.pass === true,
 			projectLayout: steps.find(s => s.name === 'contract:layout')?.pass === true,
 			projectModel: steps.find(s => s.name === 'contract:model')?.pass === true,
+			projectNetlist: steps.find(s => s.name === 'contract:netlist')?.pass === true,
 			preview: steps.find(s => s.name === 'preview')?.pass === true,
 			projectVisual: steps.find(s => s.name === 'contract:visual')?.pass === true,
 		},
@@ -106,6 +109,7 @@ const acceptance = {
 		projectAssembly: artifacts.projectAssembly ? { pass: artifacts.projectAssembly.pass, severity: artifacts.projectAssembly.severity, projectId: artifacts.projectAssembly.projectId, modules: artifacts.projectAssembly.modules, anchors: artifacts.projectAssembly.anchors, cellTypes: artifacts.projectAssembly.cellTypes } : null,
 		projectLayout: artifacts.projectLayout ? { pass: artifacts.projectLayout.pass, severity: artifacts.projectLayout.severity, projectId: artifacts.projectLayout.projectId, candidateSource: artifacts.projectLayout.candidateSource, totalCandidates: artifacts.projectLayout.totalCandidates, minModuleGap: artifacts.projectLayout.minModuleGap, moduleWireIntrusions: artifacts.projectLayout.moduleWireIntrusions, laneInterlocks: artifacts.projectLayout.laneInterlocks } : null,
 		projectModel: artifacts.projectModel ? { pass: artifacts.projectModel.pass, severity: artifacts.projectModel.severity, projectId: artifacts.projectModel.projectId, modelStats: artifacts.projectModel.modelStats } : null,
+		projectNetlist: artifacts.projectNetlist ? { pass: artifacts.projectNetlist.pass, severity: artifacts.projectNetlist.severity, projectId: artifacts.projectNetlist.projectId, stats: artifacts.projectNetlist.stats } : null,
 		projectLiveModel: artifacts.projectLiveModel ? { pass: artifacts.projectLiveModel.pass, severity: artifacts.projectLiveModel.severity, projectId: artifacts.projectLiveModel.projectId, source: artifacts.projectLiveModel.source, liveStats: artifacts.projectLiveModel.liveStats } : null,
 		projectVisual: artifacts.projectVisual ? { pass: artifacts.projectVisual.pass, severity: artifacts.projectVisual.severity, projectId: artifacts.projectVisual.projectId, requiredRegions: artifacts.projectVisual.requiredRegions, availableRegions: artifacts.projectVisual.availableRegions } : null,
 		visualReview: artifacts.visualReview ? { pass: artifacts.visualReview.pass, severity: artifacts.visualReview.severity, screenshots: artifacts.visualReview.screenshots, mode: artifacts.visualReview.mode } : null,

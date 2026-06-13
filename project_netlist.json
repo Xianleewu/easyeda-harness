@@ -1,0 +1,134 @@
+{
+  "schemaVersion": 1,
+  "projectId": "easyeda-harness-default",
+  "source": "project_contract.json",
+  "nets": [
+    {
+      "name": "USB_CC1",
+      "requiredPins": ["J1.A5", "R9.2"],
+      "modulePins": { "usb": ["J1.A5", "R9.2"] }
+    },
+    {
+      "name": "USB_CC2",
+      "requiredPins": ["J1.B5", "R10.2"],
+      "modulePins": { "usb": ["J1.B5", "R10.2"] }
+    },
+    {
+      "name": "USB_DN",
+      "requiredPins": ["J1.A7", "J1.B7", "R11.1", "R11.2", "U1.13"],
+      "modulePins": { "usb": ["J1.A7", "J1.B7", "R11.1", "R11.2"], "mcu": ["U1.13"] }
+    },
+    {
+      "name": "USB_DP",
+      "requiredPins": ["J1.A6", "J1.B6", "R12.1", "R12.2", "U1.14"],
+      "modulePins": { "usb": ["J1.A6", "J1.B6", "R12.1", "R12.2"], "mcu": ["U1.14"] }
+    },
+    {
+      "name": "SYS_5V",
+      "requiredPins": ["J1.A4B9", "J1.B4A9", "C1.1", "U2.3"],
+      "modulePins": { "usb": ["J1.A4B9", "J1.B4A9", "C1.1"], "ldo": ["U2.3"] }
+    },
+    {
+      "name": "SYS_3V3",
+      "requiredPins": ["U2.4", "U2.2", "C2.1", "C4.1", "U1.1", "R18.2", "R17.2"],
+      "modulePins": { "ldo": ["U2.4", "U2.2", "C2.1", "C4.1"], "mcu": ["U1.1"], "reset": ["R18.2"], "boot": ["R17.2"] }
+    },
+    {
+      "name": "GND",
+      "requiredPins": ["J1.A1B12", "J1.B1A12", "R9.1", "R10.1", "C1.2", "U2.1", "C2.2", "C4.2", "U1.9", "U1.19", "Q2.2", "R4.2", "Q3.2", "R15.2", "Q4.2", "R16.2"],
+      "modulePins": {
+        "usb": ["J1.A1B12", "J1.B1A12", "R9.1", "R10.1", "C1.2"],
+        "ldo": ["U2.1", "C2.2", "C4.2"],
+        "mcu": ["U1.9", "U1.19"],
+        "pmos": ["Q2.2", "R4.2"],
+        "relay1": ["Q3.2", "R15.2"],
+        "relay2": ["Q4.2", "R16.2"]
+      }
+    },
+    {
+      "name": "RESET_EN",
+      "requiredPins": ["SW1.5", "SW1.6", "R18.1", "C3.1", "U1.2"],
+      "modulePins": { "reset": ["SW1.5", "SW1.6", "R18.1", "C3.1"], "mcu": ["U1.2"] }
+    },
+    {
+      "name": "BOOT_IO9",
+      "requiredPins": ["SW2.5", "SW2.6", "R17.1", "U1.8"],
+      "modulePins": { "boot": ["SW2.5", "SW2.6", "R17.1"], "mcu": ["U1.8"] }
+    },
+    {
+      "name": "EXT_PWR_EN",
+      "requiredPins": ["U1.3", "R3.1"],
+      "modulePins": { "mcu": ["U1.3"], "pmos": ["R3.1"] }
+    },
+    {
+      "name": "Q2_GATE",
+      "scope": "internal",
+      "requiredPins": ["R3.2", "Q2.1", "R4.1"],
+      "modulePins": { "pmos": ["R3.2", "Q2.1", "R4.1"] }
+    },
+    {
+      "name": "PMOS_GATE",
+      "requiredPins": ["Q1.4", "R1.1", "R2.2", "D1.1"],
+      "modulePins": { "pmos": ["Q1.4", "R1.1", "R2.2", "D1.1"] }
+    },
+    {
+      "name": "PGATE_PULL",
+      "scope": "internal",
+      "requiredPins": ["R2.1", "Q2.3"],
+      "modulePins": { "pmos": ["R2.1", "Q2.3"] }
+    },
+    {
+      "name": "VIN_12_19V",
+      "scope": "internal",
+      "requiredPins": ["Q1.1", "Q1.2", "Q1.3", "R1.2", "D1.2", "CN1.1"],
+      "modulePins": { "pmos": ["Q1.1", "Q1.2", "Q1.3", "R1.2", "D1.2", "CN1.1"] }
+    },
+    {
+      "name": "VOUT_SW",
+      "scope": "internal",
+      "requiredPins": ["Q1.5", "Q1.6", "Q1.7", "Q1.8", "CN2.1"],
+      "modulePins": { "pmos": ["Q1.5", "Q1.6", "Q1.7", "Q1.8", "CN2.1"] }
+    },
+    {
+      "name": "RELAY1_EN",
+      "requiredPins": ["U1.4", "R13.1"],
+      "modulePins": { "mcu": ["U1.4"], "relay1": ["R13.1"] }
+    },
+    {
+      "name": "RLY1_GATE",
+      "requiredPins": ["R13.2", "Q3.1", "R15.1"],
+      "modulePins": { "relay1": ["R13.2", "Q3.1", "R15.1"] }
+    },
+    {
+      "name": "RLY1_COIL_A",
+      "requiredPins": ["Q3.3", "D2.2", "CN3.2"],
+      "modulePins": { "relay1": ["Q3.3", "D2.2", "CN3.2"] }
+    },
+    {
+      "name": "RLY1_COIL_V",
+      "requiredPins": ["D2.1", "CN3.1"],
+      "modulePins": { "relay1": ["D2.1", "CN3.1"] }
+    },
+    {
+      "name": "RELAY2_EN",
+      "requiredPins": ["U1.5", "R14.1"],
+      "modulePins": { "mcu": ["U1.5"], "relay2": ["R14.1"] }
+    },
+    {
+      "name": "RLY2_GATE",
+      "requiredPins": ["R14.2", "Q4.1", "R16.1"],
+      "modulePins": { "relay2": ["R14.2", "Q4.1", "R16.1"] }
+    },
+    {
+      "name": "RLY2_COIL_A",
+      "requiredPins": ["Q4.3", "D3.2", "CN4.2"],
+      "modulePins": { "relay2": ["Q4.3", "D3.2", "CN4.2"] }
+    },
+    {
+      "name": "RLY2_COIL_V",
+      "requiredPins": ["D3.1", "CN4.1"],
+      "modulePins": { "relay2": ["D3.1", "CN4.1"] }
+    }
+  ],
+  "allowedAnonymousNets": []
+}

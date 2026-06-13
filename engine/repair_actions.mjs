@@ -13,6 +13,7 @@ const REPORTS = [
 	{ gate: 'pipeline', file: 'layout_planner_report.json', rerun: 'npm.cmd run pipeline' },
 	{ gate: 'project-layout', file: 'project_layout_report.json', rerun: 'npm.cmd run pipeline && npm.cmd run contract:layout' },
 	{ gate: 'project-model', file: 'project_model_report.json', rerun: 'npm.cmd run contract:model' },
+	{ gate: 'project-netlist', file: 'project_netlist_report.json', rerun: 'npm.cmd run contract:netlist' },
 	{ gate: 'project-live-model', file: 'project_live_model_report.json', rerun: 'npm.cmd run accept:live' },
 	{ gate: 'preview', file: 'visual_review_report.json', rerun: 'npm.cmd run preview' },
 	{ gate: 'project-visual', file: 'project_visual_report.json', rerun: 'npm.cmd run contract:visual' },
@@ -106,6 +107,13 @@ const RULE_PLANS = [
 		inspectFiles: ['full_model.json', 'project_model_report.json'],
 		nextCommand: 'npm.cmd run fast && npm.cmd run contract:model',
 		repairHint: 'Make the generated model express every required part, net, and interface near its source and target modules.',
+	}],
+	[/^PN/, {
+		area: 'project-netlist',
+		editFiles: ['project_netlist.json', 'project_contract.json', 'engine/cells.mjs', 'engine/connectivity_qc.mjs'],
+		inspectFiles: ['project_netlist_report.json', 'full_model.json', 'project_contract.json'],
+		nextCommand: 'npm.cmd run fast && npm.cmd run contract:netlist',
+		repairHint: 'Make structured electrical intent explicit in project_netlist.json and ensure generated pins resolve to the required named nets.',
 	}],
 	[/^PLM/, {
 		area: 'project-live-model',

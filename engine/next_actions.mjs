@@ -31,6 +31,7 @@ const projectRules = readJson('project_rule_report.json');
 const projectAssembly = readJson('project_assembly_report.json');
 const projectLayout = readJson('project_layout_report.json');
 const projectModel = readJson('project_model_report.json');
+const projectNetlist = readJson('project_netlist_report.json');
 const projectLiveModel = readJson('project_live_model_report.json');
 const projectVisual = readJson('project_visual_report.json');
 const template = readJson('report.json');
@@ -104,6 +105,14 @@ const checks = {
 		modelStats: projectModel?.modelStats || null,
 		firstFinding: projectModel?.findings?.[0] || null,
 		evidence: 'project_model_report.json',
+	},
+	projectNetlist: {
+		status: status(projectNetlist?.pass),
+		severity: projectNetlist?.severity || null,
+		projectId: projectNetlist?.projectId || null,
+		stats: projectNetlist?.stats || null,
+		firstFinding: projectNetlist?.findings?.[0] || null,
+		evidence: 'project_netlist_report.json',
 	},
 	projectLiveModel: {
 		status: status(projectLiveModel?.pass),
@@ -232,6 +241,14 @@ if (checks.projectModel.status !== 'pass') {
 		action: 'Make full_model.json satisfy project_contract.json. Fix deterministic cells, assembly, or the contract so required modules, parts, nets, and interfaces match the generated model.',
 		evidence: ['project_contract.json', 'full_model.json', 'project_model_report.json'],
 		observed: checks.projectModel.firstFinding || checks.projectModel,
+	});
+}
+if (checks.projectNetlist.status !== 'pass') {
+	pushAction(actions, {
+		area: 'project-netlist',
+		action: 'Make project_netlist.json describe structured electrical intent and make full_model.json satisfy every required pin/net endpoint.',
+		evidence: ['project_netlist.json', 'project_contract.json', 'full_model.json', 'project_netlist_report.json'],
+		observed: checks.projectNetlist.firstFinding || checks.projectNetlist,
 	});
 }
 if (acceptance?.mode === 'full-with-live' && checks.projectLiveModel.status !== 'pass') {

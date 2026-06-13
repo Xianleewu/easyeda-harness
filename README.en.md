@@ -14,13 +14,14 @@ A PASS on the current model only proves the current model. It does not validate 
 
 `project_spec.json` is the machine-readable user-intent input. `project_contract.json` is the design contract derived from that spec. `npm run spec` checks that the contract covers the spec, and `npm run contract` / `npm run accept` continue checking the contract and generated model.
 
-`project_contract.json` is the first machine-readable file an agent must update for a new project. `project_assembly.json` then maps each contract module to deterministic cells, refs, anchors, nets, and layout policy. `npm run contract`, `npm run contract:assembly`, `npm run contract:layout`, and `npm run accept` check them; if they fail, the agent should not edit write-back scripts, apply to EasyEDA, or claim completion.
+`project_contract.json` is the first machine-readable file an agent must update for a new project. `project_netlist.json` records the required electrical endpoints, and `project_assembly.json` maps each contract module to deterministic cells, refs, anchors, nets, and layout policy. `npm run contract`, `npm run contract:netlist`, `npm run contract:assembly`, `npm run contract:layout`, and `npm run accept` check them; if they fail, the agent should not edit write-back scripts, apply to EasyEDA, or claim completion.
 
 ## Capabilities
 
 - Deterministic schematic assembly: functional cells live in `engine/cells.mjs`, and whole-sheet composition lives in `engine/assemble.mjs`.
 - Project spec gate: `project_spec.json` defines user-level modules, nets, interfaces, and quality policy.
 - Project contract gate: `project_contract.json` defines modules, key nets, interfaces, visual evidence regions, and the no-free-draw policy.
+- Project netlist gate: `project_netlist.json` defines required pins for key nets and proves the generated model connects them.
 - Rule coverage check: `contract:rules` proves module registry, required parts, interface contracts, and core rules cover the project contract.
 - Assembly coverage check: `contract:assembly` proves every contract module is mapped to a deterministic cell, anchor, refs, and nets before generation.
 - Layout policy check: `contract:layout` proves layout search is driven by `project_assembly.json` and that the final layout satisfies module spacing, no interlock, and no unrelated wire intrusion requirements.
@@ -61,7 +62,7 @@ Follow AGENTS.md for this repository. For a new project, create the project cont
 
 The agent runs the local checks, generates preview evidence, and writes `acceptance_report.json`, `next_actions.json`, and `repair_actions.json`. If a check fails, `next_actions.json` is the handoff summary and `repair_actions.json` maps each finding to edit targets, inspection files, and the next command to rerun.
 
-For a new project, the first implementation step is updating `project_spec.json`, then realizing it in `project_contract.json`, then mapping the contract and layout policy in `project_assembly.json`. Only then should the agent implement project-specific deterministic cells and rules.
+For a new project, the first implementation step is updating `project_spec.json`, realizing it in `project_contract.json`, defining required endpoints in `project_netlist.json`, then mapping the contract and layout policy in `project_assembly.json`. Only then should the agent implement project-specific deterministic cells and rules.
 
 ## Write Back To EasyEDA
 
@@ -87,6 +88,7 @@ For handoff, review the global sheet and local crops for USB, LDO, RESET, BOOT, 
 - Project contract check: `project_contract_report.json` has `HARD=0 SOFT=0 INFO=0`
 - Project spec coverage check: `project_spec_report.json` has `HARD=0 SOFT=0 INFO=0`
 - Project rule coverage check: `project_rule_report.json` has `HARD=0 SOFT=0 INFO=0`
+- Project netlist check: `project_netlist_report.json` has `HARD=0 SOFT=0 INFO=0`
 - Project assembly coverage check: `project_assembly_report.json` has `HARD=0 SOFT=0 INFO=0`
 - Project layout policy check: `project_layout_report.json` has `HARD=0 SOFT=0 INFO=0`
 - Contract realization check: `project_model_report.json` has `HARD=0 SOFT=0 INFO=0`
@@ -118,7 +120,7 @@ For handoff, review the global sheet and local crops for USB, LDO, RESET, BOOT, 
 
 - `engine/`: template assembly, layout search, write-back, rendering, DRC and live helpers.
 - `harness/`: normalized model, module registry, and rule gates.
-- `project_spec.json` / `project_contract.json` / `project_assembly.json`: user intent, design contract, executable assembly mapping, and layout policy.
+- `project_spec.json` / `project_contract.json` / `project_netlist.json` / `project_assembly.json`: user intent, design contract, structured electrical endpoints, executable assembly mapping, and layout policy.
 - `snap2.json`: component snapshot input.
 - `comp_state.json`: component state input for write-back preservation.
 - `engine/bridge_client.mjs` / `engine/bridge_exec.mjs`: cross-platform EasyEDA bridge runners.

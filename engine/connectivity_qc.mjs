@@ -1,6 +1,10 @@
 import { buildNetlist } from './netlist.mjs';
+import { existsSync, readFileSync } from 'node:fs';
 
-const REQUIRED_NETS = [
+const DIR = (process.env.EASYEDA_WORKDIR || process.cwd()).replace(/\\/g, '/') + '/';
+const PROJECT_NETLIST = process.env.EASYEDA_PROJECT_NETLIST || DIR + 'project_netlist.json';
+
+const FALLBACK_REQUIRED_NETS = [
 	{ net: 'USB_CC1', pins: ['J1.A5', 'R9.2'] },
 	{ net: 'USB_CC2', pins: ['J1.B5', 'R10.2'] },
 	{ net: 'USB_DN', pins: ['J1.A7', 'J1.B7', 'R11.1', 'R11.2', 'U1.13'] },
@@ -9,22 +13,44 @@ const REQUIRED_NETS = [
 	{ net: 'GND', pins: ['R9.1', 'R10.1', 'C1.2'] },
 ];
 
-const REQUIRED_PIN_NETS = [
+const FALLBACK_REQUIRED_PIN_NETS = [
 	{ ref: 'D2.2', net: 'RLY1_COIL_A', msg: 'D2 anode must connect to relay 1 switched coil node' },
 	{ ref: 'D2.1', net: 'RLY1_COIL_V', msg: 'D2 cathode must connect to relay 1 coil supply' },
 	{ ref: 'D3.2', net: 'RLY2_COIL_A', msg: 'D3 anode must connect to relay 2 switched coil node' },
 	{ ref: 'D3.1', net: 'RLY2_COIL_V', msg: 'D3 cathode must connect to relay 2 coil supply' },
 ];
 
+function readProjectRequiredNets() {
+	if (!existsSync(PROJECT_NETLIST)) return FALLBACK_REQUIRED_NETS;
+	try {
+		const projectNetlist = JSON.parse(readFileSync(PROJECT_NETLIST, 'utf8').replace(/^\uFEFF/, ''));
+		return (projectNetlist.nets || [])
+			.filter(net => net?.name && Array.isArray(net.requiredPins) && net.requiredPins.length)
+			.map(net => ({ net: net.name, pins: net.requiredPins }));
+	} catch {
+		return FALLBACK_REQUIRED_NETS;
+	}
+}
+
+function requiredPinNets(requiredNets) {
+	const out = [];
+	for (const req of requiredNets) {
+		for (const ref of req.pins || []) out.push({ ref, net: req.net, msg: `${ref} must connect to ${req.net}` });
+	}
+	return out;
+}
+
 export function connectivityQC(model) {
 	const findings = [];
 	const nets = buildNetlist(model);
+	const requiredNets = readProjectRequiredNets();
+	const requiredPinNetsList = requiredPinNets(requiredNets);
 	const pinNet = new Map();
 	for (const n of nets) {
 		for (const p of n.pins) pinNet.set(p.ref, n.name);
 	}
 
-	for (const req of REQUIRED_NETS) {
+	for (const req of requiredNets) {
 		const groups = new Map();
 		for (const ref of req.pins) {
 			const nm = pinNet.get(ref);
@@ -48,7 +74,7 @@ export function connectivityQC(model) {
 		}
 	}
 
-	for (const req of REQUIRED_PIN_NETS) {
+	for (const req of [...FALLBACK_REQUIRED_PIN_NETS, ...requiredPinNetsList]) {
 		const actual = pinNet.get(req.ref);
 		if (!actual) {
 			findings.push({ rule: 'E2-pin-missing', severity: 'hard', category: 'electrical',
