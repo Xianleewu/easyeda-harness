@@ -3,6 +3,7 @@ import { buildModel, round2 } from '../harness/model.mjs';
 import { loadProjectModuleRegistry } from '../harness/module_registry.mjs';
 import { INTERFACE_CONTRACTS } from './interface_contract.mjs';
 import { KEY_NET_CONTRACT, netContractReport } from './net_contract.mjs';
+import { isBundledAihwdebuggerRegistry } from './project_mode.mjs';
 
 const DIR = (process.env.EASYEDA_WORKDIR || process.cwd()).replace(/\\/g, '/') + '/';
 const DEFAULT_OUT = DIR + 'system_intent_gate.json';
@@ -194,7 +195,7 @@ export function auditSystemIntent(snap, opts = {}) {
 	const findings = [];
 	const nets = netNames(snap);
 	const { parts, modules, byName, registry } = moduleMap(model);
-	const isBundledAihwdebugger = registry.assembly?.circuitPack === 'aihwdebugger' || registry.assembly?.projectId === 'easyeda-harness-default';
+	const isBundledAihwdebugger = isBundledAihwdebuggerRegistry(registry);
 	const contractChecks = isBundledAihwdebugger ? contractFlagCoverage(snap) : [];
 	const netContract = isBundledAihwdebugger ? (opts.netContract || netContractReport(snap)) : { checks: [] };
 

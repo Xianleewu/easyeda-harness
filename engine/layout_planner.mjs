@@ -170,6 +170,7 @@ function geometryBoundsFromPage(pageComposition) {
 }
 
 function scoreCandidate({ template, structure, architecture, pageComposition, systemIntent, sheetOutput, design, internalPacking }) {
+	const isGenericProject = design?.stats?.moduleRegistry?.mode === 'generic-project-score';
 	const templateHard = template.bySev?.hard || 0;
 	const structureHard = structure?.severity?.hard || 0;
 	const archHard = architecture?.severity?.hard || 0;
@@ -189,24 +190,24 @@ function scoreCandidate({ template, structure, architecture, pageComposition, sy
 	const footprint = sheetOutput?.render?.evidence?.footprint || {};
 	const tileRhythm = sheetOutput?.render?.tileRhythm || {};
 	const geometryBounds = geometryBoundsFromPage(pageComposition);
-	const fixedImagePenalty = geometryBounds ? (
+	const fixedImagePenalty = !isGenericProject && geometryBounds ? (
 		Math.max(0, geometryBounds.sheetWidth - LIVE_IMAGE_BOUNDS.maxSheetWidth) * 3 +
 		Math.max(0, geometryBounds.sheetHeight - LIVE_IMAGE_BOUNDS.maxSheetHeight) * 3 +
 		Math.max(0, geometryBounds.content.maxX - LIVE_IMAGE_BOUNDS.maxContentRight) * 8 +
 		Math.max(0, geometryBounds.content.maxY - LIVE_IMAGE_BOUNDS.maxContentTop) * 8 +
 		Math.max(0, LIVE_IMAGE_BOUNDS.minContentLeft - geometryBounds.content.minX) * 4 +
 		Math.max(0, LIVE_IMAGE_BOUNDS.minContentBottom - geometryBounds.content.minY) * 4
-	) : 900;
-	const labelOnly = archStats.labelOnlyInterfaces ?? 99;
-	const a2 = architecture?.findings?.some(f => f.rule === 'A2-input-power-islands') ? 1 : 0;
-	const a3 = architecture?.findings?.some(f => f.rule === 'A3-output-band-sprawl') ? 1 : 0;
+	) : 0;
+	const labelOnly = archStats.labelOnlyInterfaces ?? 0;
+	const a2 = !isGenericProject && architecture?.findings?.some(f => f.rule === 'A2-input-power-islands') ? 1 : 0;
+	const a3 = !isGenericProject && architecture?.findings?.some(f => f.rule === 'A3-output-band-sprawl') ? 1 : 0;
 	const sparsePenalty =
 		Math.max(0, 0.9 - (footprint.electricalWidthRatio ?? 0)) * 900 +
 		Math.max(0, 0.86 - (footprint.electricalHeightRatio ?? 0)) * 900 +
 		Math.max(0, 0.72 - (footprint.moduleHeightRatio ?? 0)) * 500 +
 		Math.max(0, 0.28 - (footprint.modulePackingRatio ?? 0)) * 700;
-	const internalPackingPenalty = Math.max(0, 0.085 - (internalPacking?.minOutputRatio ?? 0)) * 5000;
-	const layoutPenalty =
+	const internalPackingPenalty = isGenericProject ? 0 : Math.max(0, 0.085 - (internalPacking?.minOutputRatio ?? 0)) * 5000;
+	const layoutPenalty = isGenericProject ? 0 : (
 		Math.max(0, (layout.inputColumnSkew ?? 0) - (layout.maxInputColumnSkew ?? 140)) * 3 +
 		Math.max(0, (layout.minOutputSubcolumnGap ?? 250) - (layout.outputSubcolumnGap ?? 999)) * 4 +
 		Math.max(0, (layout.outputSubcolumnGap ?? 0) - (layout.maxOutputSubcolumnGap ?? 460)) * 4 +
@@ -221,8 +222,9 @@ function scoreCandidate({ template, structure, architecture, pageComposition, sy
 		Math.max(0, (supportRow.minRowGap ?? 90) - (supportRow.rowGap ?? 999)) * 3 +
 		Math.max(0, (supportRow.minBelowMcu ?? 80) - (supportRow.belowMcu ?? 999)) * 3 +
 		Math.max(0, ((supportRow.minRowGap ?? 90) + 10) - (supportRow.rowGap ?? 999)) * 2 +
-		Math.max(0, (supportRow.rowCenterSkew ?? 0) - 10) * 2;
-	const tilePenalty =
+		Math.max(0, (supportRow.rowCenterSkew ?? 0) - 10) * 2
+	);
+	const tilePenalty = isGenericProject ? 0 :
 		Math.max(0, (tileRhythm.maxEmptyRun ?? 0)) * 400 +
 		Math.max(0, 0.58 - (tileRhythm.activeTileRatio ?? 0.58)) * 1200;
 	const passBonus = (template.pass ? 1200 : 0) + (structure?.pass ? 1200 : 0) + (architecture?.pass ? 1800 : 0) + (pageComposition?.pass ? 1600 : 0) + (systemIntent?.pass ? 1600 : 0) + (sheetOutput?.pass ? 1400 : 0);

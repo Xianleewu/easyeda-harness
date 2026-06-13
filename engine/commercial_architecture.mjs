@@ -2,6 +2,7 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { buildModel, rectsGap, round2 } from '../harness/model.mjs';
 import { activePartToModuleMap, loadProjectModuleRegistry } from '../harness/module_registry.mjs';
 import { INTERFACE_CONTRACTS, interfaceContractByNet } from './interface_contract.mjs';
+import { isBundledAihwdebuggerRegistry } from './project_mode.mjs';
 
 const DIR = (process.env.EASYEDA_WORKDIR || process.cwd()).replace(/\\/g, '/') + '/';
 const DEFAULT_OUT = DIR + 'commercial_architecture_report.json';
@@ -232,7 +233,7 @@ function pairedGroupedContracts(model, contracts, modules, partModule) {
 export function auditCommercialArchitecture(snap, opts = {}) {
 	const model = buildModel(snap);
 	const registry = loadProjectModuleRegistry();
-	const isBundledAihwdebugger = registry.assembly?.circuitPack === 'aihwdebugger' || registry.assembly?.projectId === 'easyeda-harness-default';
+	const isBundledAihwdebugger = isBundledAihwdebuggerRegistry(registry);
 	const findings = [];
 	const parts = new Map(model.parts.map(p => [p.designator, p]));
 	const partModule = activePartToModuleMap();

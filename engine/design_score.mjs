@@ -1,7 +1,9 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import { buildModel, round2 } from '../harness/model.mjs';
+import { loadProjectModuleRegistry } from '../harness/module_registry.mjs';
 import { auditCommercialArchitecture } from './commercial_architecture.mjs';
 import { auditPageComposition } from './page_composition.mjs';
+import { isBundledAihwdebuggerRegistry } from './project_mode.mjs';
 
 function readJson(path) {
 	return JSON.parse(readFileSync(path, 'utf8').replace(/^\uFEFF/, ''));
@@ -59,6 +61,8 @@ function contractRequiredCount(architecture) {
 
 export function autoDesignReview(snap, opts = {}) {
 	const model = buildModel(snap);
+	const registry = loadProjectModuleRegistry();
+	const isBundledAihwdebugger = isBundledAihwdebuggerRegistry(registry);
 	const architecture = opts.architecture || auditCommercialArchitecture(snap);
 	const structure = opts.structure || null;
 	const pageComposition = opts.pageComposition || auditPageComposition(snap);
@@ -81,9 +85,9 @@ export function autoDesignReview(snap, opts = {}) {
 		x: (boxCenter(relay1.box).x + boxCenter(relay2.box).x) / 2,
 		y: (boxCenter(relay1.box).y + boxCenter(relay2.box).y) / 2,
 	} : null;
-	const inputSpread = usbC && ldoC ? Math.abs(usbC.y - ldoC.y) : 999;
+	const inputSpread = usbC && ldoC ? Math.abs(usbC.y - ldoC.y) : null;
 	const outputBox = union([pmos?.box, relay1?.box, relay2?.box]);
-	const outputHeight = outputBox ? outputBox.maxY - outputBox.minY : 999;
+	const outputHeight = outputBox ? outputBox.maxY - outputBox.minY : null;
 	const outputArea = boxArea(outputBox);
 	const minGap = structure?.minModuleGap ?? Math.min(...(architecture?.stats?.moduleGaps || [{ gap: 0 }]).map(g => g.gap));
 	const labelOnly = architecture?.stats?.labelOnlyInterfaces ?? 99;
@@ -115,9 +119,9 @@ export function autoDesignReview(snap, opts = {}) {
 		(mcuC && relayC && relayC.x <= mcuC.x ? 25 : 0);
 	const systemReadingFlow = dim(
 		'system-reading-flow',
-		100 - flowOrderPenalty - Math.max(0, inputSpread - 240) * 0.25 - (hasFinding(architecture, 'A3-output-band-sprawl') ? 12 : 0),
+		100 - flowOrderPenalty - Math.max(0, n(inputSpread, 0) - 240) * 0.25 - (hasFinding(architecture, 'A3-output-band-sprawl') ? 12 : 0),
 		'Input/power, MCU/control, and output/load should read as a left-to-right engineering story.',
-		{ inputSpread: round2(inputSpread), flowOrderPenalty, outputHeight: round2(outputHeight), outputArea: round2(outputArea) },
+		{ inputSpread: inputSpread == null ? null : round2(inputSpread), flowOrderPenalty, outputHeight: outputHeight == null ? null : round2(outputHeight), outputArea: round2(outputArea) },
 	);
 
 	const functionalBlockCohesion = dim(
@@ -256,7 +260,9 @@ export function autoDesignReview(snap, opts = {}) {
 			: { evidence: 'reference baseline supplied by live acceptance evidence when available' },
 	);
 
-	const dimensions = [systemReadingFlow, functionalBlockCohesion, interfaceLanguage, repeatedChannelGrammar, moduleGridRhythm, visualDensity, referenceFootprint, referenceVisualBaseline];
+	const dimensions = isBundledAihwdebugger
+		? [systemReadingFlow, functionalBlockCohesion, interfaceLanguage, repeatedChannelGrammar, moduleGridRhythm, visualDensity, referenceFootprint, referenceVisualBaseline]
+		: [functionalBlockCohesion, interfaceLanguage, visualDensity, referenceFootprint, referenceVisualBaseline];
 	const score = clampScore(dimensions.reduce((sum, d) => sum + d.score, 0) / dimensions.length);
 	const pass = score >= 85 && dimensions.every(d => d.pass);
 	return {
@@ -268,11 +274,16 @@ export function autoDesignReview(snap, opts = {}) {
 			? 'Automatic design score meets the schematic review threshold.'
 			: 'Automatic design score still sees a schematic that is electrically valid but not reference-PDF readable.',
 		stats: {
+			moduleRegistry: {
+				source: registry.source,
+				modules: registry.modules.length,
+				mode: isBundledAihwdebugger ? 'aihwdebugger-score' : 'generic-project-score',
+			},
 			parts: model.parts.length,
 			wires: model.rawWires.length,
 			labelOnlyInterfaces: labelOnly,
-			inputSpread: round2(inputSpread),
-			outputHeight: round2(outputHeight),
+			inputSpread: inputSpread == null ? null : round2(inputSpread),
+			outputHeight: outputHeight == null ? null : round2(outputHeight),
 			outputArea: round2(outputArea),
 			minGap: round2(minGap),
 			schematicContentWidthRatio: imageMetrics?.schematicContentWidthRatio ?? null,

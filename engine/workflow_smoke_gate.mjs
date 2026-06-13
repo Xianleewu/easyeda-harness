@@ -12,6 +12,7 @@ import { auditPageComposition } from './page_composition.mjs';
 import { inferModuleRegions } from './sheet_renderer.mjs';
 import { auditCommercialArchitecture } from './commercial_architecture.mjs';
 import { auditSystemIntent } from './system_intent_gate.mjs';
+import { autoDesignReview } from './design_score.mjs';
 import { auditDocumentStyle, buildDocumentLayer } from '../harness/document_style.mjs';
 import { buildModel } from '../harness/model.mjs';
 import { runRules } from '../harness/rule_registry.mjs';
@@ -499,6 +500,36 @@ try {
 		'WS42-harness-rules-use-project-assembly-modules',
 		'core harness rules must derive required parts and module boxes from active project_assembly.json instead of the bundled AIHWDEBUGER module registry',
 		checks.harnessRulesUseProjectAssemblyModules,
+	);
+
+	const oldProjectAssemblyForDesignScore = process.env.EASYEDA_PROJECT_ASSEMBLY;
+	process.env.EASYEDA_PROJECT_ASSEMBLY = externalStructureAssemblyPath;
+	const externalDesignScore = autoDesignReview({
+		projectId: 'workflow-smoke-external-structure',
+		components: [
+			{ designator: 'U99', value: 'IC', bbox: { minX: 100, minY: 100, maxX: 160, maxY: 160 }, pins: [] },
+			{ designator: 'R99', value: '10k', bbox: { minX: 210, minY: 115, maxX: 250, maxY: 145 }, pins: [] },
+		],
+		wires: [],
+		netflags: [],
+	});
+	if (oldProjectAssemblyForDesignScore === undefined) delete process.env.EASYEDA_PROJECT_ASSEMBLY;
+	else process.env.EASYEDA_PROJECT_ASSEMBLY = oldProjectAssemblyForDesignScore;
+	checks.genericDesignScoreIgnoresBundledStory = {
+		pass: externalDesignScore.pass,
+		score: externalDesignScore.score,
+		mode: externalDesignScore.stats?.moduleRegistry?.mode || null,
+		dimensions: externalDesignScore.dimensions.map(d => d.id),
+	};
+	assertFinding(
+		findings,
+		checks.genericDesignScoreIgnoresBundledStory.mode === 'generic-project-score'
+			&& !checks.genericDesignScoreIgnoresBundledStory.dimensions.includes('system-reading-flow')
+			&& !checks.genericDesignScoreIgnoresBundledStory.dimensions.includes('repeated-channel-grammar')
+			&& !checks.genericDesignScoreIgnoresBundledStory.dimensions.includes('module-grid-rhythm'),
+		'WS43-generic-design-score-ignores-bundled-story',
+		'auto design score for external projects must use generic project dimensions instead of USB/MCU/relay reference-story penalties',
+		checks.genericDesignScoreIgnoresBundledStory,
 	);
 
 	const noDrawingRulesContract = clone(contract);
