@@ -28,6 +28,7 @@ const acceptance = readJson('acceptance_report.json');
 const spec = readJson('project_spec_report.json');
 const contract = readJson('project_contract_report.json');
 const projectRules = readJson('project_rule_report.json');
+const projectAssembly = readJson('project_assembly_report.json');
 const projectModel = readJson('project_model_report.json');
 const projectVisual = readJson('project_visual_report.json');
 const template = readJson('report.json');
@@ -65,6 +66,16 @@ const checks = {
 		registeredInterfaces: projectRules?.registeredInterfaces ?? null,
 		firstFinding: projectRules?.findings?.[0] || null,
 		evidence: 'project_rule_report.json',
+	},
+	projectAssembly: {
+		status: status(projectAssembly?.pass),
+		severity: projectAssembly?.severity || null,
+		projectId: projectAssembly?.projectId || null,
+		modules: projectAssembly?.modules ?? null,
+		anchors: projectAssembly?.anchors ?? null,
+		cellTypes: projectAssembly?.cellTypes ?? null,
+		firstFinding: projectAssembly?.findings?.[0] || null,
+		evidence: 'project_assembly_report.json',
 	},
 	template: {
 		status: status(template?.pass),
@@ -159,6 +170,14 @@ if (checks.projectRules.status !== 'pass') {
 		action: 'Make harness rule registries cover project_contract.json. Update module registry, required parts, interface contracts, or rule registration before trusting template PASS.',
 		evidence: ['project_contract.json', 'harness/module_registry.mjs', 'engine/interface_contract.mjs', 'harness/rule_registry.mjs', 'project_rule_report.json'],
 		observed: checks.projectRules.firstFinding || checks.projectRules,
+	});
+}
+if (checks.projectAssembly.status !== 'pass') {
+	pushAction(actions, {
+		area: 'project-assembly',
+		action: 'Make project_assembly.json map every project_contract.json module to a deterministic cell, anchor, refs, and nets before generation. This is the bridge from user intent to executable schematic layout.',
+		evidence: ['project_spec.json', 'project_contract.json', 'project_assembly.json', 'engine/cells.mjs', 'engine/assemble.mjs', 'project_assembly_report.json'],
+		observed: checks.projectAssembly.firstFinding || checks.projectAssembly,
 	});
 }
 if (checks.template.status !== 'pass') {

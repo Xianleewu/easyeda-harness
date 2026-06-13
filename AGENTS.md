@@ -15,7 +15,7 @@ For a new schematic project, do not draw directly in EasyEDA and then hope the g
 
 A PASS on the bundled model only proves that the bundled model passes. It does not validate another project, another schematic, or hand-drawn EasyEDA edits.
 
-`project_spec.json` is the first user-intent input. `project_contract.json` is the required machine contract derived from it. Update both before changing cells or assembly for a new project, then run `npm.cmd run spec` and `npm.cmd run contract`. A failing spec or contract blocks all write-back and delivery claims.
+`project_spec.json` is the first user-intent input. `project_contract.json` is the required machine contract derived from it. `project_assembly.json` maps each contract module to deterministic cells, refs, anchors, and nets. Update all three before changing cells for a new project, then run `npm.cmd run spec`, `npm.cmd run contract`, and `npm.cmd run contract:assembly`. A failing spec, contract, or assembly gate blocks all write-back and delivery claims.
 
 ## Required External Skill
 
@@ -39,6 +39,7 @@ For an existing harnessed project, run these commands from the repository root:
 npm.cmd install
 npm.cmd run spec
 npm.cmd run contract
+npm.cmd run contract:assembly
 npm.cmd run accept
 ```
 
@@ -49,6 +50,7 @@ Acceptance requires all local gates to pass:
 - `spec`: `project_contract.json` covers `project_spec.json`
 - `contract`: `HARD=0 SOFT=0 INFO=0`
 - `contract:rules`: harness registries and core rules cover `project_contract.json`
+- `contract:assembly`: `project_assembly.json` maps every contract module to deterministic cells, anchors, refs, and nets
 - `fast`: `HARD=0 SOFT=0 INFO=0`
 - `pipeline`: `HARD=0 SOFT=0 INFO=0`
 - `contract:model`: generated `full_model.json` satisfies `project_contract.json`
@@ -108,9 +110,10 @@ When adapting this repository to a different schematic:
 
 1. Read the electrical spec and encode it in `project_spec.json` before placing symbols.
 2. Derive/update `project_contract.json` from the spec and run `npm.cmd run spec` plus `npm.cmd run contract` until both pass.
-3. Implement or update deterministic cells and assembly code for that contract.
-4. Add/adjust rules so the project-specific contract is enforced by `project_rule_report.json`, `report.json`, `project_model_report.json`, `project_visual_report.json`, live DRC, and visual evidence.
-5. Iterate from `next_actions.json`; do not bypass failed findings with manual EasyEDA edits.
-6. Write back only through `apply:gated`, then validate using live snapshot, real canvas image, DRC, and live shots.
+3. Map every contract module in `project_assembly.json` and run `npm.cmd run contract:assembly` until it passes.
+4. Implement or update deterministic cells for that assembly mapping.
+5. Add/adjust rules so the project-specific contract is enforced by `project_rule_report.json`, `project_assembly_report.json`, `report.json`, `project_model_report.json`, `project_visual_report.json`, live DRC, and visual evidence.
+6. Iterate from `next_actions.json`; do not bypass failed findings with manual EasyEDA edits.
+7. Write back only through `apply:gated`, then validate using live snapshot, real canvas image, DRC, and live shots.
 
 Do not claim completion from offline preview images alone.

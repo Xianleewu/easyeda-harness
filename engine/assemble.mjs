@@ -5,7 +5,10 @@ import { buildModel } from './buildmodel.mjs';
 import { relayDriver, ldoCell, buttonCell, mcuCell, usbCell, pmosCell } from './cells.mjs';
 import { buildDocumentLayer } from '../harness/document_style.mjs';
 
-const DEFAULT_ANCHORS = {
+const DIR = (process.env.EASYEDA_WORKDIR || process.cwd()).replace(/\\/g, '/') + '/';
+const PROJECT_ASSEMBLY = process.env.EASYEDA_PROJECT_ASSEMBLY || DIR + 'project_assembly.json';
+
+const FALLBACK_ANCHORS = {
 	usb:   { x: 620,  y: 980 },
 	ldo:   { x: 440,  y: 800 },
 	btn1:  { x: 760,  y: 520 },
@@ -16,8 +19,37 @@ const DEFAULT_ANCHORS = {
 	relay2:{ x: 1720, y: 475 },
 };
 
+const CELL_BUILDERS = {
+	usbCell,
+	ldoCell,
+	buttonCell,
+	mcuCell,
+	pmosCell,
+	relayDriver,
+};
+
+let cachedAssemblyPath = null;
+let cachedAssembly = null;
+
 function cloneAnchors(anchors) {
 	return Object.fromEntries(Object.entries(anchors).map(([k, v]) => [k, { ...v }]));
+}
+
+export function loadProjectAssembly(path = PROJECT_ASSEMBLY) {
+	const assembly = JSON.parse(readFileSync(path, 'utf8').replace(/^\uFEFF/, ''));
+	return {
+		...assembly,
+		anchors: assembly.anchors || FALLBACK_ANCHORS,
+		modules: [...(assembly.modules || [])].sort((a, b) => (a.order ?? 0) - (b.order ?? 0)),
+	};
+}
+
+function projectAssembly() {
+	if (!cachedAssembly || cachedAssemblyPath !== PROJECT_ASSEMBLY) {
+		cachedAssemblyPath = PROJECT_ASSEMBLY;
+		cachedAssembly = loadProjectAssembly(PROJECT_ASSEMBLY);
+	}
+	return cachedAssembly;
 }
 
 export function loadPartLib(snapPath) {
@@ -51,19 +83,16 @@ export function loadPartLib(snapPath) {
 	return { snap, byDes };
 }
 
-export function assemble(byDes, anchors = DEFAULT_ANCHORS) {
-	const cells = [
-		usbCell(byDes, { J: 'J1', Rcc1: 'R9', Rcc2: 'R10', Rdn: 'R11', Rdp: 'R12', Cv: 'C1' }, anchors.usb),
-		ldoCell(byDes, { U: 'U2', Co1: 'C2', Co2: 'C4' }, anchors.ldo, { VIN: 'SYS_5V', VOUT: 'SYS_3V3' }),
-		buttonCell(byDes, { SW: 'SW1', Rpu: 'R18', Cap: 'C3' }, anchors.btn1, { SIG: 'RESET_EN' }),
-		buttonCell(byDes, { SW: 'SW2', Rpu: 'R17' }, anchors.btn2, { SIG: 'BOOT_IO9' }),
-		mcuCell(byDes, { U: 'U1' }, anchors.mcu),
-		pmosCell(byDes, { Q1: 'Q1', Q2: 'Q2', D1: 'D1', R1: 'R1', R2: 'R2', R3: 'R3', R4: 'R4', CN1: 'CN1', CN2: 'CN2' }, anchors.pmos),
-		relayDriver(byDes, { Q: 'Q3', Rs: 'R13', Rpd: 'R15', D: 'D2', CN: 'CN3' }, anchors.relay1,
-			{ EN: 'RELAY1_EN', GATE: 'RLY1_GATE', COILA: 'RLY1_COIL_A', COILV: 'RLY1_COIL_V' }),
-		relayDriver(byDes, { Q: 'Q4', Rs: 'R14', Rpd: 'R16', D: 'D3', CN: 'CN4' }, anchors.relay2,
-			{ EN: 'RELAY2_EN', GATE: 'RLY2_GATE', COILA: 'RLY2_COIL_A', COILV: 'RLY2_COIL_V' }),
-	];
+export function assemble(byDes, anchors = null, assembly = projectAssembly()) {
+	const resolvedAnchors = { ...cloneAnchors(assembly.anchors || FALLBACK_ANCHORS), ...(anchors ? cloneAnchors(anchors) : {}) };
+	const cells = [];
+	for (const mod of assembly.modules || []) {
+		const build = CELL_BUILDERS[mod.cell];
+		if (!build) throw new Error(`Unknown assembly cell ${mod.cell} for module ${mod.id}`);
+		const anchor = resolvedAnchors[mod.anchor];
+		if (!anchor) throw new Error(`Missing assembly anchor ${mod.anchor} for module ${mod.id}`);
+		cells.push(build(byDes, mod.refs || {}, anchor, mod.netArgs || {}));
+	}
 	const place = {}, wires = [], flags = [], noConnects = [];
 	for (const c of cells) {
 		Object.assign(place, c.place);
@@ -79,9 +108,11 @@ export function assemble(byDes, anchors = DEFAULT_ANCHORS) {
 		writeModuleFrames: true,
 		...documentLayer,
 		layoutProfile: {
-			name: 'reference_columns_v2',
+			name: assembly.layoutProfile || 'project_assembly',
+			projectId: assembly.projectId || null,
 			generatedAt: new Date().toISOString(),
-			anchors: cloneAnchors(anchors),
+			anchors: cloneAnchors(resolvedAnchors),
+			modules: (assembly.modules || []).map(mod => ({ id: mod.id, cell: mod.cell, anchor: mod.anchor })),
 		},
 	};
 }

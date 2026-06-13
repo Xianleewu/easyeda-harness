@@ -11,6 +11,7 @@
     "entrypoints": "node engine/entrypoint_audit.mjs",
     "spec": "node engine/project_spec_gate.mjs",
     "contract": "node engine/project_contract_gate.mjs",
+    "contract:assembly": "node engine/project_assembly_gate.mjs",
     "contract:model": "node engine/project_model_gate.mjs",
     "contract:visual": "node engine/project_visual_gate.mjs",
     "contract:rules": "node engine/project_rule_gate.mjs",

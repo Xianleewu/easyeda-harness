@@ -1,0 +1,98 @@
+{
+  "schemaVersion": 1,
+  "projectId": "easyeda-harness-default",
+  "layoutProfile": "reference_columns_v2",
+  "agentPolicy": {
+    "freeDrawAllowed": false,
+    "authoritativeEditPath": "project_spec.json -> project_contract.json -> project_assembly.json -> engine/cells.mjs -> gates -> apply:gated"
+  },
+  "anchors": {
+    "usb": { "x": 620, "y": 980 },
+    "ldo": { "x": 440, "y": 800 },
+    "btn1": { "x": 760, "y": 520 },
+    "btn2": { "x": 1000, "y": 520 },
+    "mcu": { "x": 920, "y": 820 },
+    "pmos": { "x": 1340, "y": 780 },
+    "relay1": { "x": 1720, "y": 740 },
+    "relay2": { "x": 1720, "y": 475 }
+  },
+  "modules": [
+    {
+      "id": "usb",
+      "order": 10,
+      "registryModule": "usb",
+      "cell": "usbCell",
+      "anchor": "usb",
+      "refs": { "J": "J1", "Rcc1": "R9", "Rcc2": "R10", "Rdn": "R11", "Rdp": "R12", "Cv": "C1" },
+      "nets": ["SYS_5V", "GND", "USB_DP", "USB_DN", "USB_CC1", "USB_CC2"]
+    },
+    {
+      "id": "ldo",
+      "order": 20,
+      "registryModule": "ldo",
+      "cell": "ldoCell",
+      "anchor": "ldo",
+      "refs": { "U": "U2", "Co1": "C2", "Co2": "C4" },
+      "netArgs": { "VIN": "SYS_5V", "VOUT": "SYS_3V3" },
+      "nets": ["SYS_5V", "SYS_3V3", "GND"]
+    },
+    {
+      "id": "reset",
+      "order": 30,
+      "registryModule": "btn1",
+      "cell": "buttonCell",
+      "anchor": "btn1",
+      "refs": { "SW": "SW1", "Rpu": "R18", "Cap": "C3" },
+      "netArgs": { "SIG": "RESET_EN" },
+      "nets": ["RESET_EN", "SYS_3V3", "GND"]
+    },
+    {
+      "id": "boot",
+      "order": 40,
+      "registryModule": "btn2",
+      "cell": "buttonCell",
+      "anchor": "btn2",
+      "refs": { "SW": "SW2", "Rpu": "R17" },
+      "netArgs": { "SIG": "BOOT_IO9" },
+      "nets": ["BOOT_IO9", "SYS_3V3", "GND"]
+    },
+    {
+      "id": "mcu",
+      "order": 50,
+      "registryModule": "mcu",
+      "cell": "mcuCell",
+      "anchor": "mcu",
+      "refs": { "U": "U1" },
+      "nets": ["SYS_3V3", "GND", "RESET_EN", "BOOT_IO9", "USB_DP", "USB_DN", "EXT_PWR_EN", "RELAY1_EN", "RELAY2_EN"]
+    },
+    {
+      "id": "pmos",
+      "order": 60,
+      "registryModule": "pmos",
+      "cell": "pmosCell",
+      "anchor": "pmos",
+      "refs": { "Q1": "Q1", "Q2": "Q2", "D1": "D1", "R1": "R1", "R2": "R2", "R3": "R3", "R4": "R4", "CN1": "CN1", "CN2": "CN2" },
+      "nets": ["EXT_PWR_EN", "PMOS_GATE", "SYS_5V", "GND"]
+    },
+    {
+      "id": "relay1",
+      "order": 70,
+      "registryModule": "relay1",
+      "cell": "relayDriver",
+      "anchor": "relay1",
+      "refs": { "Q": "Q3", "Rs": "R13", "Rpd": "R15", "D": "D2", "CN": "CN3" },
+      "netArgs": { "EN": "RELAY1_EN", "GATE": "RLY1_GATE", "COILA": "RLY1_COIL_A", "COILV": "RLY1_COIL_V" },
+      "nets": ["RELAY1_EN", "RLY1_GATE", "RLY1_COIL_A", "RLY1_COIL_V", "GND"]
+    },
+    {
+      "id": "relay2",
+      "order": 80,
+      "registryModule": "relay2",
+      "cell": "relayDriver",
+      "anchor": "relay2",
+      "refs": { "Q": "Q4", "Rs": "R14", "Rpd": "R16", "D": "D3", "CN": "CN4" },
+      "netArgs": { "EN": "RELAY2_EN", "GATE": "RLY2_GATE", "COILA": "RLY2_COIL_A", "COILV": "RLY2_COIL_V" },
+      "nets": ["RELAY2_EN", "RLY2_GATE", "RLY2_COIL_A", "RLY2_COIL_V", "GND"]
+    }
+  ]
+}
