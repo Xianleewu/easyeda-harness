@@ -6,76 +6,277 @@
   "agentWorkflow": {
     "freeDrawAllowed": false,
     "authoritativeEditPath": "project contract -> deterministic cells/templates -> assembly/layout constraints -> gates -> gated write-back",
-    "requiredEntrypoints": ["accept", "accept:live", "apply:gated"]
+    "requiredEntrypoints": [
+      "accept",
+      "accept:live",
+      "apply:gated"
+    ]
   },
   "modules": [
     {
       "id": "usb",
       "title": "USB-C input",
-      "requiredParts": ["J1", "R9", "R10", "R11", "R12", "C1"],
-      "requiredNets": ["SYS_5V", "GND", "USB_DP", "USB_DN", "USB_CC1", "USB_CC2"],
-      "visualEvidence": "usb"
+      "requiredParts": [
+        "J1",
+        "R9",
+        "R10",
+        "R11",
+        "R12",
+        "C1"
+      ],
+      "requiredNets": [
+        "SYS_5V",
+        "GND",
+        "USB_DP",
+        "USB_DN",
+        "USB_CC1",
+        "USB_CC2"
+      ],
+      "visualEvidence": "usb",
+      "drawingRules": [
+        "orthogonal-wiring",
+        "real-net-labels",
+        "text-clearance",
+        "module-box-isolation",
+        "no-fake-net-text",
+        "no-unnecessary-net-ports"
+      ]
     },
     {
       "id": "ldo",
       "title": "5V to 3V3 power",
-      "requiredParts": ["U2", "C2", "C4"],
-      "requiredNets": ["SYS_5V", "SYS_3V3", "GND"],
-      "visualEvidence": "ldo"
+      "requiredParts": [
+        "U2",
+        "C2",
+        "C4"
+      ],
+      "requiredNets": [
+        "SYS_5V",
+        "SYS_3V3",
+        "GND"
+      ],
+      "visualEvidence": "ldo",
+      "drawingRules": [
+        "orthogonal-wiring",
+        "real-net-labels",
+        "text-clearance",
+        "module-box-isolation",
+        "no-fake-net-text",
+        "no-unnecessary-net-ports"
+      ]
     },
     {
       "id": "mcu",
       "title": "ESP32-C3 MCU",
-      "requiredParts": ["U1"],
-      "requiredNets": ["SYS_3V3", "GND", "RESET_EN", "BOOT_IO9", "USB_DP", "USB_DN", "EXT_PWR_EN", "RELAY1_EN", "RELAY2_EN"],
-      "visualEvidence": "mcu-left"
+      "requiredParts": [
+        "U1"
+      ],
+      "requiredNets": [
+        "SYS_3V3",
+        "GND",
+        "RESET_EN",
+        "BOOT_IO9",
+        "USB_DP",
+        "USB_DN",
+        "EXT_PWR_EN",
+        "RELAY1_EN",
+        "RELAY2_EN"
+      ],
+      "visualEvidence": "mcu-left",
+      "drawingRules": [
+        "orthogonal-wiring",
+        "real-net-labels",
+        "text-clearance",
+        "module-box-isolation",
+        "no-fake-net-text",
+        "no-unnecessary-net-ports"
+      ]
     },
     {
       "id": "pmos",
       "title": "High-side power switch",
-      "requiredParts": ["Q1", "Q2", "D1", "R1", "R2", "R3", "R4", "CN1", "CN2"],
-      "requiredNets": ["EXT_PWR_EN", "PMOS_GATE", "SYS_5V", "GND"],
-      "visualEvidence": "pmos"
+      "requiredParts": [
+        "Q1",
+        "Q2",
+        "D1",
+        "R1",
+        "R2",
+        "R3",
+        "R4",
+        "CN1",
+        "CN2"
+      ],
+      "requiredNets": [
+        "EXT_PWR_EN",
+        "PMOS_GATE",
+        "SYS_5V",
+        "GND"
+      ],
+      "visualEvidence": "pmos",
+      "drawingRules": [
+        "orthogonal-wiring",
+        "real-net-labels",
+        "text-clearance",
+        "module-box-isolation",
+        "no-fake-net-text",
+        "no-unnecessary-net-ports"
+      ]
     },
     {
       "id": "reset",
       "title": "Reset support",
-      "requiredParts": ["SW1", "R18", "C3"],
-      "requiredNets": ["RESET_EN", "SYS_3V3", "GND"],
-      "visualEvidence": "reset"
+      "requiredParts": [
+        "SW1",
+        "R18",
+        "C3"
+      ],
+      "requiredNets": [
+        "RESET_EN",
+        "SYS_3V3",
+        "GND"
+      ],
+      "visualEvidence": "reset",
+      "drawingRules": [
+        "orthogonal-wiring",
+        "real-net-labels",
+        "text-clearance",
+        "module-box-isolation",
+        "no-fake-net-text",
+        "no-unnecessary-net-ports"
+      ]
     },
     {
       "id": "boot",
       "title": "Boot support",
-      "requiredParts": ["SW2", "R17"],
-      "requiredNets": ["BOOT_IO9", "SYS_3V3", "GND"],
-      "visualEvidence": "boot"
+      "requiredParts": [
+        "SW2",
+        "R17"
+      ],
+      "requiredNets": [
+        "BOOT_IO9",
+        "SYS_3V3",
+        "GND"
+      ],
+      "visualEvidence": "boot",
+      "drawingRules": [
+        "orthogonal-wiring",
+        "real-net-labels",
+        "text-clearance",
+        "module-box-isolation",
+        "no-fake-net-text",
+        "no-unnecessary-net-ports"
+      ]
     },
     {
       "id": "relay1",
       "title": "Relay output 1",
-      "requiredParts": ["Q3", "R13", "R15", "D2", "CN3"],
-      "requiredNets": ["RELAY1_EN", "RLY1_GATE", "RLY1_COIL_A", "RLY1_COIL_V", "GND"],
-      "visualEvidence": "relay1"
+      "requiredParts": [
+        "Q3",
+        "R13",
+        "R15",
+        "D2",
+        "CN3"
+      ],
+      "requiredNets": [
+        "RELAY1_EN",
+        "RLY1_GATE",
+        "RLY1_COIL_A",
+        "RLY1_COIL_V",
+        "GND"
+      ],
+      "visualEvidence": "relay1",
+      "drawingRules": [
+        "orthogonal-wiring",
+        "real-net-labels",
+        "text-clearance",
+        "module-box-isolation",
+        "no-fake-net-text",
+        "no-unnecessary-net-ports"
+      ]
     },
     {
       "id": "relay2",
       "title": "Relay output 2",
-      "requiredParts": ["Q4", "R14", "R16", "D3", "CN4"],
-      "requiredNets": ["RELAY2_EN", "RLY2_GATE", "RLY2_COIL_A", "RLY2_COIL_V", "GND"],
-      "visualEvidence": "relay2"
+      "requiredParts": [
+        "Q4",
+        "R14",
+        "R16",
+        "D3",
+        "CN4"
+      ],
+      "requiredNets": [
+        "RELAY2_EN",
+        "RLY2_GATE",
+        "RLY2_COIL_A",
+        "RLY2_COIL_V",
+        "GND"
+      ],
+      "visualEvidence": "relay2",
+      "drawingRules": [
+        "orthogonal-wiring",
+        "real-net-labels",
+        "text-clearance",
+        "module-box-isolation",
+        "no-fake-net-text",
+        "no-unnecessary-net-ports"
+      ]
     }
   ],
   "interfaces": [
-    { "net": "SYS_5V", "from": "usb", "to": "ldo", "policy": "visible-or-grouped-contract" },
-    { "net": "SYS_3V3", "from": "ldo", "to": "mcu", "policy": "visible-or-grouped-contract" },
-    { "net": "USB_DP", "from": "usb", "to": "mcu", "policy": "visible-or-grouped-contract" },
-    { "net": "USB_DN", "from": "usb", "to": "mcu", "policy": "visible-or-grouped-contract" },
-    { "net": "RESET_EN", "from": "reset", "to": "mcu", "policy": "visible-or-grouped-contract" },
-    { "net": "BOOT_IO9", "from": "boot", "to": "mcu", "policy": "visible-or-grouped-contract" },
-    { "net": "EXT_PWR_EN", "from": "mcu", "to": "pmos", "policy": "visible-or-grouped-contract" },
-    { "net": "RELAY1_EN", "from": "mcu", "to": "relay1", "policy": "visible-or-grouped-contract" },
-    { "net": "RELAY2_EN", "from": "mcu", "to": "relay2", "policy": "visible-or-grouped-contract" }
+    {
+      "net": "SYS_5V",
+      "from": "usb",
+      "to": "ldo",
+      "policy": "visible-or-grouped-contract"
+    },
+    {
+      "net": "SYS_3V3",
+      "from": "ldo",
+      "to": "mcu",
+      "policy": "visible-or-grouped-contract"
+    },
+    {
+      "net": "USB_DP",
+      "from": "usb",
+      "to": "mcu",
+      "policy": "visible-or-grouped-contract"
+    },
+    {
+      "net": "USB_DN",
+      "from": "usb",
+      "to": "mcu",
+      "policy": "visible-or-grouped-contract"
+    },
+    {
+      "net": "RESET_EN",
+      "from": "reset",
+      "to": "mcu",
+      "policy": "visible-or-grouped-contract"
+    },
+    {
+      "net": "BOOT_IO9",
+      "from": "boot",
+      "to": "mcu",
+      "policy": "visible-or-grouped-contract"
+    },
+    {
+      "net": "EXT_PWR_EN",
+      "from": "mcu",
+      "to": "pmos",
+      "policy": "visible-or-grouped-contract"
+    },
+    {
+      "net": "RELAY1_EN",
+      "from": "mcu",
+      "to": "relay1",
+      "policy": "visible-or-grouped-contract"
+    },
+    {
+      "net": "RELAY2_EN",
+      "from": "mcu",
+      "to": "relay2",
+      "policy": "visible-or-grouped-contract"
+    }
   ],
   "visualEvidenceRegions": [
     "global-sheet",

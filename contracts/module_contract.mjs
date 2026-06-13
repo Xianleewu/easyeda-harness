@@ -2,6 +2,15 @@ export function asArray(value) {
 	return Array.isArray(value) ? value : [];
 }
 
+export const REQUIRED_DRAWING_RULES = [
+	'orthogonal-wiring',
+	'real-net-labels',
+	'text-clearance',
+	'module-box-isolation',
+	'no-fake-net-text',
+	'no-unnecessary-net-ports',
+];
+
 function hard(findings, rule, msg, where = {}, category = 'project-contract') {
 	findings.push({ rule, severity: 'hard', category, msg, where });
 }
@@ -39,6 +48,14 @@ export function validateModuleContract(contract, options = {}) {
 		if (!asArray(mod?.requiredParts).length) hard(findings, 'PC12-module-parts', 'module needs requiredParts', { module: mod?.id || index }, category);
 		if (!asArray(mod?.requiredNets).length) hard(findings, 'PC13-module-nets', 'module needs requiredNets', { module: mod?.id || index }, category);
 		if (!mod?.visualEvidence) hard(findings, 'PC14-module-evidence', 'module needs visualEvidence region id', { module: mod?.id || index }, category);
+		const drawingRules = new Set(asArray(mod?.drawingRules));
+		const missingDrawingRules = REQUIRED_DRAWING_RULES.filter(rule => !drawingRules.has(rule));
+		if (missingDrawingRules.length) {
+			hard(findings, 'PC27-module-drawing-rules', 'module drawingRules must declare the reusable schematic-quality rules it is designed to satisfy before deterministic cells are trusted', {
+				module: mod?.id || index,
+				missingDrawingRules,
+			}, category);
+		}
 	}
 
 	const evidence = new Set(asArray(contract.visualEvidenceRegions));
@@ -74,4 +91,3 @@ export function validateModuleContract(contract, options = {}) {
 	}
 	return findings;
 }
-

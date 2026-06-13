@@ -7,7 +7,7 @@ Use this repository as an executable schematic workflow, not as permission to dr
 1. Capture user intent in `project_spec.json`.
 2. For a new project directory, run `node bin/easyeda-gsd.mjs init --pack <pack> --out <project-dir>` to create editable scaffold files and, for a new pack id, `circuit_packs/<pack>/` skeleton files.
 3. Run `node bin/easyeda-gsd.mjs plan <project-dir>/project_spec.json` and keep `gsd_plan_report.json` passing as the spec-to-contract realization proof.
-4. Derive `project_contract.json`.
+4. Derive `project_contract.json`, including module-level `drawingRules` for orthogonal wiring, real net labels, text clearance, module isolation, no fake net text, and no unnecessary net ports.
 5. Define required electrical endpoints in `project_netlist.json`.
 6. Fill `approved_library_manifest.json` so every required part has approved Symbol, Device, and Footprint bindings.
 7. Select or declare the circuit-pack `pack.mjs` and `cell_manifest.json`.
@@ -25,6 +25,7 @@ Use this repository as an executable schematic workflow, not as permission to dr
 - Do not claim completion from local-only PASS.
 - Do not use low-level writer scripts for final delivery.
 - Do not reuse `aihwdebugger` for unrelated schematics; create or fill the target circuit pack first.
+- Do not trust a module contract until it declares `drawingRules`; missing drawing rules mean the project has not stated the schematic-quality constraints that deterministic cells must satisfy.
 - Do not implement a deterministic cell until its `cell_manifest.json` entry declares `qualityRules` for orthogonal wiring, real net labels, text clearance, module isolation, no fake net text, and no unnecessary net ports.
 - Do not trust layout work until `project_assembly.json` declares `layoutPolicy.flow` and ordered `layoutPolicy.columns` for every module.
 - Prefer generic `layoutPolicy.anchorVariants` for new projects; do not copy the bundled USB/MCU/relay coordinate fields unless you are editing that pack.

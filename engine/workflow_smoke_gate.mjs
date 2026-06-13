@@ -134,6 +134,24 @@ try {
 		observedRules: checks.layoutColumnsRequired.rules,
 	});
 
+	const noDrawingRulesContract = clone(contract);
+	if (noDrawingRulesContract.modules?.[0]) delete noDrawingRulesContract.modules[0].drawingRules;
+	const noDrawingRulesPlan = buildPlanForFiles({
+		spec,
+		contract: noDrawingRulesContract,
+		netlist,
+		assembly,
+		libraryManifest,
+		specPath: '_tmp_workflow_smoke/no_drawing_rules_project_spec.json',
+	});
+	checks.moduleDrawingRulesRequired = {
+		pass: !noDrawingRulesPlan.pass && hasRule(noDrawingRulesPlan, 'PC27-module-drawing-rules'),
+		rules: (noDrawingRulesPlan.findings || []).map(f => f.rule),
+	};
+	assertFinding(findings, checks.moduleDrawingRulesRequired.pass, 'WS16-module-drawing-rules-required', 'GSD plan must reject modules that do not declare reusable drawing rule contracts before generation', {
+		observedRules: checks.moduleDrawingRulesRequired.rules,
+	});
+
 	writeFileSync(BAD_SPEC, JSON.stringify(badSpec, null, 2) + '\n', 'utf8');
 	const fullModelPath = `${ROOT}/full_model.json`;
 	const beforeFullModelMtime = fileMtimeMs(fullModelPath);

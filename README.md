@@ -25,7 +25,7 @@ node bin/easyeda-gsd.mjs help
 这个仓库不是让 Agent 在 EasyEDA 里自由画图的提示词集合。新项目必须先建立可检查的机器合同：
 
 - `project_spec.json`：用户意图和功能模块
-- `project_contract.json`：模块、关键网络、接口、视觉证据区域和禁止自由绘图策略
+- `project_contract.json`：模块、关键网络、接口、视觉证据区域、`drawingRules` 和禁止自由绘图策略
 - `project_netlist.json`：关键网络必须连接的电气端点
 - `approved_library_manifest.json`：每个 required part 的 Symbol、Device、Footprint 绑定
 - `project_assembly.json`：模块到 deterministic cell、refs、anchors、nets 和 layout policy 的映射
@@ -61,7 +61,7 @@ node bin/easyeda-gsd.mjs apply --gated
 1. 用 `node bin/easyeda-gsd.mjs init --pack <pack> --out <project-dir>` 创建 scaffold。
 2. 补齐 `project_spec.json`、`project_contract.json`、`project_netlist.json`、`approved_library_manifest.json` 和 `project_assembly.json`。
 3. 如果是新电路族，补齐 `circuit_packs/<pack>/pack.mjs` 和 `cell_manifest.json`。
-4. 确保每个 cell manifest entry 声明 `qualityRules`，覆盖正交走线、真实网标、文本 clearance、模块隔离、禁止 fake net text 和单页图纸无意义 net port。
+4. 确保每个 contract module 声明 `drawingRules`，每个 cell manifest entry 声明匹配的 `qualityRules`，覆盖正交走线、真实网标、文本 clearance、模块隔离、禁止 fake net text 和单页图纸无意义 net port。
 5. 在 `project_assembly.json` 中声明 `layoutPolicy.flow`、有序 `layoutPolicy.columns`，并优先使用通用 `layoutPolicy.anchorVariants`。
 6. 运行 `node bin/easyeda-gsd.mjs plan <project-dir>/project_spec.json`，直到 `gsd_plan_report.json` 通过。
 7. 运行 `node bin/easyeda-gsd.mjs generate <project-dir>/project_spec.json`，直到 `gsd_generate_report.json` 通过。

@@ -1,4 +1,5 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
+import { REQUIRED_DRAWING_RULES } from '../contracts/module_contract.mjs';
 
 function asArray(value) {
 	return Array.isArray(value) ? value : [];
@@ -35,6 +36,7 @@ export function buildScaffold(spec, { pack = 'aihwdebugger' } = {}) {
 			requiredParts: [],
 			requiredNets: asArray(mod.requiredNets),
 			visualEvidence: moduleVisualId(mod.id),
+			drawingRules: [...REQUIRED_DRAWING_RULES],
 		})),
 		interfaces: asArray(spec.interfaces).map(iface => ({ ...iface, policy: iface.policy || 'visible-or-grouped-contract' })),
 		visualEvidenceRegions,
