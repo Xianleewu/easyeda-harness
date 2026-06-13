@@ -54,6 +54,7 @@ function requireReportPass(findings, rel, label, predicate = data => data?.pass 
 const findings = [];
 const local = {
 	acceptance: requireReportPass(findings, 'acceptance_report.json', 'local acceptance report', data => data?.pass === true),
+	workflowSmoke: requireReportPass(findings, 'workflow_smoke_report.json', 'workflow smoke report'),
 	gsdPlan: requireReportPass(findings, 'gsd_plan_report.json', 'GSD plan report'),
 	gsdGenerate: requireReportPass(findings, 'gsd_generate_report.json', 'GSD generate report'),
 	nextActions: requireReportPass(findings, 'next_actions.json', 'next actions report', data => data?.pass === true && (data?.actions || []).length === 0),

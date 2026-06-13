@@ -29,6 +29,7 @@ EasyEDA Harness 是一套给 Codex、Claude Code 等编程 Agent 使用的原理
 - 项目网表门禁：`project_netlist.json` 定义关键网络必连引脚，并证明生成模型实际连接这些端点。
 - Circuit pack 门禁：`contract:pack` 验证所选 `pack.mjs` 已注册且暴露必要生成 hook。
 - 库合同门禁：`contract:library` 验证每个 required part 都有批准的 Symbol、Device、Footprint、name/value 和 BOM/PCB 状态。
+- 工作流烟测门禁：`workflow:smoke` 验证坏 spec 会被 plan 拦住、未补齐 scaffold 不会假 PASS、缺失库绑定会失败、失败 generate 不会改写 `full_model.json`。
 - Cell manifest 门禁：`circuit_packs/*/cell_manifest.json` 在装配前声明电路包 cell 的 ref role、netArg、端口和布局意图。
 - 规则覆盖检查：`contract:rules` 会确认模块注册、必备零件、接口合同和核心规则覆盖了项目合同。
 - 装配覆盖检查：`contract:assembly` 会确认每个合同模块都映射到了确定性 cell、anchor、refs 和 nets。
@@ -68,7 +69,7 @@ EasyEDA Harness 是一套给 Codex、Claude Code 等编程 Agent 使用的原理
 请按 AGENTS.md 接手这个仓库；如果是新项目，先建立项目合同、模块模板和规则覆盖，不要直接在 EasyEDA 里自由画。确认 easyeda-api-skill/Bridge，运行本地门禁；写回前必须拉取 EasyEDA live snapshot/截图/DRC 复核，只有全部 PASS 后才写回 EasyEDA。
 ```
 
-Agent 会自动运行本地检查、生成预览图，并写出 `acceptance_report.json`、`next_actions.json` 和 `repair_actions.json`。如果检查未通过，`next_actions.json` 是接手摘要，`repair_actions.json` 会把每条 finding 映射到编辑目标、检查文件和下一条复跑命令。`node bin/easyeda-gsd.mjs repair` 会通过 `workflows/repair_loop.mjs` 生成只读的分组修复计划，并写出 `repair_loop_report.json`。
+Agent 会自动运行本地检查、工作流烟测、生成预览图，并写出 `acceptance_report.json`、`workflow_smoke_report.json`、`next_actions.json` 和 `repair_actions.json`。如果检查未通过，`next_actions.json` 是接手摘要，`repair_actions.json` 会把每条 finding 映射到编辑目标、检查文件和下一条复跑命令。`node bin/easyeda-gsd.mjs repair` 会通过 `workflows/repair_loop.mjs` 生成只读的分组修复计划，并写出 `repair_loop_report.json`。
 `next_actions.json` 是经过校验的 `schemaVersion=1` action contract；`npm run action:schema` 会检查 action id、标准化检查状态、target、evidence，以及 pass/actions 一致性。
 `final:evidence` 会写出 `final_evidence_report.json`，证明所需证据产物存在、足够新、已通过，并且没有开放修复项。
 

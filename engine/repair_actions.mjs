@@ -6,6 +6,7 @@ const OUT = process.env.EASYEDA_REPAIR_ACTIONS || DIR + 'repair_actions.json';
 const REPORTS = [
 	{ gate: 'entrypoints', file: 'entrypoint_audit_report.json', rerun: 'npm.cmd run entrypoints' },
 	{ gate: 'agent-instructions', file: 'agent_instruction_report.json', rerun: 'npm.cmd run agent:instructions' },
+	{ gate: 'workflow-smoke', file: 'workflow_smoke_report.json', rerun: 'npm.cmd run workflow:smoke' },
 	{ gate: 'action-schema', file: 'action_schema_report.json', rerun: 'npm.cmd run action:schema' },
 	{ gate: 'spec-schema', file: 'spec_schema_report.json', rerun: 'npm.cmd run spec:schema' },
 	{ gate: 'project-spec', file: 'project_spec_report.json', rerun: 'npm.cmd run spec' },
@@ -64,6 +65,13 @@ const RULE_PLANS = [
 		inspectFiles: ['next_actions.json', 'action_schema_report.json'],
 		nextCommand: 'npm.cmd run next:actions && npm.cmd run action:schema',
 		repairHint: 'Keep next_actions.json on the stable schema: schemaVersion, mode, normalized checks, action ids, severity/source/title/target, and evidence arrays.',
+	}],
+	[/^WS/, {
+		area: 'workflow-smoke',
+		editFiles: ['engine/workflow_smoke_gate.mjs', 'workflows/gsd_plan.mjs', 'workflows/gsd_generate.mjs', 'workflows/gsd_scaffold.mjs', 'contracts/library_contract.mjs'],
+		inspectFiles: ['workflow_smoke_report.json', 'project_spec.json', 'project_contract.json', 'project_netlist.json', 'project_assembly.json', 'approved_library_manifest.json'],
+		nextCommand: 'npm.cmd run workflow:smoke',
+		repairHint: 'Keep reusable workflow regression checks fail-closed: bad specs must be rejected, scaffold must not be generation-ready, library bindings must be required, and negative generate must not rewrite full_model.json.',
 	}],
 	[/^SS/, {
 		area: 'spec-schema',

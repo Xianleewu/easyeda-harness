@@ -20,6 +20,12 @@ It must pass before generation work is trusted. It proves that `project_spec.jso
 
 It must pass before local acceptance is trusted. It proves that deterministic generation ran only after a passing `gsd_plan_report.json` and produced `full_model.json` plus `report.json`.
 
+## `workflow_smoke_report.json`
+
+`workflow_smoke_report.json` is written by `npm run workflow:smoke`.
+
+It must pass before local acceptance is trusted. It proves workflow regressions are blocked: bad specs fail planning, incomplete scaffolds are not generation-ready, missing approved library bindings fail, and invalid generate does not rewrite `full_model.json`.
+
 ## `next_actions.json`
 
 `next_actions.json` follows `schemaVersion: 1` and is validated by `npm run action:schema`.

@@ -29,6 +29,7 @@ A PASS on the current model only proves the current model. It does not validate 
 - Project netlist gate: `project_netlist.json` defines required pins for key nets and proves the generated model connects them.
 - Circuit pack gate: `contract:pack` verifies the selected `pack.mjs` is registered and exposes required generation hooks.
 - Library contract gate: `contract:library` verifies every required part has approved Symbol, Device, Footprint, name/value, and BOM/PCB state.
+- Workflow smoke gate: `workflow:smoke` proves bad specs are stopped by plan, incomplete scaffolds do not pass as ready, missing library bindings fail, and failed generate cannot rewrite `full_model.json`.
 - Cell manifest gate: `circuit_packs/*/cell_manifest.json` declares circuit-pack cell roles, required refs, net args, ports, and layout intent before assembly can use those cells.
 - Rule coverage check: `contract:rules` proves module registry, required parts, interface contracts, and core rules cover the project contract.
 - Assembly coverage check: `contract:assembly` proves every contract module is mapped to a deterministic cell, anchor, refs, and nets before generation.
@@ -68,7 +69,7 @@ One prompt for an agent:
 Follow AGENTS.md for this repository. For a new project, create the project contract, module templates, and rule coverage first; do not free-draw in EasyEDA. Verify easyeda-api-skill/Bridge, run the local gates, and before write-back pull real EasyEDA live snapshot/screenshot/DRC evidence. Write back only after every check passes.
 ```
 
-The agent runs the local checks, generates preview evidence, and writes `acceptance_report.json`, `next_actions.json`, and `repair_actions.json`. If a check fails, `next_actions.json` is the handoff summary and `repair_actions.json` maps each finding to edit targets, inspection files, and the next command to rerun.
+The agent runs the local checks, workflow smoke checks, generates preview evidence, and writes `acceptance_report.json`, `workflow_smoke_report.json`, `next_actions.json`, and `repair_actions.json`. If a check fails, `next_actions.json` is the handoff summary and `repair_actions.json` maps each finding to edit targets, inspection files, and the next command to rerun.
 `node bin/easyeda-gsd.mjs repair` builds a read-only grouped repair plan through `workflows/repair_loop.mjs` and writes `repair_loop_report.json`.
 `next_actions.json` is a validated `schemaVersion=1` action contract; `npm run action:schema` checks ids, normalized check statuses, targets, evidence, and pass/action consistency.
 `final:evidence` writes `final_evidence_report.json`, proving required evidence artifacts are present, fresh, passing, and free of open repair actions.

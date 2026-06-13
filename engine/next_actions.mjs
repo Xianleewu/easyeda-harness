@@ -27,6 +27,7 @@ function pushAction(actions, item) {
 
 const acceptance = readJson('acceptance_report.json');
 const agentInstructions = readJson('agent_instruction_report.json');
+const workflowSmoke = readJson('workflow_smoke_report.json');
 const gsdPlan = readJson('gsd_plan_report.json');
 const gsdGenerate = readJson('gsd_generate_report.json');
 const specSchema = readJson('spec_schema_report.json');
@@ -57,6 +58,13 @@ const checks = {
 		filesChecked: agentInstructions?.filesChecked || null,
 		firstFinding: agentInstructions?.findings?.[0] || null,
 		evidence: 'agent_instruction_report.json',
+	},
+	workflowSmoke: {
+		status: status(workflowSmoke?.pass),
+		severity: workflowSmoke?.severity || null,
+		checks: workflowSmoke?.checks || null,
+		firstFinding: workflowSmoke?.findings?.[0] || null,
+		evidence: 'workflow_smoke_report.json',
 	},
 	gsdPlan: {
 		status: status(gsdPlan?.pass),
@@ -268,6 +276,14 @@ if (checks.agentInstructions.status !== 'pass') {
 		action: 'Fix Codex/Claude-facing instructions so agents are forced through project spec, contract, netlist, assembly, local gates, live evidence, and fail-closed apply:gated instead of free-drawing in EasyEDA.',
 		evidence: ['AGENTS.md', 'CLAUDE.md', 'README.md', 'README.en.md', 'agent_instruction_report.json'],
 		observed: checks.agentInstructions.firstFinding || checks.agentInstructions,
+	});
+}
+if (checks.workflowSmoke.status !== 'pass') {
+	pushAction(actions, {
+		area: 'workflow-smoke',
+		action: 'Fix reusable workflow smoke checks before claiming the harness works for other projects. Bad specs must be rejected, scaffold must not be generation-ready, missing library bindings must fail, and invalid generate must not rewrite full_model.json.',
+		evidence: ['workflow_smoke_report.json', 'engine/workflow_smoke_gate.mjs', 'workflows/gsd_plan.mjs', 'workflows/gsd_generate.mjs', 'workflows/gsd_scaffold.mjs', 'contracts/library_contract.mjs'],
+		observed: checks.workflowSmoke.firstFinding || checks.workflowSmoke,
 	});
 }
 if (checks.gsdPlan.status !== 'pass') {
