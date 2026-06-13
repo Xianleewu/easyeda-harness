@@ -281,12 +281,20 @@ try {
 	checks.restoreGenerate = {
 		pass: restoreGenerate.status === 0,
 		stage: restoreGenerate.report?.stage || null,
+		assemblyPath: restoreGenerate.report?.generationContext?.assemblyPath || null,
 	};
 	assertFinding(findings, restoreGenerate.status === 0, 'WS10-restore-generate-pass', 'workflow smoke must restore normal GSD generate reports after negative checks', {
 		status: restoreGenerate.status,
 		stage: restoreGenerate.report?.stage || null,
 		firstFinding: restoreGenerate.report?.findings?.[0] || null,
 	});
+	assertFinding(
+		findings,
+		restoreGenerate.report?.generationContext?.assemblyPath === `${ROOT}/project_assembly.json`,
+		'WS14-generate-context-bound',
+		'GSD generate must record and pass the active project assembly path into deterministic generation',
+		checks.restoreGenerate,
+	);
 } catch (e) {
 	hard(findings, 'WS0-unhandled-error', 'workflow smoke gate crashed', { error: e.message, stack: e.stack });
 } finally {

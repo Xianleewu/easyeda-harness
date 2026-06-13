@@ -15,21 +15,35 @@ function fileInfo(root, rel) {
 	return { exists: true, size: stat.size, mtime: stat.mtime.toISOString() };
 }
 
-export function buildGeneratePlan(root, specPath = 'project_spec.json') {
+function generateContext(root, specPath = 'project_spec.json') {
 	const specAbs = resolve(root, specPath);
 	const specDir = dirname(specAbs).replace(/\\/g, '/');
 	const companion = name => existsSync(`${specDir}/${name}`) ? `${specDir}/${name}` : name;
-	const spec = readJson(root, specAbs);
-	const contract = readJson(root, companion('project_contract.json'));
-	const netlist = readJson(root, companion('project_netlist.json'));
-	const assembly = readJson(root, companion('project_assembly.json'));
-	const libraryManifest = readJson(root, companion('approved_library_manifest.json'));
+	return {
+		specAbs,
+		specDir,
+		specPath,
+		contractPath: companion('project_contract.json'),
+		netlistPath: companion('project_netlist.json'),
+		assemblyPath: companion('project_assembly.json'),
+		libraryManifestPath: companion('approved_library_manifest.json'),
+	};
+}
+
+export function buildGeneratePlan(root, specPath = 'project_spec.json') {
+	const context = generateContext(root, specPath);
+	const spec = readJson(root, context.specAbs);
+	const contract = readJson(root, context.contractPath);
+	const netlist = readJson(root, context.netlistPath);
+	const assembly = readJson(root, context.assemblyPath);
+	const libraryManifest = readJson(root, context.libraryManifestPath);
 	const model = existsSync(`${root}/full_model.json`) ? readJson(root, 'full_model.json') : null;
 	return buildGsdPlan({ spec, contract, netlist, assembly, libraryManifest, model, specPath });
 }
 
 export function runGsdGenerate({ root, specPath = 'project_spec.json', command = ['engine/pipeline_fast.mjs'] }) {
 	const started = Date.now();
+	const context = generateContext(root, specPath);
 	const plan = buildGeneratePlan(root, specPath);
 	writeFileSync(`${root}/gsd_plan_report.json`, JSON.stringify(plan, null, 2), 'utf8');
 	if (!plan.pass) {
@@ -47,7 +61,18 @@ export function runGsdGenerate({ root, specPath = 'project_spec.json', command =
 		return { report, status: 1 };
 	}
 
-	const child = spawnSync(process.execPath, command, { cwd: root, stdio: 'inherit', shell: false, env: process.env });
+	const child = spawnSync(process.execPath, command, {
+		cwd: root,
+		stdio: 'inherit',
+		shell: false,
+		env: {
+			...process.env,
+			EASYEDA_PROJECT_ASSEMBLY: context.assemblyPath,
+			EASYEDA_PROJECT_CONTRACT: context.contractPath,
+			EASYEDA_PROJECT_NETLIST: context.netlistPath,
+			EASYEDA_APPROVED_LIBRARY_MANIFEST: context.libraryManifestPath,
+		},
+	});
 	const reportJson = existsSync(`${root}/report.json`) ? readJson(root, 'report.json') : null;
 	const generated = {
 		fullModel: fileInfo(root, 'full_model.json'),
@@ -62,6 +87,13 @@ export function runGsdGenerate({ root, specPath = 'project_spec.json', command =
 		command: [process.execPath, ...command].join(' '),
 		projectId: plan.projectId,
 		circuitPack: plan.circuitPack,
+		generationContext: {
+			specDir: context.specDir,
+			assemblyPath: context.assemblyPath,
+			contractPath: context.contractPath,
+			netlistPath: context.netlistPath,
+			libraryManifestPath: context.libraryManifestPath,
+		},
 		plan: { pass: plan.pass, severity: plan.severity },
 		generated,
 		template: reportJson ? { pass: reportJson.pass, severity: reportJson.severity, score: reportJson.score, mode: reportJson.mode } : null,

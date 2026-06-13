@@ -9,14 +9,14 @@
     "authoritativeEditPath": "project_spec.json -> project_contract.json -> project_assembly.json -> engine/cells.mjs -> gates -> apply:gated"
   },
   "anchors": {
-    "usb": { "x": 620, "y": 980 },
-    "ldo": { "x": 440, "y": 800 },
-    "btn1": { "x": 760, "y": 520 },
-    "btn2": { "x": 1000, "y": 520 },
-    "mcu": { "x": 920, "y": 820 },
-    "pmos": { "x": 1340, "y": 780 },
-    "relay1": { "x": 1720, "y": 740 },
-    "relay2": { "x": 1720, "y": 475 }
+    "usb": { "x": 640, "y": 1020 },
+    "ldo": { "x": 440, "y": 830 },
+    "btn1": { "x": 720, "y": 500 },
+    "btn2": { "x": 1020, "y": 500 },
+    "mcu": { "x": 900, "y": 800 },
+    "pmos": { "x": 1370, "y": 860 },
+    "relay1": { "x": 1710, "y": 740 },
+    "relay2": { "x": 1710, "y": 495 }
   },
   "layoutPolicy": {
     "candidateSource": "project_assembly.layoutPolicy",

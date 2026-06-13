@@ -1,5 +1,5 @@
 import { readFileSync, writeFileSync } from 'node:fs';
-import { assemble, loadPartLib } from './assemble.mjs';
+import { assemble, loadPartLib, loadProjectAssembly } from './assemble.mjs';
 import { validateTemplate } from './validate.mjs';
 import { HARNESS_RULES } from '../harness/rule_registry.mjs';
 
@@ -13,6 +13,7 @@ function readJson(path) {
 }
 
 function defaultAnchors() {
+	const assembly = loadProjectAssembly();
 	if (process.env.EASYEDA_FAST_REUSE_ANCHORS === '1') {
 		try {
 			const rep = readJson(OUT_REPORT);
@@ -20,16 +21,7 @@ function defaultAnchors() {
 			if (a) return a;
 		} catch {}
 	}
-	return {
-		usb: { x: 640, y: 1020 },
-		ldo: { x: 440, y: 830 },
-		btn1: { x: 720, y: 500 },
-		btn2: { x: 1020, y: 500 },
-		mcu: { x: 900, y: 800 },
-		pmos: { x: 1370, y: 860 },
-		relay1: { x: 1710, y: 740 },
-		relay2: { x: 1710, y: 495 },
-	};
+	return assembly.anchors || {};
 }
 
 const started = performance.now();
