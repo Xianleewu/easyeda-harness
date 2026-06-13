@@ -31,7 +31,7 @@ A PASS on the current model only proves the current model. It does not validate 
 - Circuit pack scaffold: `init --pack <new_pack> --out <project-dir>` also creates `circuit_packs/<new_pack>/pack.mjs` and `cell_manifest.json` skeletons, preventing new projects from accidentally reusing the bundled example pack.
 - Library contract gate: `contract:library` verifies every required part has approved Symbol, Device, Footprint, name/value, and BOM/PCB state.
 - Workflow smoke gate: `workflow:smoke` proves bad specs are stopped by plan, incomplete scaffolds do not pass as ready, missing library bindings fail, and failed generate cannot rewrite `full_model.json`.
-- Cell manifest gate: `circuit_packs/*/cell_manifest.json` declares circuit-pack cell roles, required refs, net args, ports, and layout intent before assembly can use those cells.
+- Cell manifest gate: `circuit_packs/*/cell_manifest.json` declares circuit-pack cell roles, required refs, net args, ports, layout intent, and `qualityRules`, moving basic drawing rules such as orthogonal wiring, real net labels, text clearance, and module isolation into cell design before assembly can use those cells.
 - Rule coverage check: `contract:rules` proves module registry, required parts, interface contracts, and core rules cover the project contract.
 - Assembly coverage check: `contract:assembly` proves every contract module is mapped to a deterministic cell, anchor, refs, and nets before generation.
 - Layout policy check: `contract:layout` proves layout search is driven by `project_assembly.json` and that the final layout satisfies module spacing, no interlock, and no unrelated wire intrusion requirements.

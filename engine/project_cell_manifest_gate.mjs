@@ -16,6 +16,14 @@ function unique(values) {
 
 function validateManifest(manifest, assembly, manifestPath, pack) {
 	const findings = [];
+	const requiredQualityRules = asArray(manifest.requiredQualityRules).length ? manifest.requiredQualityRules : [
+		'orthogonal-wiring',
+		'real-net-labels',
+		'text-clearance',
+		'module-box-isolation',
+		'no-fake-net-text',
+		'no-unnecessary-net-ports',
+	];
 	if (manifest.schemaVersion !== 1) hard(findings, 'CM1-schema-version', 'cell manifest schemaVersion must be 1', { schemaVersion: manifest.schemaVersion });
 	if (!manifest.packId) hard(findings, 'CM2-pack-id', 'cell manifest needs a stable packId');
 	if (assembly.circuitPack && manifest.packId && assembly.circuitPack !== manifest.packId) {
@@ -26,6 +34,7 @@ function validateManifest(manifest, assembly, manifestPath, pack) {
 		});
 	}
 	if (!asArray(manifest.cells).length) hard(findings, 'CM4-cells-present', 'cell manifest must declare at least one deterministic cell');
+	if (!asArray(manifest.requiredQualityRules).length) hard(findings, 'CM14-quality-rules-present', 'cell manifest must declare requiredQualityRules for reusable schematic quality contracts');
 
 	const ids = asArray(manifest.cells).map(cell => cell.id);
 	for (const duplicate of unique(ids.filter((id, index) => ids.indexOf(id) !== index))) {
@@ -39,6 +48,15 @@ function validateManifest(manifest, assembly, manifestPath, pack) {
 		if (!asArray(cell?.refs).length) hard(findings, 'CM8-ref-roles', `${id} must declare required ref roles`, { cell: id });
 		if (!asArray(cell?.ports).length) hard(findings, 'CM9-ports', `${id} must declare electrical ports`, { cell: id });
 		if (!cell?.layoutIntent) hard(findings, 'CM10-layout-intent', `${id} must declare layoutIntent so agents know the template purpose`, { cell: id });
+		const qualityRules = new Set(asArray(cell?.qualityRules));
+		const missingQualityRules = requiredQualityRules.filter(rule => !qualityRules.has(rule));
+		if (missingQualityRules.length) {
+			hard(findings, 'CM15-cell-quality-rules', `${id} must declare every required reusable quality rule it is designed to satisfy`, {
+				cell: id,
+				missingQualityRules,
+				requiredQualityRules,
+			});
+		}
 		if (cell?.id && !pack.cellBuilders?.[cell.id]) {
 			hard(findings, 'CM11-builder-exists', `${cell.id} is declared in the manifest but has no implemented builder`, {
 				cell: cell.id,
@@ -93,6 +111,7 @@ const report = {
 	severity: { hard: findings.length, soft: 0, info: 0 },
 	packId: manifest?.packId || null,
 	manifestPath,
+	requiredQualityRules: asArray(manifest?.requiredQualityRules),
 	cellCount: asArray(manifest?.cells).length,
 	implementedBuilders: Object.keys(pack?.cellBuilders || {}),
 	assemblyCells: unique(asArray(assembly?.modules).map(mod => mod.cell)),

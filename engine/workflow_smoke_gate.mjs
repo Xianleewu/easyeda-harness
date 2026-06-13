@@ -1,3 +1,4 @@
+import { spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { buildGsdPlan } from '../workflows/gsd_plan.mjs';
@@ -11,6 +12,8 @@ const REPORT = process.env.EASYEDA_WORKFLOW_SMOKE_REPORT || `${ROOT}/workflow_sm
 const TMP_DIR = `${ROOT}/_tmp_workflow_smoke`;
 const BAD_SPEC = `${TMP_DIR}/bad_project_spec.json`;
 const SCAFFOLD_DIR = `${TMP_DIR}/scaffold`;
+const BAD_MANIFEST = `${TMP_DIR}/bad_cell_manifest.json`;
+const BAD_MANIFEST_ASSEMBLY = `${TMP_DIR}/bad_manifest_project_assembly.json`;
 const CUSTOM_PACK = 'workflow_smoke_pack';
 const CUSTOM_PACK_DIR = `${ROOT}/circuit_packs/${CUSTOM_PACK}`;
 
@@ -132,6 +135,37 @@ try {
 		'approved library manifest must fail when a required part binding is missing',
 		{ removedPart: firstRequiredPart || null, findings: missingPartResult.findings },
 	);
+
+	const badManifest = clone(readJson(`${ROOT}/circuit_packs/aihwdebugger/cell_manifest.json`));
+	if (badManifest.cells?.[0]) delete badManifest.cells[0].qualityRules;
+	const badManifestAssembly = { ...assembly, cellManifest: '_tmp_workflow_smoke/bad_cell_manifest.json' };
+	writeFileSync(BAD_MANIFEST, JSON.stringify(badManifest, null, 2) + '\n', 'utf8');
+	writeFileSync(BAD_MANIFEST_ASSEMBLY, JSON.stringify(badManifestAssembly, null, 2) + '\n', 'utf8');
+	const badManifestGate = spawnSync(process.execPath, ['engine/project_cell_manifest_gate.mjs'], {
+		cwd: ROOT,
+		stdio: 'pipe',
+		shell: false,
+		env: {
+			...process.env,
+			EASYEDA_PROJECT_ASSEMBLY: BAD_MANIFEST_ASSEMBLY,
+			EASYEDA_CELL_MANIFEST_REPORT: `${TMP_DIR}/bad_cell_manifest_report.json`,
+		},
+		encoding: 'utf8',
+	});
+	const badManifestReport = existsSync(`${TMP_DIR}/bad_cell_manifest_report.json`)
+		? readJson(`${TMP_DIR}/bad_cell_manifest_report.json`)
+		: null;
+	checks.cellQualityRulesRejected = {
+		pass: badManifestGate.status !== 0 && (badManifestReport?.findings || []).some(f => f.rule === 'CM15-cell-quality-rules'),
+		status: badManifestGate.status,
+		rules: (badManifestReport?.findings || []).map(f => f.rule),
+	};
+	assertFinding(findings, checks.cellQualityRulesRejected.pass, 'WS11-cell-quality-rules-rejected', 'cell manifest gate must reject cells that do not declare required reusable quality rules', {
+		status: badManifestGate.status,
+		stdout: badManifestGate.stdout,
+		stderr: badManifestGate.stderr,
+		observedRules: checks.cellQualityRulesRejected.rules,
+	});
 
 	const scaffoldReport = writeScaffold({ outDir: SCAFFOLD_DIR, spec, pack: spec.circuitPack || 'aihwdebugger' });
 	const scaffoldFiles = [

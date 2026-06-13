@@ -31,7 +31,7 @@ EasyEDA Harness 是一套给 Codex、Claude Code 等编程 Agent 使用的原理
 - Circuit pack scaffold：`init --pack <new_pack> --out <project-dir>` 会同时创建 `circuit_packs/<new_pack>/pack.mjs` 和 `cell_manifest.json` 骨架，避免新项目误套用内置样例包。
 - 库合同门禁：`contract:library` 验证每个 required part 都有批准的 Symbol、Device、Footprint、name/value 和 BOM/PCB 状态。
 - 工作流烟测门禁：`workflow:smoke` 验证坏 spec 会被 plan 拦住、未补齐 scaffold 不会假 PASS、缺失库绑定会失败、失败 generate 不会改写 `full_model.json`。
-- Cell manifest 门禁：`circuit_packs/*/cell_manifest.json` 在装配前声明电路包 cell 的 ref role、netArg、端口和布局意图。
+- Cell manifest 门禁：`circuit_packs/*/cell_manifest.json` 在装配前声明电路包 cell 的 ref role、netArg、端口、布局意图和 `qualityRules`，把正交走线、真实网标、文字 clearance、模块隔离等基础绘图规则前置到 cell 设计。
 - 规则覆盖检查：`contract:rules` 会确认模块注册、必备零件、接口合同和核心规则覆盖了项目合同。
 - 装配覆盖检查：`contract:assembly` 会确认每个合同模块都映射到了确定性 cell、anchor、refs 和 nets。
 - 布局策略检查：`contract:layout` 会确认布局搜索来自 `project_assembly.json`，并验证最终模块间距、无榫卯穿插、无无关导线侵入。

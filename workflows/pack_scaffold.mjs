@@ -37,6 +37,14 @@ function manifestSource(packId) {
 		schemaVersion: 1,
 		packId,
 		purpose: `Scaffold cell contracts for the ${packId} circuit pack. Fill cells and builders before generation.`,
+		requiredQualityRules: [
+			'orthogonal-wiring',
+			'real-net-labels',
+			'text-clearance',
+			'module-box-isolation',
+			'no-fake-net-text',
+			'no-unnecessary-net-ports',
+		],
 		cells: [],
 	}, null, 2)}\n`;
 }
