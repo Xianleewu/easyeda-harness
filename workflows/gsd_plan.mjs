@@ -89,9 +89,11 @@ function validateSpecRealization(spec, contract, netlist, assembly, model = null
 	}
 
 	const policy = assembly?.layoutPolicy || {};
-	if (!policy.candidateSource || !policy.baseAnchors || !asArray(policy.xProfiles).length) {
-		hard(findings, 'GP12-layout-policy-present', 'project_assembly.json must define layoutPolicy candidateSource, baseAnchors, and xProfiles before planning', {
+	if (!policy.candidateSource || !policy.flow || !asArray(policy.columns).length || !policy.baseAnchors || !asArray(policy.xProfiles).length) {
+		hard(findings, 'GP12-layout-policy-present', 'project_assembly.json must define layoutPolicy candidateSource, flow, columns, baseAnchors, and xProfiles before planning', {
 			candidateSource: policy.candidateSource || null,
+			flow: policy.flow || null,
+			columns: asArray(policy.columns).length,
 			baseAnchors: Object.keys(policy.baseAnchors || {}).length,
 			xProfiles: asArray(policy.xProfiles).length,
 		});

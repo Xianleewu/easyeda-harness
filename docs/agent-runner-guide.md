@@ -26,6 +26,7 @@ Use this repository as an executable schematic workflow, not as permission to dr
 - Do not use low-level writer scripts for final delivery.
 - Do not reuse `aihwdebugger` for unrelated schematics; create or fill the target circuit pack first.
 - Do not implement a deterministic cell until its `cell_manifest.json` entry declares `qualityRules` for orthogonal wiring, real net labels, text clearance, module isolation, no fake net text, and no unnecessary net ports.
+- Do not trust layout work until `project_assembly.json` declares `layoutPolicy.flow` and ordered `layoutPolicy.columns` for every module.
 - Inspect `next_actions.json` first when a gate fails.
 - Use `repair_actions.json` to find the owning files and rerun command for each finding.
 - Use `node bin/easyeda-gsd.mjs repair` for the read-only grouped repair plan.

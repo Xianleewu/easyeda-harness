@@ -8,6 +8,20 @@ function finitePoint(point) {
 	return point && Number.isFinite(point.x) && Number.isFinite(point.y);
 }
 
+function columnIndexByModule(policy) {
+	const result = new Map();
+	for (const [index, column] of asArray(policy.columns).entries()) {
+		for (const moduleId of asArray(column.modules)) {
+			result.set(moduleId, {
+				index,
+				id: column.id || `column_${index + 1}`,
+				role: column.role || '',
+			});
+		}
+	}
+	return result;
+}
+
 export function validateLayoutContract(assembly, layout, structure, options = {}) {
 	const category = options.category || 'project-layout';
 	const findings = [];
@@ -17,6 +31,8 @@ export function validateLayoutContract(assembly, layout, structure, options = {}
 	const base = policy.baseAnchors || {};
 
 	if (!policy.candidateSource) hard(findings, 'PL1-candidate-source-declared', 'layoutPolicy.candidateSource must be declared', {}, category);
+	if (!policy.flow || typeof policy.flow !== 'string') hard(findings, 'PL14-flow-declared', 'layoutPolicy.flow must declare the intended schematic reading flow', {}, category);
+	if (!asArray(policy.columns).length) hard(findings, 'PL15-columns-declared', 'layoutPolicy.columns must declare ordered module columns before layout search', {}, category);
 	if (layout.candidateSource !== policy.candidateSource) {
 		hard(findings, 'PL2-planner-uses-assembly-policy', 'layout planner report must prove candidates came from project_assembly.json layoutPolicy', {
 			expected: policy.candidateSource,
@@ -31,6 +47,32 @@ export function validateLayoutContract(assembly, layout, structure, options = {}
 		if (!mod.registryModule) {
 			hard(findings, 'PL4-registry-module-defined', `${mod.id} module must name its registry module for layout metrics`, { module: mod.id }, category);
 		}
+	}
+
+	const columns = columnIndexByModule(policy);
+	const moduleIds = new Set(modules.map(mod => mod.id));
+	const missingColumns = [...moduleIds].filter(id => !columns.has(id));
+	if (missingColumns.length) {
+		hard(findings, 'PL16-module-column-covered', 'layoutPolicy.columns must place every assembly module in an ordered reading-flow column', { missingColumns }, category);
+	}
+	for (const column of asArray(policy.columns)) {
+		for (const id of asArray(column.modules)) {
+			if (!moduleIds.has(id)) hard(findings, 'PL17-column-module-known', 'layoutPolicy.columns references an unknown assembly module', { column: column.id || null, module: id }, category);
+		}
+	}
+	const orderedModules = modules
+		.filter(mod => columns.has(mod.id) && finitePoint(anchors[mod.anchor]))
+		.map(mod => ({ id: mod.id, x: anchors[mod.anchor].x, column: columns.get(mod.id) }));
+	const columnPairs = [];
+	for (const a of orderedModules) {
+		for (const b of orderedModules) {
+			if (a.column.index >= b.column.index) continue;
+			columnPairs.push({ left: a.id, right: b.id, leftX: a.x, rightX: b.x, leftColumn: a.column.id, rightColumn: b.column.id });
+		}
+	}
+	const reversedPairs = columnPairs.filter(pair => pair.leftX > pair.rightX);
+	if (reversedPairs.length) {
+		hard(findings, 'PL18-column-x-order', 'module anchors must follow the declared left-to-right layoutPolicy.columns order', { reversedPairs }, category);
 	}
 
 	const expectedAnchors = new Set(modules.map(mod => mod.anchor).filter(Boolean));
@@ -88,4 +130,3 @@ export function validateLayoutContract(assembly, layout, structure, options = {}
 
 	return findings;
 }
-

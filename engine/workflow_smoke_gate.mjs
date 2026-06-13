@@ -97,6 +97,24 @@ try {
 		});
 	}
 
+	const noColumnsAssembly = clone(assembly);
+	delete noColumnsAssembly.layoutPolicy.columns;
+	const noColumnsPlan = buildPlanForFiles({
+		spec,
+		contract,
+		netlist,
+		assembly: noColumnsAssembly,
+		libraryManifest,
+		specPath: '_tmp_workflow_smoke/no_columns_project_spec.json',
+	});
+	checks.layoutColumnsRequired = {
+		pass: !noColumnsPlan.pass && hasRule(noColumnsPlan, 'GP12-layout-policy-present'),
+		rules: (noColumnsPlan.findings || []).map(f => f.rule),
+	};
+	assertFinding(findings, checks.layoutColumnsRequired.pass, 'WS3-layout-columns-required', 'GSD plan must reject layout policies that do not declare ordered columns', {
+		observedRules: checks.layoutColumnsRequired.rules,
+	});
+
 	writeFileSync(BAD_SPEC, JSON.stringify(badSpec, null, 2) + '\n', 'utf8');
 	const fullModelPath = `${ROOT}/full_model.json`;
 	const beforeFullModelMtime = fileMtimeMs(fullModelPath);

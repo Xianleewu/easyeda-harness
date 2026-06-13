@@ -34,7 +34,7 @@ A PASS on the current model only proves the current model. It does not validate 
 - Cell manifest gate: `circuit_packs/*/cell_manifest.json` declares circuit-pack cell roles, required refs, net args, ports, layout intent, and `qualityRules`, moving basic drawing rules such as orthogonal wiring, real net labels, text clearance, and module isolation into cell design before assembly can use those cells.
 - Rule coverage check: `contract:rules` proves module registry, required parts, interface contracts, and core rules cover the project contract.
 - Assembly coverage check: `contract:assembly` proves every contract module is mapped to a deterministic cell, anchor, refs, and nets before generation.
-- Layout policy check: `contract:layout` proves layout search is driven by `project_assembly.json` and that the final layout satisfies module spacing, no interlock, and no unrelated wire intrusion requirements.
+- Layout policy check: `contract:layout` proves layout search is driven by `project_assembly.json` and that `layoutPolicy.flow`, ordered `layoutPolicy.columns`, module spacing, no interlock, and no unrelated wire intrusion requirements are satisfied.
 - Contract realization check: after `full_model.json` is generated, `contract:model` proves the model actually expresses the contract modules, parts, nets, and interfaces.
 - Visual evidence check: after offline previews are generated, `contract:visual` proves every contract visual evidence region exists and passes image inspection.
 - Fast offline check: validates the schematic model on local CPU and is intended for daily coordinate and rule iteration.

@@ -22,6 +22,8 @@ A PASS on the bundled model only proves that the bundled model passes. It does n
 
 Every cell manifest entry must include `qualityRules` for the reusable drawing contracts it is designed to satisfy: orthogonal wiring, real net labels, text clearance, module box isolation, no fake net text, and no unnecessary single-sheet net ports. Missing `qualityRules` is a pre-generation failure, not a visual polish note.
 
+Every `project_assembly.json` layoutPolicy must include a readable `layoutPolicy.flow` string and ordered `layoutPolicy.columns` that place each assembly module into the intended left-to-right schematic reading order. Missing columns or reversed anchor X order is a layout-contract failure.
+
 ## Required External Skill
 
 Install and start the official EasyEDA API Skill first:
@@ -78,7 +80,7 @@ Acceptance requires all local gates to pass:
 - `contract:assembly`: `project_assembly.json` maps every contract module to deterministic cells, anchors, refs, and nets
 - `fast`: `HARD=0 SOFT=0 INFO=0`
 - `pipeline`: `HARD=0 SOFT=0 INFO=0`
-- `contract:layout`: layout search is driven by `project_assembly.json` layout policy and final module spacing/interlock/intrusion checks pass
+- `contract:layout`: layout search is driven by `project_assembly.json` layout policy, `layoutPolicy.flow`, ordered `layoutPolicy.columns`, and final module spacing/interlock/intrusion checks pass
 - `contract:model`: generated `full_model.json` satisfies `project_contract.json`
 - `preview`: at least 10 offline preview screenshots plus visual audit PASS
 - `contract:visual`: preview evidence covers every `project_contract.json` visual region

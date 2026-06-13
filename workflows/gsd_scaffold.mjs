@@ -90,6 +90,12 @@ export function buildScaffold(spec, { pack = 'aihwdebugger' } = {}) {
 		anchors,
 		layoutPolicy: {
 			candidateSource: 'project_assembly.layoutPolicy',
+			flow: 'left-to-right: fill ordered functional columns before generation',
+			columns: modules.map((mod, index) => ({
+				id: `column_${index + 1}`,
+				role: mod.title || mod.id,
+				modules: [mod.id],
+			})),
 			minModuleGap: 90,
 			maxModuleWireIntrusions: 0,
 			requireNoLaneInterlocks: true,

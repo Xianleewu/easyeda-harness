@@ -20,6 +20,13 @@
   },
   "layoutPolicy": {
     "candidateSource": "project_assembly.layoutPolicy",
+    "flow": "left-to-right: input and power, control MCU/support, switch, relay outputs",
+    "columns": [
+      { "id": "input", "role": "external input and raw power", "modules": ["usb", "ldo"] },
+      { "id": "control", "role": "controller and bring-up support", "modules": ["reset", "boot", "mcu"] },
+      { "id": "switching", "role": "high-side power switching", "modules": ["pmos"] },
+      { "id": "outputs", "role": "external relay outputs", "modules": ["relay1", "relay2"] }
+    ],
     "minModuleGap": 90,
     "maxModuleWireIntrusions": 0,
     "requireNoLaneInterlocks": true,

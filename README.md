@@ -34,7 +34,7 @@ EasyEDA Harness 是一套给 Codex、Claude Code 等编程 Agent 使用的原理
 - Cell manifest 门禁：`circuit_packs/*/cell_manifest.json` 在装配前声明电路包 cell 的 ref role、netArg、端口、布局意图和 `qualityRules`，把正交走线、真实网标、文字 clearance、模块隔离等基础绘图规则前置到 cell 设计。
 - 规则覆盖检查：`contract:rules` 会确认模块注册、必备零件、接口合同和核心规则覆盖了项目合同。
 - 装配覆盖检查：`contract:assembly` 会确认每个合同模块都映射到了确定性 cell、anchor、refs 和 nets。
-- 布局策略检查：`contract:layout` 会确认布局搜索来自 `project_assembly.json`，并验证最终模块间距、无榫卯穿插、无无关导线侵入。
+- 布局策略检查：`contract:layout` 会确认布局搜索来自 `project_assembly.json`，并验证 `layoutPolicy.flow`、有序 `layoutPolicy.columns`、最终模块间距、无榫卯穿插、无无关导线侵入。
 - 合同兑现检查：生成 `full_model.json` 后，`contract:model` 会确认模型实际包含合同要求的模块、零件、网络和接口表达。
 - 视觉证据检查：生成离线预览后，`contract:visual` 会确认合同要求的截图区域都存在且通过图像检查。
 - 快速离线检查：`npm run fast` 在本机 CPU 上完成核心模板校验，适合日常坐标和规则迭代。
