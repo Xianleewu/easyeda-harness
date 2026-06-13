@@ -17,7 +17,7 @@ For a new schematic project, do not draw directly in EasyEDA and then hope the g
 
 A PASS on the bundled model only proves that the bundled model passes. It does not validate another project, another schematic, or hand-drawn EasyEDA edits.
 
-`project_spec.json` is the first user-intent input. `spec:schema` validates that input before any contract is trusted. `project_contract.json` is the required machine contract derived from it. `project_netlist.json` records required electrical endpoints. `circuit_packs/*/pack.mjs` owns circuit-family generation behavior, `circuit_packs/*/cell_manifest.json` declares deterministic cell capabilities for the selected circuit pack, and `project_assembly.json` maps each contract module to those cells, refs, anchors, nets, and layout policy. Update all of them before changing cells for a new project, then run `npm.cmd run spec:schema`, `npm.cmd run spec`, `npm.cmd run contract`, `npm.cmd run contract:netlist`, `npm.cmd run contract:pack`, `npm.cmd run contract:cells`, `npm.cmd run contract:assembly`, and `npm.cmd run accept`. A failing spec schema, spec coverage, contract, netlist, circuit-pack, cell-manifest, assembly, or layout gate blocks all write-back and delivery claims.
+`project_spec.json` is the first user-intent input. `node bin/easyeda-gsd.mjs plan` writes `gsd_plan_report.json` and proves that the current spec is actually realized by `project_contract.json`, `project_netlist.json`, `project_assembly.json`, and a registered circuit pack. `spec:schema` validates that input before any contract is trusted. `project_contract.json` is the required machine contract derived from it. `project_netlist.json` records required electrical endpoints. `circuit_packs/*/pack.mjs` owns circuit-family generation behavior, `circuit_packs/*/cell_manifest.json` declares deterministic cell capabilities for the selected circuit pack, and `project_assembly.json` maps each contract module to those cells, refs, anchors, nets, and layout policy. Update all of them before changing cells for a new project, then run `npm.cmd run gsd:plan`, `npm.cmd run spec:schema`, `npm.cmd run spec`, `npm.cmd run contract`, `npm.cmd run contract:netlist`, `npm.cmd run contract:pack`, `npm.cmd run contract:cells`, `npm.cmd run contract:assembly`, and `npm.cmd run accept`. A failing plan, spec schema, spec coverage, contract, netlist, circuit-pack, cell-manifest, assembly, or layout gate blocks all write-back and delivery claims.
 
 ## Required External Skill
 
@@ -61,6 +61,7 @@ Use `node bin/easyeda-gsd.mjs repair` for the read-only grouped repair plan; it 
 `next_actions.json` is a stable `schemaVersion=1` action contract validated by `npm.cmd run action:schema`; see `reports/README.md`.
 Acceptance requires all local gates to pass:
 
+- `gsd:plan`: `project_spec.json` is realized by the current contract, netlist, assembly, and circuit pack
 - `spec`: `project_contract.json` covers `project_spec.json`
 - `spec:schema`: `project_spec.json` is a valid first-layer user-intent contract
 - `contract`: `HARD=0 SOFT=0 INFO=0`
@@ -136,7 +137,7 @@ If a visual or DRC issue appears, update the deterministic template/rules first,
 When adapting this repository to a different schematic:
 
 1. Read the electrical spec and encode it in `project_spec.json` before placing symbols.
-2. Derive/update `project_contract.json` from the spec and run `npm.cmd run spec` plus `npm.cmd run contract` until both pass.
+2. Derive/update `project_contract.json` from the spec and run `npm.cmd run gsd:plan`, `npm.cmd run spec`, and `npm.cmd run contract` until all pass.
 3. Define required electrical endpoints in `project_netlist.json` and run `npm.cmd run contract:netlist` until it passes.
 4. Map every contract module and layout policy in `project_assembly.json`, then run `npm.cmd run contract:assembly` until it passes.
 5. Implement or update deterministic cells for that assembly mapping.

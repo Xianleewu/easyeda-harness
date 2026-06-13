@@ -4,6 +4,7 @@ import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { validateSpecSchema } from '../contracts/spec_schema.mjs';
 import { loadRepairLoopPlan } from '../workflows/repair_loop.mjs';
+import { buildGsdPlan } from '../workflows/gsd_plan.mjs';
 
 const ROOT = resolve(new URL('..', import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1')).replace(/\\/g, '/');
 
@@ -86,25 +87,15 @@ function plan(args) {
 		process.exit(2);
 	}
 	const specDoc = readJson(specPath);
-	const findings = validateSpecSchema(specDoc);
-	if (findings.length) {
-		console.error(JSON.stringify({ pass: false, spec, findings }, null, 2));
-		process.exit(1);
-	}
 	const assembly = readJson('project_assembly.json');
 	const contract = readJson('project_contract.json');
-	log(JSON.stringify({
-		pass: true,
-		spec,
-		projectId: specDoc.projectId || contract.projectId,
-		circuitPack: assembly.circuitPack || 'aihwdebugger',
-		cellManifest: assembly.cellManifest || 'circuit_packs/aihwdebugger/cell_manifest.json',
-		modules: (specDoc.modules || []).map(mod => mod.id),
-		interfaces: (specDoc.interfaces || []).length,
-		requiredLocalGate: 'node bin/easyeda-gsd.mjs accept',
-		requiredFinalGate: 'node bin/easyeda-gsd.mjs live-check',
-		finalApply: 'node bin/easyeda-gsd.mjs apply --gated',
-	}, null, 2));
+	const netlist = readJson('project_netlist.json');
+	const model = existsSync(`${ROOT}/full_model.json`) ? readJson('full_model.json') : null;
+	const report = buildGsdPlan({ spec: specDoc, contract, netlist, assembly, model, specPath: spec });
+	writeFileSync(`${ROOT}/gsd_plan_report.json`, JSON.stringify(report, null, 2), 'utf8');
+	log(JSON.stringify(report, null, 2));
+	log('report -> gsd_plan_report.json');
+	process.exit(report.pass ? 0 : 1);
 }
 
 function report() {

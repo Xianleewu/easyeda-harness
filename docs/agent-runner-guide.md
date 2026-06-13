@@ -5,14 +5,15 @@ Use this repository as an executable schematic workflow, not as permission to dr
 ## Required Path
 
 1. Capture user intent in `project_spec.json`.
-2. Derive `project_contract.json`.
-3. Define required electrical endpoints in `project_netlist.json`.
-4. Select or declare the circuit-pack `pack.mjs` and `cell_manifest.json`.
-5. Map modules, refs, anchors, nets, and layout policy in `project_assembly.json`.
-6. Implement deterministic cells and rules only after those contracts exist.
-7. Run `node bin/easyeda-gsd.mjs accept`.
-8. Run `node bin/easyeda-gsd.mjs live-check` before final delivery.
-9. Write back only with `node bin/easyeda-gsd.mjs apply --gated`.
+2. Run `node bin/easyeda-gsd.mjs plan` and keep `gsd_plan_report.json` passing as the spec-to-contract realization proof.
+3. Derive `project_contract.json`.
+4. Define required electrical endpoints in `project_netlist.json`.
+5. Select or declare the circuit-pack `pack.mjs` and `cell_manifest.json`.
+6. Map modules, refs, anchors, nets, and layout policy in `project_assembly.json`.
+7. Implement deterministic cells and rules only after those contracts exist.
+8. Run `node bin/easyeda-gsd.mjs accept`.
+9. Run `node bin/easyeda-gsd.mjs live-check` before final delivery.
+10. Write back only with `node bin/easyeda-gsd.mjs apply --gated`.
 
 ## Constraints
 

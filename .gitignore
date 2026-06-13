@@ -16,6 +16,7 @@ visual_review_report.json
 harness_*_report.json
 apply_report.json
 acceptance_report.json
+gsd_plan_report.json
 next_actions.json
 repair_actions.json
 repair_loop_report.json

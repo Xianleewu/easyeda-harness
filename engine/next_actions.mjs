@@ -27,6 +27,7 @@ function pushAction(actions, item) {
 
 const acceptance = readJson('acceptance_report.json');
 const agentInstructions = readJson('agent_instruction_report.json');
+const gsdPlan = readJson('gsd_plan_report.json');
 const specSchema = readJson('spec_schema_report.json');
 const spec = readJson('project_spec_report.json');
 const contract = readJson('project_contract_report.json');
@@ -54,6 +55,15 @@ const checks = {
 		filesChecked: agentInstructions?.filesChecked || null,
 		firstFinding: agentInstructions?.findings?.[0] || null,
 		evidence: 'agent_instruction_report.json',
+	},
+	gsdPlan: {
+		status: status(gsdPlan?.pass),
+		severity: gsdPlan?.severity || null,
+		projectId: gsdPlan?.projectId || null,
+		circuitPack: gsdPlan?.circuitPack || null,
+		modules: gsdPlan?.modules || null,
+		firstFinding: gsdPlan?.findings?.[0] || null,
+		evidence: 'gsd_plan_report.json',
 	},
 	specSchema: {
 		status: status(specSchema?.pass),
@@ -240,6 +250,14 @@ if (checks.agentInstructions.status !== 'pass') {
 		action: 'Fix Codex/Claude-facing instructions so agents are forced through project spec, contract, netlist, assembly, local gates, live evidence, and fail-closed apply:gated instead of free-drawing in EasyEDA.',
 		evidence: ['AGENTS.md', 'CLAUDE.md', 'README.md', 'README.en.md', 'agent_instruction_report.json'],
 		observed: checks.agentInstructions.firstFinding || checks.agentInstructions,
+	});
+}
+if (checks.gsdPlan.status !== 'pass') {
+	pushAction(actions, {
+		area: 'gsd-plan',
+		action: 'Fix spec-to-contract realization before generation. gsd_plan_report.json must prove project_spec.json is covered by project_contract.json, project_netlist.json, project_assembly.json, and a registered circuit pack.',
+		evidence: ['project_spec.json', 'project_contract.json', 'project_netlist.json', 'project_assembly.json', 'gsd_plan_report.json'],
+		observed: checks.gsdPlan.firstFinding || checks.gsdPlan,
 	});
 }
 if (checks.specSchema.status !== 'pass') {
