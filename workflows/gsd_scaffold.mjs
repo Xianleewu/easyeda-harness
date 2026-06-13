@@ -26,7 +26,7 @@ export function buildScaffold(spec, { pack = 'aihwdebugger' } = {}) {
 		intent: spec.intent || 'Scaffolded EasyEDA schematic workflow.',
 		agentWorkflow: {
 			freeDrawAllowed: false,
-			authoritativeEditPath: 'project_spec.json -> project_contract.json -> project_netlist.json -> project_assembly.json -> deterministic cells -> gates -> apply:gated',
+			authoritativeEditPath: 'project_spec.json -> project contract -> project_netlist.json -> project_assembly.json -> deterministic cells -> gates -> gated write-back',
 			requiredEntrypoints: ['accept', 'accept:live', 'apply:gated'],
 		},
 		modules: modules.map(mod => ({
@@ -85,7 +85,7 @@ export function buildScaffold(spec, { pack = 'aihwdebugger' } = {}) {
 		layoutProfile: 'scaffold',
 		agentPolicy: {
 			freeDrawAllowed: false,
-			authoritativeEditPath: 'project_spec.json -> project_contract.json -> project_netlist.json -> project_assembly.json -> deterministic cells -> gates -> apply:gated',
+			authoritativeEditPath: 'project_spec.json -> project contract -> project_netlist.json -> project_assembly.json -> deterministic cells -> gates -> gated write-back',
 		},
 		anchors,
 		layoutPolicy: {

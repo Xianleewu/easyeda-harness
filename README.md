@@ -28,6 +28,7 @@ EasyEDA Harness 是一套给 Codex、Claude Code 等编程 Agent 使用的原理
 - 项目合同门禁：`project_contract.json` 定义模块、关键网络、接口、视觉证据区域和禁止自由绘图策略。
 - 项目网表门禁：`project_netlist.json` 定义关键网络必连引脚，并证明生成模型实际连接这些端点。
 - Circuit pack 门禁：`contract:pack` 验证所选 `pack.mjs` 已注册且暴露必要生成 hook。
+- Circuit pack scaffold：`init --pack <new_pack> --out <project-dir>` 会同时创建 `circuit_packs/<new_pack>/pack.mjs` 和 `cell_manifest.json` 骨架，避免新项目误套用内置样例包。
 - 库合同门禁：`contract:library` 验证每个 required part 都有批准的 Symbol、Device、Footprint、name/value 和 BOM/PCB 状态。
 - 工作流烟测门禁：`workflow:smoke` 验证坏 spec 会被 plan 拦住、未补齐 scaffold 不会假 PASS、缺失库绑定会失败、失败 generate 不会改写 `full_model.json`。
 - Cell manifest 门禁：`circuit_packs/*/cell_manifest.json` 在装配前声明电路包 cell 的 ref role、netArg、端口和布局意图。
@@ -83,7 +84,7 @@ node bin/easyeda-gsd.mjs apply --gated
 ```
 
 新项目的第一步不是画图，而是让 Agent 修改 `project_spec.json`，再把它落实到 `project_contract.json`，用 `project_netlist.json` 定义必连端点，选择或声明 `circuit_packs/*/cell_manifest.json`，随后用 `project_assembly.json` 定义可执行装配映射和布局策略；通过这些门禁后再实现项目自己的 deterministic cells 和规则覆盖。
-对于新项目目录，`node bin/easyeda-gsd.mjs init --pack <pack> --out <project-dir>` 会写出这些 scaffold 文件、`approved_library_manifest.json` 和 `gsd_scaffold_report.json`；scaffold 故意是不完整的，必须补齐到 `plan` 通过后才能进入生成。
+对于新项目目录，`node bin/easyeda-gsd.mjs init --pack <pack> --out <project-dir>` 会写出这些 scaffold 文件、`approved_library_manifest.json` 和 `gsd_scaffold_report.json`。如果 `<pack>` 还不存在，它也会创建 `circuit_packs/<pack>/pack.mjs`、`circuit_packs/<pack>/cell_manifest.json` 并更新 pack registry。scaffold 故意是不完整的，必须补齐 pack builders、cell manifest、合同、网表、库绑定和装配映射到 `plan` 通过后才能进入生成。
 
 ## 写回 EasyEDA
 

@@ -28,6 +28,7 @@ A PASS on the current model only proves the current model. It does not validate 
 - Project contract gate: `project_contract.json` defines modules, key nets, interfaces, visual evidence regions, and the no-free-draw policy.
 - Project netlist gate: `project_netlist.json` defines required pins for key nets and proves the generated model connects them.
 - Circuit pack gate: `contract:pack` verifies the selected `pack.mjs` is registered and exposes required generation hooks.
+- Circuit pack scaffold: `init --pack <new_pack> --out <project-dir>` also creates `circuit_packs/<new_pack>/pack.mjs` and `cell_manifest.json` skeletons, preventing new projects from accidentally reusing the bundled example pack.
 - Library contract gate: `contract:library` verifies every required part has approved Symbol, Device, Footprint, name/value, and BOM/PCB state.
 - Workflow smoke gate: `workflow:smoke` proves bad specs are stopped by plan, incomplete scaffolds do not pass as ready, missing library bindings fail, and failed generate cannot rewrite `full_model.json`.
 - Cell manifest gate: `circuit_packs/*/cell_manifest.json` declares circuit-pack cell roles, required refs, net args, ports, and layout intent before assembly can use those cells.
@@ -84,7 +85,7 @@ node bin/easyeda-gsd.mjs apply --gated
 ```
 
 For a new project, the first implementation step is updating `project_spec.json`, realizing it in `project_contract.json`, defining required endpoints in `project_netlist.json`, declaring/choosing a circuit-pack `cell_manifest.json`, then mapping the contract and layout policy in `project_assembly.json`. Only then should the agent implement project-specific deterministic cells and rules.
-For a new project directory, `node bin/easyeda-gsd.mjs init --pack <pack> --out <project-dir>` writes scaffold versions of those files plus `approved_library_manifest.json` and `gsd_scaffold_report.json`; the scaffold is intentionally incomplete and must not be treated as ready for generation until `plan` passes.
+For a new project directory, `node bin/easyeda-gsd.mjs init --pack <pack> --out <project-dir>` writes scaffold versions of those files plus `approved_library_manifest.json` and `gsd_scaffold_report.json`. If `<pack>` does not exist, it also creates `circuit_packs/<pack>/pack.mjs`, `circuit_packs/<pack>/cell_manifest.json`, and updates the pack registry. The scaffold is intentionally incomplete and must not be treated as ready for generation until pack builders, cell manifest, contracts, netlist, library bindings, and assembly mappings make `plan` pass.
 
 ## Write Back To EasyEDA
 

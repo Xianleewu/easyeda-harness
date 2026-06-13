@@ -7,6 +7,8 @@ import { loadRepairLoopPlan } from '../workflows/repair_loop.mjs';
 import { buildGsdPlan } from '../workflows/gsd_plan.mjs';
 import { runGsdGenerate } from '../workflows/gsd_generate.mjs';
 import { writeScaffold } from '../workflows/gsd_scaffold.mjs';
+import { buildMinimalSpec, validatePackId, writePackScaffold } from '../workflows/pack_scaffold.mjs';
+import { circuitPackIds } from '../circuit_packs/registry.mjs';
 
 const ROOT = resolve(new URL('..', import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1')).replace(/\\/g, '/');
 
@@ -28,8 +30,8 @@ Safe order:
 
 Commands:
   help                         Show this help.
-  init --pack aihwdebugger --out <file>
-                               Write a spec file, or a full scaffold when <out> is a directory.
+  init --pack <pack> --out <file-or-dir>
+                               Write a spec file, or a full project + circuit-pack scaffold when <out> is a directory.
   plan [spec]                  Validate current project contracts and print selected pack data.
   generate [spec]              Plan-gated deterministic generation without write-back.
   accept                       Run local acceptance gates.
@@ -64,26 +66,26 @@ function optionValue(args, name) {
 }
 
 function writeInit(args) {
-	const pack = optionValue(args, '--pack') || 'aihwdebugger';
+	const pack = validatePackId(optionValue(args, '--pack') || 'aihwdebugger');
 	const out = optionValue(args, '--out');
 	if (!out) {
 		console.error('init requires --out <file>');
 		process.exit(2);
 	}
-	if (pack !== 'aihwdebugger') {
-		console.error(`unsupported pack: ${pack}`);
-		process.exit(2);
-	}
-	const spec = readJson('project_spec.json');
+	const spec = pack === 'aihwdebugger' && circuitPackIds().includes('aihwdebugger')
+		? readJson('project_spec.json')
+		: buildMinimalSpec(pack);
+	const packScaffold = circuitPackIds().includes(pack) ? null : writePackScaffold({ root: ROOT, packId: pack });
 	const target = resolve(ROOT, out).replace(/\\/g, '/');
 	if (!/\.[A-Za-z0-9]+$/.test(target)) {
 		const scaffold = writeScaffold({ outDir: target, spec, pack });
-		log(JSON.stringify(scaffold, null, 2));
+		log(JSON.stringify({ pack: packScaffold, project: scaffold }, null, 2));
 		log(`${target}/gsd_scaffold_report.json`);
 		return;
 	}
 	mkdirSync(dirname(target), { recursive: true });
 	writeFileSync(target, JSON.stringify({ ...spec, circuitPack: pack }, null, 2) + '\n', 'utf8');
+	if (packScaffold) log(JSON.stringify({ pack: packScaffold }, null, 2));
 	log(`wrote ${target}`);
 }
 

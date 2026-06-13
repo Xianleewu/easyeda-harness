@@ -8,7 +8,7 @@ Use `docs/agent-runner-guide.md` as the neutral runner contract. Prefer `node bi
 
 This harness is an executable workflow, not a free-form schematic drawing assistant.
 
-For a new schematic project, do not draw directly in EasyEDA and then hope the gates catch the result. Start with `node bin/easyeda-gsd.mjs init --pack <pack> --out <project-dir>` to create the editable spec/contract/netlist/assembly scaffold, then fill it until `gsd_plan_report.json` passes. First create or update the project-specific structure that the gates can reason about:
+For a new schematic project, do not draw directly in EasyEDA and then hope the gates catch the result. Start with `node bin/easyeda-gsd.mjs init --pack <pack> --out <project-dir>` to create the editable spec/contract/netlist/assembly scaffold. If `<pack>` is new, this also creates `circuit_packs/<pack>/pack.mjs`, `circuit_packs/<pack>/cell_manifest.json`, and updates the registry. Fill that scaffold until `gsd_plan_report.json` passes. First create or update the project-specific structure that the gates can reason about:
 
 - module contracts: functional blocks, pins, required nets, and intended signal flow
 - deterministic cells/templates: component placement, fanout wires, labels, and local routing
@@ -144,7 +144,7 @@ If a visual or DRC issue appears, update the deterministic template/rules first,
 When adapting this repository to a different schematic:
 
 1. Read the electrical spec and encode it in `project_spec.json` before placing symbols.
-2. For a new project directory, run `node bin/easyeda-gsd.mjs init --pack <pack> --out <project-dir>` and use the generated scaffold files as the editing surface.
+2. For a new project directory, run `node bin/easyeda-gsd.mjs init --pack <pack> --out <project-dir>` and use the generated scaffold files plus `circuit_packs/<pack>/` as the editing surface.
 3. Derive/update `project_contract.json` from the spec and run `npm.cmd run gsd:plan`, `npm.cmd run spec`, and `npm.cmd run contract` until all pass.
 4. Define required electrical endpoints in `project_netlist.json` and run `npm.cmd run contract:netlist` until it passes.
 5. Fill `approved_library_manifest.json` and run `npm.cmd run contract:library` until every required part has approved bindings.

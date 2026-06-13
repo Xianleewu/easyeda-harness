@@ -5,7 +5,7 @@ Use this repository as an executable schematic workflow, not as permission to dr
 ## Required Path
 
 1. Capture user intent in `project_spec.json`.
-2. For a new project directory, run `node bin/easyeda-gsd.mjs init --pack <pack> --out <project-dir>` to create editable scaffold files.
+2. For a new project directory, run `node bin/easyeda-gsd.mjs init --pack <pack> --out <project-dir>` to create editable scaffold files and, for a new pack id, `circuit_packs/<pack>/` skeleton files.
 3. Run `node bin/easyeda-gsd.mjs plan <project-dir>/project_spec.json` and keep `gsd_plan_report.json` passing as the spec-to-contract realization proof.
 4. Derive `project_contract.json`.
 5. Define required electrical endpoints in `project_netlist.json`.
@@ -24,6 +24,7 @@ Use this repository as an executable schematic workflow, not as permission to dr
 - Do not free-draw EasyEDA primitives for delivery.
 - Do not claim completion from local-only PASS.
 - Do not use low-level writer scripts for final delivery.
+- Do not reuse `aihwdebugger` for unrelated schematics; create or fill the target circuit pack first.
 - Inspect `next_actions.json` first when a gate fails.
 - Use `repair_actions.json` to find the owning files and rerun command for each finding.
 - Use `node bin/easyeda-gsd.mjs repair` for the read-only grouped repair plan.

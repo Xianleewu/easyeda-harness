@@ -3,6 +3,7 @@ import { resolve } from 'node:path';
 import { buildGsdPlan } from '../workflows/gsd_plan.mjs';
 import { runGsdGenerate } from '../workflows/gsd_generate.mjs';
 import { writeScaffold } from '../workflows/gsd_scaffold.mjs';
+import { buildMinimalSpec, syncPackRegistry, writePackScaffold } from '../workflows/pack_scaffold.mjs';
 import { validateLibraryContract } from '../contracts/library_contract.mjs';
 
 const ROOT = (process.env.EASYEDA_WORKDIR || process.cwd()).replace(/\\/g, '/');
@@ -10,6 +11,8 @@ const REPORT = process.env.EASYEDA_WORKFLOW_SMOKE_REPORT || `${ROOT}/workflow_sm
 const TMP_DIR = `${ROOT}/_tmp_workflow_smoke`;
 const BAD_SPEC = `${TMP_DIR}/bad_project_spec.json`;
 const SCAFFOLD_DIR = `${TMP_DIR}/scaffold`;
+const CUSTOM_PACK = 'workflow_smoke_pack';
+const CUSTOM_PACK_DIR = `${ROOT}/circuit_packs/${CUSTOM_PACK}`;
 
 function readJson(path) {
 	return JSON.parse(readFileSync(path, 'utf8').replace(/^\uFEFF/, ''));
@@ -46,6 +49,7 @@ const findings = [];
 const checks = {};
 
 rmSync(TMP_DIR, { recursive: true, force: true });
+rmSync(CUSTOM_PACK_DIR, { recursive: true, force: true });
 mkdirSync(TMP_DIR, { recursive: true });
 
 try {
@@ -177,6 +181,36 @@ try {
 		});
 	}
 
+	const customPackReport = writePackScaffold({ root: ROOT, packId: CUSTOM_PACK });
+	const customSpec = buildMinimalSpec(CUSTOM_PACK);
+	const customDir = `${TMP_DIR}/custom_project`;
+	const customScaffold = writeScaffold({ outDir: customDir, spec: customSpec, pack: CUSTOM_PACK });
+	const customPlan = buildGsdPlan({
+		spec: readJson(`${customDir}/project_spec.json`),
+		contract: readJson(`${customDir}/project_contract.json`),
+		netlist: readJson(`${customDir}/project_netlist.json`),
+		assembly: readJson(`${customDir}/project_assembly.json`),
+		libraryManifest: readJson(`${customDir}/approved_library_manifest.json`),
+		model: null,
+		specPath: '_tmp_workflow_smoke/custom_project/project_spec.json',
+	});
+	checks.customPackScaffold = {
+		packFiles: customPackReport.files,
+		projectScaffoldPass: customScaffold.pass,
+		planPass: customPlan.pass,
+		rules: (customPlan.findings || []).map(f => f.rule),
+	};
+	assertFinding(findings, existsSync(`${CUSTOM_PACK_DIR}/pack.mjs`) && existsSync(`${CUSTOM_PACK_DIR}/cell_manifest.json`), 'WS11-custom-pack-files', 'init workflow must be able to create a custom circuit pack scaffold', {
+		packDir: CUSTOM_PACK_DIR,
+	});
+	assertFinding(findings, customPlan.pass === false, 'WS12-custom-pack-scaffold-not-ready', 'custom pack scaffold must fail plan until contract, library, and executable cells are implemented', {
+		severity: customPlan.severity,
+		firstFinding: customPlan.findings?.[0] || null,
+	});
+	assertFinding(findings, hasRule(customPlan, 'GP-LC3-approved-parts') && hasRule(customPlan, 'GP8-assembly-executable-module'), 'WS13-custom-pack-fails-explicitly', 'custom pack scaffold must fail with explicit library and executable assembly findings', {
+		observedRules: checks.customPackScaffold.rules,
+	});
+
 	const restoreGenerate = runGsdGenerate({ root: ROOT, specPath: 'project_spec.json', command: ['engine/pipeline_fast.mjs'] });
 	checks.restoreGenerate = {
 		pass: restoreGenerate.status === 0,
@@ -191,6 +225,8 @@ try {
 	hard(findings, 'WS0-unhandled-error', 'workflow smoke gate crashed', { error: e.message, stack: e.stack });
 } finally {
 	rmSync(TMP_DIR, { recursive: true, force: true });
+	rmSync(CUSTOM_PACK_DIR, { recursive: true, force: true });
+	try { syncPackRegistry(ROOT); } catch {}
 }
 
 const report = {
