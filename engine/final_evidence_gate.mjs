@@ -105,6 +105,7 @@ const local = {
 	projectLibrary: requireReportPass(findings, 'project_library_report.json', 'project library report'),
 	projectNetlist: requireReportPass(findings, 'project_netlist_report.json', 'project netlist report'),
 	projectLayout: requireReportPass(findings, 'project_layout_report.json', 'project layout report'),
+	projectLabelLayout: requireReportPass(findings, 'project_label_layout_report.json', 'project label layout report'),
 	projectVisual: requireReportPass(findings, 'project_visual_report.json', 'project visual report'),
 	template: requireReportPass(findings, 'report.json', 'template/layout report', data => data?.pass === true && data?.coverage?.layoutPlanner === true),
 };
@@ -127,6 +128,7 @@ for (const [rel, label, report] of [
 	['project_library_report.json', 'project library report', local.projectLibrary],
 	['project_netlist_report.json', 'project netlist report', local.projectNetlist],
 	['project_layout_report.json', 'project layout report', local.projectLayout],
+	['project_label_layout_report.json', 'project label layout report', local.projectLabelLayout],
 	['project_visual_report.json', 'project visual report', local.projectVisual],
 ]) {
 	requireProjectId(report, rel, label);

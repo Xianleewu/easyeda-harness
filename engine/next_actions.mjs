@@ -71,6 +71,7 @@ const projectLibrary = readJson('project_library_report.json');
 const cellManifest = readJson('cell_manifest_report.json');
 const projectAssembly = readJson('project_assembly_report.json');
 const projectLayout = readJson('project_layout_report.json');
+const projectLabelLayout = readJson('project_label_layout_report.json');
 const projectModel = readJson('project_model_report.json');
 const projectNetlist = readJson('project_netlist_report.json');
 const projectLiveModel = readJson('project_live_model_report.json');
@@ -214,6 +215,15 @@ const checks = {
 		modelStats: projectModel?.modelStats || null,
 		firstFinding: projectModel?.findings?.[0] || null,
 		evidence: 'project_model_report.json',
+	},
+	projectLabelLayout: {
+		status: status(projectLabelLayout?.pass),
+		severity: projectLabelLayout?.severity || null,
+		projectId: projectLabelLayout?.projectId || null,
+		source: projectLabelLayout?.source || null,
+		stats: projectLabelLayout?.stats || null,
+		firstFinding: projectLabelLayout?.findings?.[0] || null,
+		evidence: 'project_label_layout_report.json',
 	},
 	projectNetlist: {
 		status: status(projectNetlist?.pass),
@@ -592,6 +602,16 @@ if (checks.projectModel.status !== 'pass') {
 		action: 'Make full_model.json satisfy project_contract.json. Fix deterministic cells, assembly, or the contract so required modules, parts, nets, and interfaces match the generated model.',
 		evidence: ['project_contract.json', 'full_model.json', 'project_model_report.json'],
 		observed: checks.projectModel.firstFinding || checks.projectModel,
+	});
+}
+if (checks.projectLabelLayout.status !== 'pass') {
+	pushAction(actions, {
+		area: 'project-label-layout',
+		action: 'Make visible signal labels an executable layout contract. Declare layoutPolicy.labelColumns, keep each net label origin on a same-net wire endpoint, use left-bottom/right-bottom align modes, and remove fake text or unbudgeted scattered labels.',
+		evidence: ['project_label_layout_report.json', 'project_assembly.json', 'full_model.json', 'live.json'],
+		observed: checks.projectLabelLayout.firstFinding || checks.projectLabelLayout,
+		editFiles: ['project_assembly.json', 'circuit_packs/<pack>/pack.mjs', 'circuit_packs/<pack>/cell_manifest.json', 'engine/apply_full.mjs'],
+		nextCommand: 'npm.cmd run contract:labels',
 	});
 }
 if (checks.projectNetlist.status !== 'pass') {

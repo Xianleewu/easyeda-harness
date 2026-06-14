@@ -34,6 +34,7 @@ project_library_report.json
 project_contract_report.json
 project_assembly_report.json
 project_layout_report.json
+project_label_layout_report.json
 project_model_report.json
 project_netlist_report.json
 project_live_model_report.json

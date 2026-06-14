@@ -23,6 +23,7 @@ const BASE_REPORTS = [
 	{ gate: 'template', file: 'report.json', rerun: 'npm.cmd run fast' },
 	{ gate: 'pipeline', file: 'layout_planner_report.json', rerun: 'npm.cmd run pipeline' },
 	{ gate: 'project-layout', file: 'project_layout_report.json', rerun: 'npm.cmd run pipeline && npm.cmd run contract:layout' },
+	{ gate: 'project-label-layout', file: 'project_label_layout_report.json', rerun: 'npm.cmd run contract:labels' },
 	{ gate: 'project-model', file: 'project_model_report.json', rerun: 'npm.cmd run contract:model' },
 	{ gate: 'project-netlist', file: 'project_netlist_report.json', rerun: 'npm.cmd run contract:netlist' },
 	{ gate: 'project-live-model', file: 'project_live_model_report.json', rerun: 'npm.cmd run accept:live' },
@@ -270,6 +271,13 @@ const RULE_PLANS = [
 		inspectFiles: ['layout_planner_report.json', 'layout_planner_structure.json', 'project_layout_report.json', 'contracts/layout_contract.mjs'],
 		nextCommand: 'npm.cmd run pipeline && npm.cmd run contract:layout',
 		repairHint: 'Fix project_assembly.json layoutPolicy or planner consumption until candidate source, module gaps, interlocks, and wire intrusions pass.',
+	}],
+	[/^LL/, {
+		area: 'project-label-layout',
+		editFiles: ['project_assembly.json', 'circuit_packs/<pack>/pack.mjs', 'circuit_packs/<pack>/cell_manifest.json', 'engine/apply_full.mjs', 'engine/project_label_layout_gate.mjs'],
+		inspectFiles: ['project_label_layout_report.json', 'full_model.json', 'live.json', 'project_assembly.json'],
+		nextCommand: 'npm.cmd run contract:labels',
+		repairHint: 'Make visible signal labels geometry-driven: declare layoutPolicy.labelColumns, attach each label origin to a same-net wire endpoint, use alignMode=6 for left-bottom and alignMode=8 for right-bottom, and remove fake or unbudgeted scattered labels.',
 	}],
 	[/^PM/, {
 		area: 'project-model',

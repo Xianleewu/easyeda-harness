@@ -19,6 +19,7 @@ import { auditDocumentStyle, buildDocumentLayer } from '../harness/document_styl
 import { buildModel } from '../harness/model.mjs';
 import { runRules } from '../harness/rule_registry.mjs';
 import { acquireRunLock } from '../workflows/run_lock.mjs';
+import { validateLabelLayout } from './project_label_layout_gate.mjs';
 
 const ROOT = (process.env.EASYEDA_WORKDIR || process.cwd()).replace(/\\/g, '/');
 let LOCK;
@@ -363,6 +364,84 @@ try {
 	};
 	assertFinding(findings, checks.layoutContractRejectsMissingInterfaceRoutes.pass, 'WS60-layout-contract-rejects-missing-interface-routes', 'project layout contract must reject final layouts whose contract interfaces lack explicit route intent', checks.layoutContractRejectsMissingInterfaceRoutes);
 
+	const noLabelColumnsAssembly = clone(assembly);
+	delete noLabelColumnsAssembly.layoutPolicy.labelColumns;
+	const noLabelColumnsPlan = buildPlanForFiles({
+		spec,
+		contract,
+		netlist,
+		assembly: noLabelColumnsAssembly,
+		libraryManifest,
+		specPath: '_tmp_workflow_smoke/no_label_columns_project_spec.json',
+	});
+	checks.labelColumnsRequiredForGroupedRoutes = {
+		pass: !noLabelColumnsPlan.pass && hasRule(noLabelColumnsPlan, 'GP35-label-columns-declared'),
+		rules: (noLabelColumnsPlan.findings || []).map(f => f.rule),
+		firstFinding: noLabelColumnsPlan.findings?.find(f => f.rule === 'GP35-label-columns-declared') || null,
+	};
+	assertFinding(findings, checks.labelColumnsRequiredForGroupedRoutes.pass, 'WS65-label-columns-required-for-grouped-routes', 'GSD plan must reject grouped-net-label routes without layoutPolicy.labelColumns before generation', checks.labelColumnsRequiredForGroupedRoutes);
+
+	const labelAuditGood = validateLabelLayout({
+		assembly,
+		snap: {
+			wires: [
+				{ net: 'RESET_EN', line: [760, 855, 860, 855] },
+				{ net: 'EXT_PWR_EN', line: [760, 845, 860, 845] },
+			],
+			netflags: [
+				{ kind: 'sig', net: 'RESET_EN', x: 760, y: 855, textX: 760, textY: 855, alignMode: 6, bbox: { minX: 760, minY: 855, maxX: 824, maxY: 863 } },
+				{ kind: 'sig', net: 'EXT_PWR_EN', x: 760, y: 845, textX: 760, textY: 845, alignMode: 6, bbox: { minX: 760, minY: 845, maxX: 836, maxY: 853 } },
+			],
+			texts: [],
+		},
+	});
+	checks.labelLayoutAcceptsAnchoredColumn = {
+		pass: labelAuditGood.findings.length === 0,
+		findings: labelAuditGood.findings,
+	};
+	assertFinding(findings, checks.labelLayoutAcceptsAnchoredColumn.pass, 'WS66-label-layout-accepts-anchored-column', 'label layout audit must accept correctly budgeted left-bottom labels attached to same-net wire endpoints', checks.labelLayoutAcceptsAnchoredColumn);
+
+	const labelAuditBad = validateLabelLayout({
+		assembly,
+		snap: {
+			wires: [{ net: 'RESET_EN', line: [760, 855, 860, 855] }],
+			netflags: [
+				{ kind: 'sig', net: 'RESET_EN', x: 730, y: 855, textX: 730, textY: 855, alignMode: 6, bbox: { minX: 730, minY: 855, maxX: 794, maxY: 863 } },
+				{ kind: 'sig', net: 'EXT_PWR_EN', x: 760, y: 845, textX: 760, textY: 845, alignMode: 2, bbox: { minX: 720, minY: 840, maxX: 800, maxY: 852 } },
+			],
+			texts: [{ content: 'RESET_EN', x: 700, y: 820, bbox: { minX: 700, minY: 812, maxX: 765, maxY: 828 } }],
+		},
+	});
+	checks.labelLayoutRejectsFloatingAndFakeText = {
+		pass: ['LL7-no-fake-text-net-labels', 'LL9-label-origin-mode', 'LL13-label-attached-endpoint', 'LL14-label-column-match'].every(rule => labelAuditBad.findings.some(f => f.rule === rule)),
+		rules: labelAuditBad.findings.map(f => f.rule),
+		firstFinding: labelAuditBad.findings[0] || null,
+	};
+	assertFinding(findings, checks.labelLayoutRejectsFloatingAndFakeText.pass, 'WS67-label-layout-rejects-floating-origin-and-fake-text', 'label layout audit must reject fake text labels, floating labels, wrong origin modes, and off-column labels', checks.labelLayoutRejectsFloatingAndFakeText);
+
+	const liveLabelAuditBad = validateLabelLayout({
+		assembly,
+		snap: {
+			components: [{ designator: 'U1', x: 900, y: 800 }],
+			wires: [{
+				id: 'w1',
+				net: 'Q2_GATE',
+				line: [1000, 640, 1040, 640],
+				attrs: [{ key: 'Name', value: 'Q2_GATE', x: 1000, y: 640, alignMode: 6, valueVisible: true, bbox: { minX: 1000, minY: 640, maxX: 1058, maxY: 648 } }],
+			}],
+			netflags: [],
+			texts: [],
+		},
+		modelForTransform: { components: [{ designator: 'U1', x: 900, y: 800 }] },
+		liveMode: true,
+	});
+	checks.liveLabelLayoutRejectsUnbudgetedWireName = {
+		pass: ['LL14-label-column-match', 'LL16-unbudgeted-visible-label'].every(rule => liveLabelAuditBad.findings.some(f => f.rule === rule)),
+		rules: liveLabelAuditBad.findings.map(f => f.rule),
+		firstFinding: liveLabelAuditBad.findings[0] || null,
+	};
+	assertFinding(findings, checks.liveLabelLayoutRejectsUnbudgetedWireName.pass, 'WS68-live-label-layout-rejects-unbudgeted-wire-name', 'live label layout audit must reject visible wire Name labels for nets not declared in layoutPolicy.labelColumns', checks.liveLabelLayoutRejectsUnbudgetedWireName);
+
 	const duplicateRefAssembly = clone(assembly);
 	if (duplicateRefAssembly.modules?.[0] && duplicateRefAssembly.modules?.[1]) {
 		const firstRef = Object.values(duplicateRefAssembly.modules[0].refs || {})[0];
@@ -660,6 +739,7 @@ try {
 		project_library_report: passReport(finalLiveSpec.projectId),
 		project_netlist_report: passReport(finalLiveSpec.projectId),
 		project_layout_report: passReport(finalLiveSpec.projectId),
+		project_label_layout_report: { ...passReport(finalLiveSpec.projectId), source: 'live.json', stats: { labels: 0, labelColumns: 0 } },
 		project_visual_report: passReport(finalLiveSpec.projectId),
 		report: { ...passReport(finalLiveSpec.projectId), coverage: { layoutPlanner: true } },
 		acceptance_report: {

@@ -35,6 +35,7 @@ A PASS on the current model only proves the current model. It does not validate 
 - Rule coverage check: `contract:rules` proves module registry, required parts, interface contracts, and core rules cover the project contract.
 - Assembly coverage check: `contract:assembly` proves every contract module is mapped to a deterministic cell, anchor, refs, and nets before generation.
 - Layout policy check: `contract:layout` proves layout search is driven by `project_assembly.json` and that `layoutPolicy.flow`, ordered `layoutPolicy.columns`, generic `anchorVariants` or project search space, module spacing, no interlock, and no unrelated wire intrusion requirements are satisfied.
+- Label layout check: `contract:labels` audits actual generated label geometry, including `layoutPolicy.labelColumns`, visible label budgets, left-bottom/right-bottom origins, same-net wire endpoint attachment, fake text labels, and scattered unbudgeted labels. In live mode, `contract:labels:live` runs the same audit against the real EasyEDA snapshot.
 - Contract realization check: after `full_model.json` is generated, `contract:model` proves the model actually expresses the contract modules, parts, nets, and interfaces.
 - Visual evidence check: after offline previews are generated, `contract:visual` proves every contract visual evidence region exists and passes image inspection.
 - Fast offline check: validates the schematic model on local CPU and is intended for daily coordinate and rule iteration.
@@ -102,6 +103,7 @@ It runs local gates, live snapshot, live canvas image, EasyEDA DRC, module-level
 When a gate remains open, inspect `next_actions.json` first; it is the machine-readable handoff checklist for the next agent. Then inspect `repair_actions.json` for finding-level edit targets and rerun commands, or run `node bin/easyeda-gsd.mjs repair` to produce `repair_loop_report.json`.
 
 In live mode, `contract:live:model` checks `live.json` from the real EasyEDA canvas against `project_contract.json`. Final acceptance is not based on `full_model.json` alone.
+`contract:labels:live` also checks the real EasyEDA wire `Name` geometry, so a local label contract cannot hide floating labels, wrong origins, or scattered live wire names.
 
 `node bin/easyeda-gsd.mjs deliver` writes `delivery_report.json` and is the final handoff gate. It rejects local-only `accept` output and only passes with `full-with-live` acceptance, live final evidence, `live.json`, `live_canvas.png`, live shots, live model proof, and EasyEDA DRC `0 error / 0 warning / 0 info`.
 
@@ -122,6 +124,7 @@ For handoff, review the global sheet and local crops for USB, LDO, RESET, BOOT, 
 - Cell manifest check: `cell_manifest_report.json` has `HARD=0 SOFT=0 INFO=0`
 - Project assembly coverage check: `project_assembly_report.json` has `HARD=0 SOFT=0 INFO=0`
 - Project layout policy check: `project_layout_report.json` has `HARD=0 SOFT=0 INFO=0`
+- Project label layout check: `project_label_layout_report.json` has `HARD=0 SOFT=0 INFO=0`
 - Contract realization check: `project_model_report.json` has `HARD=0 SOFT=0 INFO=0`
 - Fast local check: `HARD=0 SOFT=0 INFO=0`
 - Full layout check: `HARD=0 SOFT=0 INFO=0`
@@ -143,6 +146,7 @@ For handoff, review the global sheet and local crops for USB, LDO, RESET, BOOT, 
 - No fake text net labels
 - No unnecessary NET PORT symbols on a single-sheet schematic
 - Readable wire `Name` anchors: left-side labels use bottom-left origin, right-side labels use bottom-right origin
+- Declared label columns: every visible signal label is covered by `layoutPolicy.labelColumns`
 - Functional modules occupy clean rectangular regions with reasonable gaps
 - No overlap among text, component attributes, net names, GND symbols, and NC markers
 
@@ -164,6 +168,7 @@ For handoff, review the global sheet and local crops for USB, LDO, RESET, BOOT, 
 - `project_spec.json` / `project_contract.json` / `project_netlist.json` / `project_assembly.json`: user intent, design contract, structured electrical endpoints, executable assembly mapping, and layout policy.
 - `contracts/spec_schema.mjs`: reusable schema validation for the first user-intent input.
 - `contracts/module_contract.mjs` / `contracts/net_contract.mjs` / `contracts/layout_contract.mjs`: reusable validators for functional modules, electrical endpoint intent, and project-driven layout policy.
+- `docs/schematic-design-rules.md`: executable schematic layout rules for wire crossings, object overlap, label origins, label columns, module rectangles, and live evidence.
 - `workflows/repair_loop.mjs`: read-only repair loop planner that groups `next_actions.json` and `repair_actions.json` into fix kinds, files, evidence, and rerun commands, then emits `repair_loop_report.json`.
 - `workflows/gsd_plan.mjs`: spec-to-contract realization planner that emits `gsd_plan_report.json`.
 - `workflows/gsd_generate.mjs`: plan-gated deterministic generation wrapper that emits `gsd_generate_report.json`.

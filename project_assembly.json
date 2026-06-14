@@ -21,6 +21,76 @@
   "layoutPolicy": {
     "candidateSource": "project_assembly.layoutPolicy",
     "flow": "left-to-right: input and power, control MCU/support, switch, relay outputs",
+    "labelColumns": [
+      {
+        "id": "usb-data-labels",
+        "role": "USB-C local data labels at the left endpoint of the short readable stubs",
+        "side": "left",
+        "x": 405,
+        "tolerance": 4,
+        "nets": [
+          "USB_DN",
+          "USB_DP"
+        ]
+      },
+      {
+        "id": "reset-boot-module-outputs",
+        "role": "support module output labels attached to the right endpoint of each support net",
+        "side": "right",
+        "x": 835,
+        "tolerance": 4,
+        "nets": [
+          "RESET_EN"
+        ]
+      },
+      {
+        "id": "boot-module-output",
+        "role": "boot support output label attached to the right endpoint of BOOT_IO9",
+        "side": "right",
+        "x": 1115,
+        "tolerance": 4,
+        "nets": [
+          "BOOT_IO9"
+        ]
+      },
+      {
+        "id": "mcu-left-interface-labels",
+        "role": "ESP32 left-side interface labels aligned on one readable column",
+        "side": "left",
+        "x": 760,
+        "tolerance": 4,
+        "nets": [
+          "RESET_EN",
+          "EXT_PWR_EN",
+          "RELAY1_EN",
+          "RELAY2_EN",
+          "BOOT_IO9",
+          "USB_DN",
+          "USB_DP"
+        ]
+      },
+      {
+        "id": "pmos-left-control-label",
+        "role": "high-side switch input label attached to the PMOS control handoff stub",
+        "side": "left",
+        "x": 1095,
+        "tolerance": 4,
+        "nets": [
+          "EXT_PWR_EN"
+        ]
+      },
+      {
+        "id": "relay-output-control-labels",
+        "role": "relay module input labels aligned before relay driver stages",
+        "side": "left",
+        "x": 1515,
+        "tolerance": 4,
+        "nets": [
+          "RELAY1_EN",
+          "RELAY2_EN"
+        ]
+      }
+    ],
     "columns": [
       { "id": "input", "role": "external input and raw power", "modules": ["usb", "ldo"] },
       { "id": "control", "role": "controller and bring-up support", "modules": ["reset", "boot", "mcu"] },

@@ -314,7 +314,7 @@ if (!process.exitCode) {
 			console.error('ABORT: live acceptance gate failed after write-back');
 			process.exitCode = 1;
 		} else {
-			const finalEvidence = spawnSync('node', ['engine/final_evidence_gate.mjs', '--live'], {
+			const finalEvidence = spawnSync(process.execPath, ['engine/final_evidence_gate.mjs', '--live', SPEC_PATH], {
 				cwd: DIR,
 				stdio: 'inherit',
 				env: STEP_ENV,
@@ -323,7 +323,17 @@ if (!process.exitCode) {
 				console.error('ABORT: final evidence gate failed after write-back');
 				process.exitCode = 1;
 			} else {
-				console.log('gate OK: template PASS, write-back done, live acceptance PASS, final evidence PASS');
+				const delivery = spawnSync(process.execPath, ['engine/delivery_gate.mjs', SPEC_PATH], {
+					cwd: DIR,
+					stdio: 'inherit',
+					env: STEP_ENV,
+				});
+				if (delivery.status !== 0) {
+					console.error('ABORT: delivery gate failed after write-back');
+					process.exitCode = 1;
+				} else {
+					console.log('gate OK: template PASS, write-back done, live acceptance PASS, final evidence PASS, delivery PASS');
+				}
 			}
 		}
 	}

@@ -124,109 +124,12 @@ function nodeKey(x, y) {
 
 function keepNamedWire(s) {
 	if (!keepNamedWires.has(s.net)) return false;
-	const [x1, y1, x2, y2] = s.line;
-	const minX = Math.min(x1, x2), maxX = Math.max(x1, x2);
-	const minY = Math.min(y1, y2), maxY = Math.max(y1, y2);
-	return minX >= 560 && maxX <= 725 && minY >= 925 && maxY <= 995;
+	return true;
 }
 
 function labelForSegment(s) {
 	if (!s.net) return null;
 	return sigLabels.find(f => f.net === s.net && pointOnSegment(f.anchorX ?? f.x, f.anchorY ?? f.y, s));
-}
-
-function segmentLength(s) {
-	const [x1, y1, x2, y2] = s.line;
-	return Math.hypot(x2 - x1, y2 - y1);
-}
-
-const componentKeepouts = (model.components || [])
-	.map(c => c.bodyBBox || c.bbox)
-	.filter(Boolean)
-	.map(b => ({ minX: b.minX - 55, maxX: b.maxX + 55, minY: b.minY - 55, maxY: b.maxY + 55 }));
-
-function labelWidth(net) {
-	return Math.max(38, String(net || '').length * 6 + 16);
-}
-
-function edaAttrLabel(label) {
-	return label;
-}
-
-function labelBox(label) {
-	const w = labelWidth(label.net);
-	const h = 8;
-	const mode = label.alignMode == null ? 6 : Number(label.alignMode);
-	if (mode === 2) return { minX: label.x - w / 2, maxX: label.x + w / 2, minY: label.y - h / 2, maxY: label.y + h / 2 };
-	if (mode === 8 || mode === 9) return { minX: label.x - w, maxX: label.x, minY: label.y, maxY: label.y + h };
-	if (mode === 6 || mode === 3) return { minX: label.x, maxX: label.x + w, minY: label.y, maxY: label.y + h };
-	if (mode === 1) return { minX: label.x, maxX: label.x + w, minY: label.y - h, maxY: label.y };
-	if (mode === 7) return { minX: label.x - w, maxX: label.x, minY: label.y - h, maxY: label.y };
-	return { minX: label.x, maxX: label.x + w, minY: label.y, maxY: label.y + h };
-}
-
-function boxesOverlap(a, b) {
-	return a.minX < b.maxX && b.minX < a.maxX && a.minY < b.maxY && b.minY < a.maxY;
-}
-
-function segmentCutsBoxInterior(line, box) {
-	const [x1, y1, x2, y2] = line;
-	if (Math.abs(y1 - y2) < 1e-6) {
-		if (y1 <= box.minY || y1 >= box.maxY) return false;
-		return Math.max(Math.min(x1, x2), box.minX) < Math.min(Math.max(x1, x2), box.maxX);
-	}
-	if (Math.abs(x1 - x2) < 1e-6) {
-		if (x1 <= box.minX || x1 >= box.maxX) return false;
-		return Math.max(Math.min(y1, y2), box.minY) < Math.min(Math.max(y1, y2), box.maxY);
-	}
-	return false;
-}
-
-function clearAutoLabel(label, allSegments) {
-	const box = labelBox(label);
-	if (componentKeepouts.some(b => boxesOverlap(box, b))) return false;
-	if ((allSegments || []).some(seg => segmentCutsBoxInterior(seg.line, box))) return false;
-	return true;
-}
-
-function autoLabelForSegment(s, allSegments) {
-	const [x1, y1, x2, y2] = s.line;
-	const horizontal = Math.abs(y1 - y2) < 1e-6;
-	const vertical = Math.abs(x1 - x2) < 1e-6;
-	const w = labelWidth(s.net);
-	const minX = Math.min(x1, x2);
-	const maxX = Math.max(x1, x2);
-	const minY = Math.min(y1, y2);
-	const maxY = Math.max(y1, y2);
-	const candidates = [];
-	if (horizontal) {
-		for (const x of [minX - w - 12, maxX + 12, minX - w - 32, maxX + 32, minX, maxX - w]) {
-			for (const y of [y1 + 14, y1 - 22, y1 + 34, y1 - 42, y1 + 58, y1 - 66]) {
-				candidates.push({ net: s.net, x, y, alignMode: 6, rotation: 0 });
-			}
-		}
-	} else if (vertical) {
-		for (const x of [x1 + 14, x1 - w - 14, x1 + 34, x1 - w - 34, x1 + 58, x1 - w - 58]) {
-			for (const y of [(minY + maxY) / 2 + 6, maxY + 10, minY - 18, maxY + 34, minY - 42]) {
-				candidates.push({ net: s.net, x, y, alignMode: 6, rotation: 0 });
-			}
-		}
-	} else {
-		candidates.push({ net: s.net, x: (x1 + x2) / 2 + 12, y: (y1 + y2) / 2 + 12, alignMode: 6, rotation: 0 });
-	}
-	for (const dx of [-180, -140, -100, 100, 140, 180, -240, 240]) {
-		for (const dy of [-120, -80, -50, 50, 80, 120, -160, 160]) {
-			candidates.push({ net: s.net, x: minX + dx, y: maxY + dy, alignMode: 6, rotation: 0 });
-		}
-	}
-	return candidates.find(c => clearAutoLabel(c, allSegments)) || candidates[0] || { net: s.net, x: maxX + 12, y: maxY + 14, alignMode: 6, rotation: 0 };
-}
-
-function carrierScore(s) {
-	const label = labelForSegment(s);
-	const [x1, y1, x2, y2] = s.line;
-	const horizontal = Math.abs(y1 - y2) < 1e-6;
-	return (label ? 1_000_000 : 0) + (horizontal ? 10_000 : 0) + segmentLength(s);
 }
 
 function explodeWires(modelWires) {
@@ -268,28 +171,15 @@ function explodeWires(modelWires) {
 			}
 		}
 	}
-	const namedByRoot = new Map();
-	const carrierByRoot = new Map();
-	for (const s of segments) {
-		if (!s.net) continue;
-		const root = rootByLine.get(`${s.line.join(',')}`) || ptKey(s.line[0], s.line[1]);
-		const flagNets = flagNetByRoot.get(root);
-		const hasSameFlag = flagNets && s.net && flagNets.has(s.net);
-		const hasExternalLabel = applyLabelNets.has(s.net) || (portNets.has(s.net) && !keepNamedWire(s));
-		if (hasSameFlag || hasExternalLabel) continue;
-		const prev = carrierByRoot.get(root);
-		if (!prev || carrierScore(s) > carrierScore(prev)) carrierByRoot.set(root, s);
-	}
 	const out = [];
 	for (const s of segments) {
 		const root = rootByLine.get(`${s.line.join(',')}`) || ptKey(s.line[0], s.line[1]);
 		const flagNets = flagNetByRoot.get(root);
 		const hasSameFlag = flagNets && s.net && flagNets.has(s.net);
 		const hasExternalLabel = applyLabelNets.has(s.net) || (portNets.has(s.net) && !keepNamedWire(s));
-		const net = s.net && !hasSameFlag && !hasExternalLabel && carrierByRoot.get(root) === s ? s.net : '';
-		if (net) namedByRoot.set(root, net);
+		const net = s.net && !hasSameFlag && !hasExternalLabel ? s.net : '';
 		const anchoredLabel = net ? labelForSegment({ ...s, net }) : null;
-		out.push({ ...s, net, label: net ? (anchoredLabel || autoLabelForSegment({ ...s, net }, segments)) : null });
+		out.push({ ...s, net, label: anchoredLabel || null });
 	}
 	return out;
 }

@@ -84,12 +84,18 @@ const wires = [];
 for (const w of wiresRaw) {
   const id = w.primitiveId || (w.getState_PrimitiveId && w.getState_PrimitiveId());
   const attrsRaw = id ? await eda.sch_PrimitiveAttribute.getAll(id).catch(() => []) || [] : [];
-  wires.push({
-    id,
-    net: w.net || (w.getState_Net && w.getState_Net()) || '',
-    line: w.line || (w.getState_Line && w.getState_Line()) || [],
-    attrs: attrsRaw.map(a => ({
-      id: a.primitiveId || (a.getState_PrimitiveId && a.getState_PrimitiveId()),
+  const attrs = [];
+  for (const a of attrsRaw) {
+    const aid = a.primitiveId || (a.getState_PrimitiveId && a.getState_PrimitiveId());
+    const rb = aid ? await eda.sch_Primitive.getPrimitivesBBox([aid]).catch(() => null) : null;
+    const bbox = rb ? {
+      minX: round(rb.minX != null ? rb.minX : rb.x),
+      minY: round(rb.minY != null ? rb.minY : rb.y),
+      maxX: round(rb.maxX != null ? rb.maxX : (rb.x + rb.width)),
+      maxY: round(rb.maxY != null ? rb.maxY : (rb.y + rb.height)),
+    } : null;
+    attrs.push({
+      id: aid,
       key: a.key || (a.getState_Key && a.getState_Key()) || '',
       value: a.value || (a.getState_Value && a.getState_Value()) || '',
       x: a.x ?? (a.getState_X && a.getState_X()),
@@ -98,7 +104,14 @@ for (const w of wiresRaw) {
       alignMode: a.alignMode ?? a.align ?? (a.getState_AlignMode && a.getState_AlignMode()),
       keyVisible: a.keyVisible ?? (a.getState_KeyVisible && a.getState_KeyVisible()),
       valueVisible: a.valueVisible ?? (a.getState_ValueVisible && a.getState_ValueVisible()),
-    })),
+      bbox,
+    });
+  }
+  wires.push({
+    id,
+    net: w.net || (w.getState_Net && w.getState_Net()) || '',
+    line: w.line || (w.getState_Line && w.getState_Line()) || [],
+    attrs,
   });
 }
 const textsRaw = await eda.sch_PrimitiveText.getAll();

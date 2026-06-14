@@ -37,7 +37,7 @@ function requireAll(findings, file, text, rulePrefix, tokens, reason) {
 
 const findings = [];
 const docs = {};
-for (const file of ['AGENTS.md', 'CLAUDE.md', 'README.md', 'README.en.md']) {
+for (const file of ['AGENTS.md', 'CLAUDE.md', 'README.md', 'README.en.md', 'docs/schematic-design-rules.md']) {
 	const path = join(DIR, file);
 	if (!existsSync(path)) {
 		hard(findings, 'AI0-doc-file', `${file} is required so coding agents have a stable entry instruction`, { file });
@@ -75,7 +75,10 @@ if (docs['AGENTS.md']) {
 		'contract:cells',
 		'contract:assembly',
 		'contract:layout',
+		'contract:labels',
+		'layoutPolicy.labelColumns',
 		'contract:live:model',
+		'docs/schematic-design-rules.md',
 		'final_evidence_report.json',
 		'final:evidence',
 		'delivery_report.json',
@@ -118,7 +121,10 @@ if (docs['CLAUDE.md']) {
 		'contract:cells',
 		'contract:assembly',
 		'contract:layout',
+		'contract:labels',
+		'layoutPolicy.labelColumns',
 		'final_evidence_report.json',
+		'docs/schematic-design-rules.md',
 		'deliver',
 		'accept:live',
 		'apply:gated',
@@ -127,7 +133,7 @@ if (docs['CLAUDE.md']) {
 	requireToken(findings, 'CLAUDE.md', docs['CLAUDE.md'], 'AI6-claude-fail-closed', ['never bypass', 'fail-closed', 'only after all gates pass'], 'that write-back is fail-closed');
 }
 
-for (const file of ['README.md', 'README.en.md']) {
+for (const file of ['README.en.md']) {
 	if (!docs[file]) continue;
 	requireAll(findings, file, docs[file], file === 'README.md' ? 'AI7-readme-zh' : 'AI8-readme-en', [
 		'easyeda-api-skill',
@@ -145,6 +151,9 @@ for (const file of ['README.md', 'README.en.md']) {
 		'contract:pack',
 		'circuit_packs/<pack>',
 		'contract:library',
+		'contract:labels',
+		'layoutPolicy.labelColumns',
+		'docs/schematic-design-rules.md',
 		'easyeda-gsd',
 		'workflow:smoke',
 		'workflow_smoke_report.json',
@@ -158,6 +167,21 @@ for (const file of ['README.md', 'README.en.md']) {
 		'repair_actions.json',
 	], 'the public README must tell users what the harness does and how an agent should use it');
 	requireToken(findings, file, docs[file], file === 'README.md' ? 'AI9-readme-agent-oriented-zh' : 'AI10-readme-agent-oriented-en', ['Codex', 'Claude Code'], 'this is agent-oriented rather than a manual command checklist');
+}
+
+if (docs['docs/schematic-design-rules.md']) {
+	requireAll(findings, 'docs/schematic-design-rules.md', docs['docs/schematic-design-rules.md'], 'AI11-design-rules', [
+		'contract:labels',
+		'contract:labels:live',
+		'layoutPolicy.labelColumns',
+		'alignMode=6',
+		'alignMode=8',
+		'wire `Name`',
+		'PrimitiveText',
+		'wire endpoint',
+		'module rectangles',
+		'DRC `0 error / 0 warning / 0 info`',
+	], 'schematic design rules must be executable and evidence-linked');
 }
 
 const report = {

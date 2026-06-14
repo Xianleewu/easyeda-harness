@@ -10,6 +10,8 @@ import { asArray as cellArray, cellContractMap, loadCellManifest, resolveCellMan
 import { withLocalPins } from '../engine/transform.mjs';
 import { HARNESS_RULES } from '../harness/rule_registry.mjs';
 
+const LABEL_POWER_NETS = new Set(['GND', 'SYS_5V', 'SYS_3V3', 'VIN_12_19V', 'VOUT_SW', 'VBUS']);
+
 function hard(findings, rule, msg, where = {}) {
 	findings.push({ rule, severity: 'hard', category: 'gsd-plan', msg, where });
 }
@@ -126,6 +128,41 @@ function validateStaticInterfaceRoutes(contract, assembly) {
 	return validateInterfaceRoutes(contract, assembly, 'gsd-plan').map(f => ({ ...f, rule: ruleMap[f.rule] || f.rule.replace(/^PL/, 'GP') }));
 }
 
+function validateStaticLabelColumns(contract, assembly) {
+	const findings = [];
+	const policy = assembly?.layoutPolicy || {};
+	const columns = asArray(policy.labelColumns);
+	const groupedRoutes = asArray(policy.interfaceRoutes)
+		.filter(route => route.strategy === 'grouped-net-label')
+		.filter(route => route.net && !LABEL_POWER_NETS.has(route.net) && !String(route.net).startsWith('NC_'));
+	if (groupedRoutes.length && !columns.length) {
+		hard(findings, 'GP35-label-columns-declared', 'layoutPolicy.labelColumns must declare visible label columns for grouped-net-label routes before generation', {
+			groupedRoutes: groupedRoutes.map(route => ({ net: route.net, from: route.from, to: route.to, channel: route.channel })),
+		});
+	}
+	const columnIds = new Set();
+	for (const [index, col] of columns.entries()) {
+		const id = col.id || `label_column_${index + 1}`;
+		if (columnIds.has(id)) hard(findings, 'GP36-label-column-id-unique', 'layoutPolicy.labelColumns ids must be unique', { column: id });
+		columnIds.add(id);
+		if (!col.role || typeof col.role !== 'string') hard(findings, 'GP37-label-column-role', 'layoutPolicy.labelColumns entries must explain their reading-flow role', { index, column: col });
+		if (!['left', 'right'].includes(col.side)) hard(findings, 'GP38-label-column-side', 'layoutPolicy.labelColumns entries must declare side left or right', { index, column: col });
+		if (!Number.isFinite(col.x)) hard(findings, 'GP39-label-column-x', 'layoutPolicy.labelColumns entries must declare finite x', { index, column: col });
+		if (!asArray(col.nets).length) hard(findings, 'GP40-label-column-nets', 'layoutPolicy.labelColumns entries must declare allowed nets', { index, column: col });
+	}
+	for (const route of groupedRoutes) {
+		const covered = columns.some(col => asArray(col.nets).includes(route.net));
+		if (!covered) hard(findings, 'GP41-label-column-covers-route-net', 'each grouped-net-label route must have at least one label column budget for its net', { route });
+	}
+	for (const iface of asArray(contract?.interfaces)) {
+		const route = groupedRoutes.find(r => r.net === iface.net && r.from === iface.from && r.to === iface.to);
+		if (!route) continue;
+		const covered = columns.some(col => asArray(col.nets).includes(iface.net));
+		if (!covered) hard(findings, 'GP42-label-column-covers-interface', 'each grouped-net-label contract interface must be covered by layoutPolicy.labelColumns', { interface: iface });
+	}
+	return findings;
+}
+
 function validateSpecRealization(spec, contract, netlist, assembly, model = null) {
 	const findings = [];
 	const specModules = moduleById(spec);
@@ -206,6 +243,7 @@ function validateSpecRealization(spec, contract, netlist, assembly, model = null
 		});
 	}
 	findings.push(...validateStaticInterfaceRoutes(contract, assembly));
+	findings.push(...validateStaticLabelColumns(contract, assembly));
 
 	if (model) {
 		const netResult = validateNetContract(contract, netlist, model);
