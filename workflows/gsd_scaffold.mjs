@@ -115,24 +115,30 @@ export function buildScaffold(spec, { pack = 'aihwdebugger' } = {}) {
 		direction: 'left-to-right',
 	}));
 	const groupedSignalRoutes = interfaceRoutes.filter(route => route.strategy === 'grouped-net-label' && route.net && !['GND', 'SYS_3V3', 'SYS_5V', 'VBUS'].includes(route.net));
-	const labelColumns = groupedSignalRoutes.flatMap(route => ([
-		{
-			id: `${route.from || 'source'}_${route.net}_out`,
-			role: `visible ${route.net} handoff at the ${route.from || 'source'} module output endpoint`,
-			side: 'right',
-			x: anchors[route.from]?.x == null ? 300 : anchors[route.from].x + 90,
-			tolerance: 4,
-			nets: [route.net],
-		},
-		{
-			id: `${route.to || 'target'}_${route.net}_in`,
-			role: `visible ${route.net} handoff at the ${route.to || 'target'} module input endpoint`,
-			side: 'left',
-			x: anchors[route.to]?.x == null ? 540 : anchors[route.to].x - 90,
-			tolerance: 4,
-			nets: [route.net],
-		},
-	]));
+	const labelColumnMap = new Map();
+	function addLabelColumn({ moduleId, side, routeEnd, net }) {
+		const x = anchors[moduleId]?.x == null ? (side === 'left' ? 540 : 300) : anchors[moduleId].x + (side === 'left' ? -90 : 90);
+		const key = `${moduleId || 'module'}:${side}:${routeEnd}:${x}`;
+		if (!labelColumnMap.has(key)) {
+			labelColumnMap.set(key, {
+				id: `${moduleId || 'module'}_${routeEnd}_${side}_labels`,
+				role: `${moduleId || 'module'} ${routeEnd === 'from' ? 'output' : 'input'} interface labels aligned on a single ${side} column`,
+				module: moduleId || '',
+				routeEnd,
+				side,
+				x,
+				tolerance: 4,
+				nets: [],
+			});
+		}
+		const col = labelColumnMap.get(key);
+		if (!col.nets.includes(net)) col.nets.push(net);
+	}
+	for (const route of groupedSignalRoutes) {
+		addLabelColumn({ moduleId: route.from, side: 'right', routeEnd: 'from', net: route.net });
+		addLabelColumn({ moduleId: route.to, side: 'left', routeEnd: 'to', net: route.net });
+	}
+	const labelColumns = [...labelColumnMap.values()];
 	const assembly = {
 		schemaVersion: 1,
 		projectId: contract.projectId,

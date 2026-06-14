@@ -100,6 +100,64 @@ export function validateInterfaceRoutes(contract, assembly, category = 'project-
 	return findings;
 }
 
+const DEFAULT_SIGNAL_POWER_NETS = new Set(['GND', 'SYS_5V', 'SYS_3V3', 'VIN_12_19V', 'VOUT_SW', 'VBUS']);
+
+function signalRoute(route, powerNets = DEFAULT_SIGNAL_POWER_NETS) {
+	const net = String(route?.net || '');
+	return route?.strategy === 'grouped-net-label' && net && !powerNets.has(net) && !net.startsWith('NC_');
+}
+
+function labelColumnCovers(columns, route, side, moduleId) {
+	return asArray(columns).some(col => {
+		if (col.side !== side) return false;
+		if (!asArray(col.nets).includes(route.net)) return false;
+		if (col.module && col.module !== moduleId) return false;
+		if (col.routeEnd && col.routeEnd !== (side === 'right' ? 'from' : 'to')) return false;
+		return true;
+	});
+}
+
+export function validateGroupedRouteLabelColumns(contract, assembly, category = 'project-layout', options = {}) {
+	const findings = [];
+	const policy = assembly?.layoutPolicy || {};
+	const columns = asArray(policy.labelColumns);
+	const powerNets = options.powerNets || DEFAULT_SIGNAL_POWER_NETS;
+	const groupedRoutes = asArray(policy.interfaceRoutes).filter(route => signalRoute(route, powerNets));
+	if (groupedRoutes.length && !columns.length) {
+		hard(findings, 'PL30-label-columns-declared', 'layoutPolicy.labelColumns must declare interface label columns for every grouped-net-label route', {
+			groupedRoutes: groupedRoutes.map(route => ({ net: route.net, from: route.from, to: route.to, channel: route.channel })),
+		}, category);
+	}
+	for (const route of groupedRoutes) {
+		const fromCovered = labelColumnCovers(columns, route, 'right', route.from);
+		const toCovered = labelColumnCovers(columns, route, 'left', route.to);
+		if (!fromCovered) {
+			hard(findings, 'PL31-label-column-covers-route-from', 'each grouped-net-label route needs a right-side output label column for its source module', {
+				route,
+				expected: { side: 'right', module: route.from, net: route.net, routeEnd: 'from' },
+				candidateColumns: columns.filter(col => asArray(col.nets).includes(route.net)).map(col => ({ id: col.id || null, side: col.side || null, module: col.module || null, routeEnd: col.routeEnd || null, x: col.x ?? null })),
+			}, category);
+		}
+		if (!toCovered) {
+			hard(findings, 'PL32-label-column-covers-route-to', 'each grouped-net-label route needs a left-side input label column for its target module', {
+				route,
+				expected: { side: 'left', module: route.to, net: route.net, routeEnd: 'to' },
+				candidateColumns: columns.filter(col => asArray(col.nets).includes(route.net)).map(col => ({ id: col.id || null, side: col.side || null, module: col.module || null, routeEnd: col.routeEnd || null, x: col.x ?? null })),
+			}, category);
+		}
+	}
+	for (const iface of asArray(contract?.interfaces)) {
+		const route = groupedRoutes.find(r => r.net === iface.net && r.from === iface.from && r.to === iface.to);
+		if (!route) continue;
+		if (!labelColumnCovers(columns, route, 'right', iface.from) || !labelColumnCovers(columns, route, 'left', iface.to)) {
+			hard(findings, 'PL33-label-column-covers-interface', 'each grouped-net-label contract interface must have source and target label-column coverage', {
+				interface: iface,
+			}, category);
+		}
+	}
+	return findings;
+}
+
 export function validateLayoutContract(assembly, layout, structure, options = {}) {
 	const category = options.category || 'project-layout';
 	const findings = [];
@@ -115,6 +173,7 @@ export function validateLayoutContract(assembly, layout, structure, options = {}
 		hard(findings, 'PL22-interface-routes-declared', 'layoutPolicy.interfaceRoutes must declare cross-module routing intent before layout search', {}, category);
 	}
 	findings.push(...validateInterfaceRoutes(options.contract, assembly, category));
+	findings.push(...validateGroupedRouteLabelColumns(options.contract, assembly, category));
 	if (layout.candidateSource !== policy.candidateSource) {
 		hard(findings, 'PL2-planner-uses-assembly-policy', 'layout planner report must prove candidates came from project_assembly.json layoutPolicy', {
 			expected: policy.candidateSource,

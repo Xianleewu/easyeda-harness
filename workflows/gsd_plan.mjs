@@ -5,7 +5,7 @@ import { validateNetContract } from '../contracts/net_contract.mjs';
 import { validateLibraryContract } from '../contracts/library_contract.mjs';
 import { validateDrawingRuleBindings } from '../contracts/drawing_rule_registry.mjs';
 import { validateCellBuilderDryRun } from '../contracts/cell_builder_contract.mjs';
-import { interfaceKey, measureColumnAnchorGaps, validateInterfaceRoutes } from '../contracts/layout_contract.mjs';
+import { interfaceKey, measureColumnAnchorGaps, validateGroupedRouteLabelColumns, validateInterfaceRoutes } from '../contracts/layout_contract.mjs';
 import { asArray as cellArray, cellContractMap, loadCellManifest, resolveCellManifestPath } from '../engine/cell_manifest.mjs';
 import { withLocalPins } from '../engine/transform.mjs';
 import { HARNESS_RULES } from '../harness/rule_registry.mjs';
@@ -159,6 +159,15 @@ function validateStaticLabelColumns(contract, assembly) {
 		if (!route) continue;
 		const covered = columns.some(col => asArray(col.nets).includes(iface.net));
 		if (!covered) hard(findings, 'GP42-label-column-covers-interface', 'each grouped-net-label contract interface must be covered by layoutPolicy.labelColumns', { interface: iface });
+	}
+	const routeColumnRules = {
+		'PL30-label-columns-declared': 'GP43-label-columns-declared',
+		'PL31-label-column-covers-route-from': 'GP44-label-column-covers-route-from',
+		'PL32-label-column-covers-route-to': 'GP45-label-column-covers-route-to',
+		'PL33-label-column-covers-interface': 'GP46-label-column-covers-interface',
+	};
+	for (const finding of validateGroupedRouteLabelColumns(contract, assembly, 'gsd-plan')) {
+		findings.push({ ...finding, rule: routeColumnRules[finding.rule] || finding.rule.replace(/^PL/, 'GP') });
 	}
 	return findings;
 }

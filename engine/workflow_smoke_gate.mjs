@@ -382,6 +382,52 @@ try {
 	};
 	assertFinding(findings, checks.labelColumnsRequiredForGroupedRoutes.pass, 'WS65-label-columns-required-for-grouped-routes', 'GSD plan must reject grouped-net-label routes without layoutPolicy.labelColumns before generation', checks.labelColumnsRequiredForGroupedRoutes);
 
+	const incompleteLabelColumnsAssembly = clone(assembly);
+	incompleteLabelColumnsAssembly.layoutPolicy.labelColumns = (incompleteLabelColumnsAssembly.layoutPolicy.labelColumns || [])
+		.filter(col => !(col.module === 'mcu' && col.routeEnd === 'from'));
+	const incompleteLabelColumnsPlan = buildPlanForFiles({
+		spec,
+		contract,
+		netlist,
+		assembly: incompleteLabelColumnsAssembly,
+		libraryManifest,
+		specPath: '_tmp_workflow_smoke/incomplete_label_columns_project_spec.json',
+	});
+	const incompleteLabelLayoutFindings = validateLayoutContract(
+		incompleteLabelColumnsAssembly,
+		{
+			candidateSource: incompleteLabelColumnsAssembly.layoutPolicy.candidateSource,
+			totalCandidates: 20,
+			availableCandidates: 20,
+			policyStats: { baseAnchors: Object.keys(incompleteLabelColumnsAssembly.layoutPolicy.baseAnchors || {}).length, anchorVariants: 1 },
+			best: { pass: true, score: 1 },
+		},
+		{
+			pass: true,
+			minModuleGap: 200,
+			laneInterlocks: [],
+			stats: { moduleWireIntrusions: 0 },
+			moduleWireIntrusions: [],
+		},
+		{ contract },
+	);
+	checks.labelColumnsMustCoverRouteEnds = {
+		planPass: incompleteLabelColumnsPlan.pass,
+		planRules: (incompleteLabelColumnsPlan.findings || []).map(f => f.rule),
+		layoutRules: incompleteLabelLayoutFindings.map(f => f.rule),
+		firstPlanFinding: incompleteLabelColumnsPlan.findings?.find(f => f.rule === 'GP44-label-column-covers-route-from') || null,
+		firstLayoutFinding: incompleteLabelLayoutFindings.find(f => f.rule === 'PL31-label-column-covers-route-from') || null,
+	};
+	assertFinding(
+		findings,
+		!incompleteLabelColumnsPlan.pass
+			&& hasRule(incompleteLabelColumnsPlan, 'GP44-label-column-covers-route-from')
+			&& incompleteLabelLayoutFindings.some(f => f.rule === 'PL31-label-column-covers-route-from'),
+		'WS73-label-columns-cover-route-ends',
+		'grouped-net-label interfaces must declare source and target module label columns before plan/layout can pass',
+		checks.labelColumnsMustCoverRouteEnds,
+	);
+
 	const geometryAuditGood = validateProjectGeometry({
 		components: [
 			{ designator: 'U1', bbox: { minX: 100, minY: 100, maxX: 140, maxY: 140 } },
@@ -1222,12 +1268,18 @@ try {
 	);
 	assertFinding(
 		findings,
-		(scaffoldAssembly.layoutPolicy?.labelColumns || []).length >= (scaffoldAssembly.layoutPolicy?.interfaceRoutes || [])
-			.filter(route => route.strategy === 'grouped-net-label' && !['GND', 'SYS_3V3', 'SYS_5V', 'VBUS'].includes(route.net))
-			.length * 2
-			&& (scaffoldAssembly.layoutPolicy?.labelColumns || []).every(col => ['left', 'right'].includes(col.side) && Number.isFinite(col.x) && Array.isArray(col.nets) && col.nets.length),
+		(scaffoldAssembly.layoutPolicy?.labelColumns || []).every(col => ['left', 'right'].includes(col.side)
+			&& ['from', 'to'].includes(col.routeEnd)
+			&& col.module
+			&& Number.isFinite(col.x)
+			&& Array.isArray(col.nets)
+			&& col.nets.length)
+			&& (scaffoldAssembly.layoutPolicy?.interfaceRoutes || [])
+				.filter(route => route.strategy === 'grouped-net-label' && !['GND', 'SYS_3V3', 'SYS_5V', 'VBUS'].includes(route.net))
+				.every(route => (scaffoldAssembly.layoutPolicy?.labelColumns || []).some(col => col.module === route.from && col.routeEnd === 'from' && col.side === 'right' && col.nets.includes(route.net))
+					&& (scaffoldAssembly.layoutPolicy?.labelColumns || []).some(col => col.module === route.to && col.routeEnd === 'to' && col.side === 'left' && col.nets.includes(route.net))),
 		'WS71-scaffold-label-columns',
-		'new project scaffolds with grouped interfaces must include editable layoutPolicy.labelColumns so agents do not invent floating labels',
+		'new project scaffolds with grouped interfaces must include module-side layoutPolicy.labelColumns so agents do not invent floating labels',
 		checks.scaffold,
 	);
 

@@ -25,6 +25,8 @@
       {
         "id": "usb-data-labels",
         "role": "USB-C local data labels at the left endpoint of the short readable stubs",
+        "module": "usb",
+        "routeEnd": "from",
         "side": "left",
         "x": 405,
         "tolerance": 4,
@@ -34,8 +36,23 @@
         ]
       },
       {
+        "id": "usb-right-data-outputs",
+        "role": "USB-C data handoff labels budgeted at the right-side output interface",
+        "module": "usb",
+        "routeEnd": "from",
+        "side": "right",
+        "x": 835,
+        "tolerance": 4,
+        "nets": [
+          "USB_DN",
+          "USB_DP"
+        ]
+      },
+      {
         "id": "reset-boot-module-outputs",
         "role": "support module output labels attached to the right endpoint of each support net",
+        "module": "reset",
+        "routeEnd": "from",
         "side": "right",
         "x": 835,
         "tolerance": 4,
@@ -46,6 +63,8 @@
       {
         "id": "boot-module-output",
         "role": "boot support output label attached to the right endpoint of BOOT_IO9",
+        "module": "boot",
+        "routeEnd": "from",
         "side": "right",
         "x": 1115,
         "tolerance": 4,
@@ -56,6 +75,8 @@
       {
         "id": "mcu-left-interface-labels",
         "role": "ESP32 left-side interface labels aligned on one readable column",
+        "module": "mcu",
+        "routeEnd": "to",
         "side": "left",
         "x": 760,
         "tolerance": 4,
@@ -70,8 +91,24 @@
         ]
       },
       {
+        "id": "mcu-right-output-labels",
+        "role": "ESP32 right-side output interface label budget for downstream control nets",
+        "module": "mcu",
+        "routeEnd": "from",
+        "side": "right",
+        "x": 1015,
+        "tolerance": 4,
+        "nets": [
+          "EXT_PWR_EN",
+          "RELAY1_EN",
+          "RELAY2_EN"
+        ]
+      },
+      {
         "id": "pmos-left-control-label",
         "role": "high-side switch input label attached to the PMOS control handoff stub",
+        "module": "pmos",
+        "routeEnd": "to",
         "side": "left",
         "x": 1095,
         "tolerance": 4,
@@ -82,11 +119,24 @@
       {
         "id": "relay-output-control-labels",
         "role": "relay module input labels aligned before relay driver stages",
+        "module": "relay1",
+        "routeEnd": "to",
         "side": "left",
         "x": 1515,
         "tolerance": 4,
         "nets": [
-          "RELAY1_EN",
+          "RELAY1_EN"
+        ]
+      },
+      {
+        "id": "relay2-output-control-label",
+        "role": "relay2 module input label aligned before relay driver stage",
+        "module": "relay2",
+        "routeEnd": "to",
+        "side": "left",
+        "x": 1515,
+        "tolerance": 4,
+        "nets": [
           "RELAY2_EN"
         ]
       }
