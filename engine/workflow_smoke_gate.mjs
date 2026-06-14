@@ -1188,6 +1188,7 @@ try {
 		readyForGenerate: scaffoldReport.readyForGenerate,
 		missingFiles: missingScaffoldFiles,
 		planPass: scaffoldPlan.pass,
+		labelColumns: (scaffoldAssembly.layoutPolicy?.labelColumns || []).map(col => ({ id: col.id, side: col.side, x: col.x, nets: col.nets })),
 		rules: (scaffoldPlan.findings || []).map(f => f.rule),
 	};
 	assertFinding(findings, missingScaffoldFiles.length === 0, 'WS6-scaffold-files-present', 'GSD scaffold must emit all editable project contract files', {
@@ -1218,6 +1219,16 @@ try {
 		'WS10-generic-layout-variants',
 		'layout planner must support enough generic anchorVariants for new project scaffolds instead of only AIHWDEBUGER-specific coordinate fields',
 		checks.genericLayoutCandidates,
+	);
+	assertFinding(
+		findings,
+		(scaffoldAssembly.layoutPolicy?.labelColumns || []).length >= (scaffoldAssembly.layoutPolicy?.interfaceRoutes || [])
+			.filter(route => route.strategy === 'grouped-net-label' && !['GND', 'SYS_3V3', 'SYS_5V', 'VBUS'].includes(route.net))
+			.length * 2
+			&& (scaffoldAssembly.layoutPolicy?.labelColumns || []).every(col => ['left', 'right'].includes(col.side) && Number.isFinite(col.x) && Array.isArray(col.nets) && col.nets.length),
+		'WS71-scaffold-label-columns',
+		'new project scaffolds with grouped interfaces must include editable layoutPolicy.labelColumns so agents do not invent floating labels',
+		checks.scaffold,
 	);
 
 	mkdirSync(GENERIC_RULE_DIR, { recursive: true });
@@ -1592,6 +1603,7 @@ export const pack = { id: '${badBuilderPackId}', fallbackAnchors, cellBuilders, 
 	);
 
 	const customPackReport = writePackScaffold({ root: ROOT, packId: CUSTOM_PACK });
+	const customPackManifest = readJson(`${CUSTOM_PACK_DIR}/cell_manifest.json`);
 	const customSpec = buildMinimalSpec(CUSTOM_PACK);
 	const customDir = `${TMP_DIR}/custom_project`;
 	const customScaffold = writeScaffold({ outDir: customDir, spec: customSpec, pack: CUSTOM_PACK });
@@ -1614,6 +1626,8 @@ export const pack = { id: '${badBuilderPackId}', fallbackAnchors, cellBuilders, 
 		rules: (customPlan.findings || []).map(f => f.rule),
 		hasApplyWriterTemplate: existsSync(`${CUSTOM_PACK_DIR}/apply_writer.mjs`),
 		hasApplyRunTemplate: existsSync(`${CUSTOM_PACK_DIR}/apply_run.mjs`),
+		hasGeometryContractTemplate: customPackManifest.cellTemplate?.geometryContract?.checkedBy?.includes('contract:geometry') === true,
+		hasLabelContractTemplate: customPackManifest.cellTemplate?.labelContract?.checkedBy?.includes('contract:labels') === true,
 	};
 	const customPlanCli = spawnSync(process.execPath, ['bin/easyeda-gsd.mjs', 'plan', '_tmp_workflow_smoke/custom_project/project_spec.json'], {
 		cwd: ROOT,
@@ -1794,6 +1808,14 @@ export const pack = { id: '${NO_WRITER_PACK}', fallbackAnchors, cellBuilders, no
 			&& checks.customPackScaffold.hasApplyRunTemplate,
 		'WS52-pack-scaffold-includes-writer-template',
 		'custom circuit pack scaffold must include apply writer templates so agents know where external EasyEDA write-back must be implemented',
+		checks.customPackScaffold,
+	);
+	assertFinding(
+		findings,
+		checks.customPackScaffold.hasGeometryContractTemplate
+			&& checks.customPackScaffold.hasLabelContractTemplate,
+		'WS72-pack-scaffold-includes-layout-contract-template',
+		'custom circuit pack scaffold must include geometry and label contract templates so agents implement cells against executable visual-layout rules',
 		checks.customPackScaffold,
 	);
 	assertFinding(findings, customPlan.pass === false, 'WS12-custom-pack-scaffold-not-ready', 'custom pack scaffold must fail plan until contract, library, and executable cells are implemented', {

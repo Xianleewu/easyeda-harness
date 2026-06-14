@@ -80,6 +80,21 @@ function manifestSource(packId) {
 			'no-unnecessary-net-ports',
 		],
 		cellTemplate: {
+			geometryContract: {
+				orthogonalWiresOnly: true,
+				noLocalWireCrossings: true,
+				noWiresThroughComponentBodies: true,
+				noVisibleObjectOverlaps: true,
+				checkedBy: ['gsd:plan cell-builder dry-run', 'contract:geometry', 'contract:geometry:live'],
+			},
+			labelContract: {
+				visibleSignalLabelsMustUseRealNetflags: true,
+				floatingLabelsAllowed: false,
+				leftSideAlignMode: 6,
+				rightSideAlignMode: 8,
+				labelColumnsSource: 'project_assembly.layoutPolicy.labelColumns',
+				checkedBy: ['contract:labels', 'contract:labels:live'],
+			},
 			portLayout: {
 				EXAMPLE_INPUT: { side: 'left', kind: 'sig', label: 'required' },
 				EXAMPLE_OUTPUT: { side: 'right', kind: 'sig', label: 'required' },

@@ -114,6 +114,25 @@ export function buildScaffold(spec, { pack = 'aihwdebugger' } = {}) {
 		channel: `${iface.from || 'source'}-to-${iface.to || 'target'}`,
 		direction: 'left-to-right',
 	}));
+	const groupedSignalRoutes = interfaceRoutes.filter(route => route.strategy === 'grouped-net-label' && route.net && !['GND', 'SYS_3V3', 'SYS_5V', 'VBUS'].includes(route.net));
+	const labelColumns = groupedSignalRoutes.flatMap(route => ([
+		{
+			id: `${route.from || 'source'}_${route.net}_out`,
+			role: `visible ${route.net} handoff at the ${route.from || 'source'} module output endpoint`,
+			side: 'right',
+			x: anchors[route.from]?.x == null ? 300 : anchors[route.from].x + 90,
+			tolerance: 4,
+			nets: [route.net],
+		},
+		{
+			id: `${route.to || 'target'}_${route.net}_in`,
+			role: `visible ${route.net} handoff at the ${route.to || 'target'} module input endpoint`,
+			side: 'left',
+			x: anchors[route.to]?.x == null ? 540 : anchors[route.to].x - 90,
+			tolerance: 4,
+			nets: [route.net],
+		},
+	]));
 	const assembly = {
 		schemaVersion: 1,
 		projectId: contract.projectId,
@@ -138,6 +157,7 @@ export function buildScaffold(spec, { pack = 'aihwdebugger' } = {}) {
 			maxModuleWireIntrusions: 0,
 			requireNoLaneInterlocks: true,
 			interfaceRoutes,
+			labelColumns,
 			baseAnchors: anchors,
 			anchorVariants,
 			inputRows: [{ y: 600 }],
@@ -182,7 +202,7 @@ export function writeScaffold({ outDir, spec, pack = 'aihwdebugger' }) {
 		circuitPack: normalizedSpec.circuitPack,
 		files: Object.keys(files),
 		readyForGenerate: false,
-		nextStep: 'Fill requiredParts, approved library bindings, requiredPins, deterministic cell mappings, refs, registryModule, netArgs, anchors, and layoutPolicy until node bin/easyeda-gsd.mjs plan <outDir>/project_spec.json passes.',
+		nextStep: 'Fill requiredParts, approved library bindings, requiredPins, deterministic cell mappings, refs, registryModule, netArgs, portLayout, layoutPolicy.labelColumns, anchors, and writer implementation until node bin/easyeda-gsd.mjs plan <outDir>/project_spec.json passes.',
 	};
 	writeFileSync(`${outDir}/gsd_scaffold_report.json`, JSON.stringify(report, null, 2) + '\n', 'utf8');
 	return report;
