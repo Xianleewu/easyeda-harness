@@ -3,6 +3,7 @@ import { normalizeLiveWires } from './validate.mjs';
 
 const DIR = (process.env.EASYEDA_WORKDIR || process.cwd()).replace(/\\/g, '/') + '/';
 const ASSEMBLY = process.env.EASYEDA_PROJECT_ASSEMBLY || DIR + 'project_assembly.json';
+const CONTRACT = process.env.EASYEDA_PROJECT_CONTRACT || DIR + 'project_contract.json';
 const MODEL = process.env.EASYEDA_PROJECT_MODEL || DIR + 'full_model.json';
 const LIVE = process.env.EASYEDA_LIVE_MODEL || DIR + 'live.json';
 const REPORT = process.env.EASYEDA_PROJECT_LABEL_LAYOUT_REPORT || DIR + 'project_label_layout_report.json';
@@ -107,6 +108,22 @@ function visibleWireNameLabels(live) {
 	return labels;
 }
 
+function visibleNetPortLabels(snap, liveMode) {
+	return asArray(snap.netflags)
+		.filter(flag => flag?.type === 'netport' || flag?.kind === 'netport' || (!liveMode && flag?.kind === 'sig' && flag?.type === 'netport'))
+		.filter(flag => signalNet(flag.net))
+		.map(flag => ({
+			source: 'net-port',
+			net: String(flag.net || '').trim(),
+			x: Number(flag.textX ?? flag.x),
+			y: Number(flag.textY ?? flag.y),
+			alignMode: flag.alignMode == null ? null : Number(flag.alignMode),
+			bbox: normBox(flag.bbox),
+			type: flag.type || null,
+			kind: flag.kind || null,
+		}));
+}
+
 function modelNetflagLabels(model) {
 	return asArray(model.netflags)
 		.filter(f => f.kind === 'sig' && signalNet(f.net))
@@ -198,13 +215,15 @@ function expectedCorner(label) {
 	return { side, x: null, y: null, box };
 }
 
-export function validateLabelLayout({ assembly, snap, modelForTransform = null, liveMode = false } = {}) {
+export function validateLabelLayout({ assembly, contract = null, snap, modelForTransform = null, liveMode = false } = {}) {
 	const findings = [];
 	const labels = labelsFromSource(snap || {}, liveMode);
 	const transform = liveMode ? liveTransformFromModel(snap, modelForTransform) : { dx: 0, dy: 0, samples: 0 };
 	const columns = declaredColumns(assembly || {}, transform);
 	const wires = liveMode ? normalizeLiveWires(snap || {}) : asArray(snap?.wires);
 	const policy = assembly?.layoutPolicy || {};
+	const quality = contract?.qualityPolicy || {};
+	const netPortsForbidden = quality.singleSheetNoNetPortsByDefault !== false;
 	const requiredCols = asArray(policy.labelColumns);
 	const labelBudget = new Map();
 
@@ -228,6 +247,14 @@ export function validateLabelLayout({ assembly, snap, modelForTransform = null, 
 			x: t.x,
 			y: t.y,
 			bbox: t.bbox,
+		});
+	}
+	const netPorts = visibleNetPortLabels(snap || {}, liveMode);
+	if (netPortsForbidden && netPorts.length) {
+		hard(findings, 'LL17-no-unnecessary-net-ports', 'single-sheet schematics must not use EasyEDA NET PORT symbols for visible signal labels; use wire Name attributes or generated signal netflags attached to wire endpoints', {
+			count: netPorts.length,
+			policy: { singleSheetNoNetPortsByDefault: quality.singleSheetNoNetPortsByDefault ?? true },
+			samples: netPorts.slice(0, 20),
 		});
 	}
 
@@ -314,6 +341,7 @@ export function validateLabelLayout({ assembly, snap, modelForTransform = null, 
 			source: liveMode ? 'live' : 'model',
 			labels: labels.length,
 			fakeTextLabels: fakeTextLabels(snap || {}).length,
+			netPorts: netPorts.length,
 			labelColumns: columns.length,
 			liveTransform: liveMode ? transform : null,
 		},
@@ -324,6 +352,7 @@ export function validateLabelLayout({ assembly, snap, modelForTransform = null, 
 
 export function runProjectLabelLayoutGate({
 	assemblyPath = ASSEMBLY,
+	contractPath = CONTRACT,
 	sourcePath = SOURCE,
 	reportPath = REPORT,
 	liveMode = RUN_LIVE,
@@ -331,20 +360,23 @@ export function runProjectLabelLayoutGate({
 } = {}) {
 	const findings = [];
 	let assembly = null;
+	let contract = null;
 	let snap = null;
 	let modelForTransform = null;
 	if (!existsSync(assemblyPath)) hard(findings, 'LL0-assembly-file', 'project_assembly.json is required before label layout audit', { path: assemblyPath });
+	if (!existsSync(contractPath)) hard(findings, 'LL0-contract-file', 'project_contract.json is required before label layout audit', { path: contractPath });
 	if (!existsSync(sourcePath)) hard(findings, 'LL0-source-file', `${liveMode ? 'live.json' : 'full_model.json'} is required before label layout audit`, { path: sourcePath });
 	if (liveMode && existsSync(modelPath)) {
 		try { modelForTransform = readJson(modelPath); } catch {}
 	}
 	if (!findings.length) {
 		try { assembly = readJson(assemblyPath); } catch (e) { hard(findings, 'LL0-assembly-parse', 'project_assembly.json must parse as JSON', { error: e.message }); }
+		try { contract = readJson(contractPath); } catch (e) { hard(findings, 'LL0-contract-parse', 'project_contract.json must parse as JSON', { error: e.message }); }
 		try { snap = readJson(sourcePath); } catch (e) { hard(findings, 'LL0-source-parse', `${SOURCE_LABEL} must parse as JSON`, { error: e.message }); }
 	}
 	let audit = { findings: [], stats: null, labels: [], columns: [] };
 	if (assembly && snap) {
-		audit = validateLabelLayout({ assembly, snap, modelForTransform, liveMode });
+		audit = validateLabelLayout({ assembly, contract, snap, modelForTransform, liveMode });
 		findings.push(...audit.findings);
 	}
 	const report = {

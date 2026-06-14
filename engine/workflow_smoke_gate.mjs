@@ -651,6 +651,27 @@ try {
 	};
 	assertFinding(findings, checks.liveLabelLayoutRejectsUnbudgetedWireName.pass, 'WS68-live-label-layout-rejects-unbudgeted-wire-name', 'live label layout audit must reject visible wire Name labels for nets not declared in layoutPolicy.labelColumns', checks.liveLabelLayoutRejectsUnbudgetedWireName);
 
+	const liveNetPortAuditBad = validateLabelLayout({
+		assembly,
+		contract,
+		snap: {
+			components: [{ designator: 'U1', x: 900, y: 800 }],
+			wires: [{ id: 'w2', net: 'RESET_EN', line: [760, 855, 860, 855] }],
+			netflags: [
+				{ type: 'netport', kind: 'sig', net: 'RESET_EN', x: 760, y: 855, textX: 760, textY: 855, alignMode: 6, bbox: { minX: 760, minY: 855, maxX: 824, maxY: 863 } },
+			],
+			texts: [],
+		},
+		modelForTransform: { components: [{ designator: 'U1', x: 900, y: 800 }] },
+		liveMode: true,
+	});
+	checks.liveLabelLayoutRejectsNetPorts = {
+		pass: liveNetPortAuditBad.findings.some(f => f.rule === 'LL17-no-unnecessary-net-ports'),
+		rules: liveNetPortAuditBad.findings.map(f => f.rule),
+		firstFinding: liveNetPortAuditBad.findings.find(f => f.rule === 'LL17-no-unnecessary-net-ports') || null,
+	};
+	assertFinding(findings, checks.liveLabelLayoutRejectsNetPorts.pass, 'WS78-live-label-layout-rejects-net-ports', 'live label layout audit must reject EasyEDA NET PORT symbols when singleSheetNoNetPortsByDefault is enabled', checks.liveLabelLayoutRejectsNetPorts);
+
 	const duplicateRefAssembly = clone(assembly);
 	if (duplicateRefAssembly.modules?.[0] && duplicateRefAssembly.modules?.[1]) {
 		const firstRef = Object.values(duplicateRefAssembly.modules[0].refs || {})[0];

@@ -304,7 +304,7 @@ const RULE_PLANS = [
 		editFiles: ['project_assembly.json', 'circuit_packs/<pack>/pack.mjs', 'circuit_packs/<pack>/cell_manifest.json', 'engine/apply_full.mjs', 'engine/project_label_layout_gate.mjs'],
 		inspectFiles: ['project_label_layout_report.json', 'full_model.json', 'live.json', 'project_assembly.json'],
 		nextCommand: 'npm.cmd run contract:labels',
-		repairHint: 'Make visible signal labels geometry-driven: declare layoutPolicy.labelColumns, attach each label origin to a same-net wire endpoint, use alignMode=6 for left-bottom and alignMode=8 for right-bottom, and remove fake or unbudgeted scattered labels.',
+		repairHint: 'Make visible signal labels geometry-driven: declare layoutPolicy.labelColumns, attach each label origin to a same-net wire endpoint, use alignMode=6 for left-bottom and alignMode=8 for right-bottom, remove fake or unbudgeted scattered labels, and replace single-sheet NET PORT symbols with wire Name attributes or generated signal netflags.',
 	}],
 	[/^PM/, {
 		area: 'project-model',
