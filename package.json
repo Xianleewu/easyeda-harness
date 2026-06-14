@@ -24,6 +24,8 @@
     "contract:cells": "node engine/project_cell_manifest_gate.mjs",
     "contract:assembly": "node engine/project_assembly_gate.mjs",
     "contract:layout": "node engine/project_layout_gate.mjs",
+    "contract:geometry": "node engine/project_geometry_gate.mjs",
+    "contract:geometry:live": "node engine/project_geometry_gate.mjs --live",
     "contract:labels": "node engine/project_label_layout_gate.mjs",
     "contract:labels:live": "node engine/project_label_layout_gate.mjs --live",
     "contract:model": "node engine/project_model_gate.mjs",

@@ -75,6 +75,7 @@ if (docs['AGENTS.md']) {
 		'contract:cells',
 		'contract:assembly',
 		'contract:layout',
+		'contract:geometry',
 		'contract:labels',
 		'layoutPolicy.labelColumns',
 		'contract:live:model',
@@ -121,6 +122,7 @@ if (docs['CLAUDE.md']) {
 		'contract:cells',
 		'contract:assembly',
 		'contract:layout',
+		'contract:geometry',
 		'contract:labels',
 		'layoutPolicy.labelColumns',
 		'final_evidence_report.json',
@@ -151,6 +153,7 @@ for (const file of ['README.en.md']) {
 		'contract:pack',
 		'circuit_packs/<pack>',
 		'contract:library',
+		'contract:geometry',
 		'contract:labels',
 		'layoutPolicy.labelColumns',
 		'docs/schematic-design-rules.md',
@@ -171,6 +174,8 @@ for (const file of ['README.en.md']) {
 
 if (docs['docs/schematic-design-rules.md']) {
 	requireAll(findings, 'docs/schematic-design-rules.md', docs['docs/schematic-design-rules.md'], 'AI11-design-rules', [
+		'contract:geometry',
+		'contract:geometry:live',
 		'contract:labels',
 		'contract:labels:live',
 		'layoutPolicy.labelColumns',

@@ -26,6 +26,8 @@ This file defines the layout rules that agents must treat as executable delivery
 The following gates are responsible for these rules:
 
 - `contract:layout`: module columns, spacing, no interlocks, and no unrelated wire intrusion.
+- `contract:geometry`: generated-model wire crossings, wires through visible objects, and text/label/flag/attribute overlaps.
+- `contract:geometry:live`: the same geometry audit on the real EasyEDA `live.json` snapshot.
 - `contract:labels`: generated-model label columns, label origin geometry, endpoint attachment, fake text labels, and label budget.
 - `contract:labels:live`: the same label audit on the real EasyEDA `live.json` snapshot.
 - `pipeline`: local model geometry, crossings, text clearance, label clearance, and structured layout checks.

@@ -71,6 +71,7 @@ const projectLibrary = readJson('project_library_report.json');
 const cellManifest = readJson('cell_manifest_report.json');
 const projectAssembly = readJson('project_assembly_report.json');
 const projectLayout = readJson('project_layout_report.json');
+const projectGeometry = readJson('project_geometry_report.json');
 const projectLabelLayout = readJson('project_label_layout_report.json');
 const projectModel = readJson('project_model_report.json');
 const projectNetlist = readJson('project_netlist_report.json');
@@ -202,6 +203,14 @@ const checks = {
 		laneInterlocks: projectLayout?.laneInterlocks ?? null,
 		firstFinding: projectLayout?.findings?.[0] || null,
 		evidence: 'project_layout_report.json',
+	},
+	projectGeometry: {
+		status: status(projectGeometry?.pass),
+		severity: projectGeometry?.severity || null,
+		source: projectGeometry?.source || null,
+		stats: projectGeometry?.stats || null,
+		firstFinding: projectGeometry?.findings?.[0] || null,
+		evidence: 'project_geometry_report.json',
 	},
 	template: {
 		status: status(template?.pass),
@@ -594,6 +603,16 @@ if (checks.template.status !== 'pass') {
 		area: 'template',
 		action: 'Fix deterministic schematic model until report.json has HARD=0 SOFT=0 INFO=0.',
 		evidence: ['report.json'],
+	});
+}
+if (checks.projectGeometry.status !== 'pass') {
+	pushAction(actions, {
+		area: 'project-geometry',
+		action: 'Fix actual schematic geometry before accepting visual quality. Remove diagonal wires, different-net or unnamed wire crossings, wires through visible objects, and text/label/flag/attribute overlaps in deterministic cells or writer output.',
+		evidence: ['project_geometry_report.json', 'full_model.json', 'live.json', 'docs/schematic-design-rules.md'],
+		observed: checks.projectGeometry.firstFinding || checks.projectGeometry,
+		editFiles: ['project_assembly.json', 'circuit_packs/<pack>/pack.mjs', 'circuit_packs/<pack>/cell_manifest.json', 'engine/apply_full.mjs'],
+		nextCommand: 'npm.cmd run contract:geometry',
 	});
 }
 if (checks.projectModel.status !== 'pass') {

@@ -19,6 +19,7 @@ import { auditDocumentStyle, buildDocumentLayer } from '../harness/document_styl
 import { buildModel } from '../harness/model.mjs';
 import { runRules } from '../harness/rule_registry.mjs';
 import { acquireRunLock } from '../workflows/run_lock.mjs';
+import { validateProjectGeometry } from './project_geometry_gate.mjs';
 import { validateLabelLayout } from './project_label_layout_gate.mjs';
 
 const ROOT = (process.env.EASYEDA_WORKDIR || process.cwd()).replace(/\\/g, '/');
@@ -381,6 +382,45 @@ try {
 	};
 	assertFinding(findings, checks.labelColumnsRequiredForGroupedRoutes.pass, 'WS65-label-columns-required-for-grouped-routes', 'GSD plan must reject grouped-net-label routes without layoutPolicy.labelColumns before generation', checks.labelColumnsRequiredForGroupedRoutes);
 
+	const geometryAuditGood = validateProjectGeometry({
+		components: [
+			{ designator: 'U1', bbox: { minX: 100, minY: 100, maxX: 140, maxY: 140 } },
+			{ designator: 'R1', bbox: { minX: 190, minY: 115, maxX: 210, maxY: 125 } },
+		],
+		wires: [
+			{ net: 'SIG_A', line: [140, 120, 190, 120] },
+			{ net: 'GND', line: [120, 150, 120, 180] },
+		],
+		netflags: [{ kind: 'gnd', net: 'GND', x: 120, y: 180, bbox: { minX: 110, minY: 180, maxX: 130, maxY: 198 } }],
+		texts: [{ content: 'Sensor', x: 160, y: 95, bbox: { minX: 150, minY: 82, maxX: 190, maxY: 98 } }],
+	});
+	checks.geometryAcceptsCleanModel = {
+		pass: geometryAuditGood.findings.length === 0,
+		findings: geometryAuditGood.findings,
+	};
+	assertFinding(findings, checks.geometryAcceptsCleanModel.pass, 'WS69-geometry-accepts-clean-model', 'project geometry audit must accept clean orthogonal non-overlapping schematic geometry', checks.geometryAcceptsCleanModel);
+
+	const geometryAuditBad = validateProjectGeometry({
+		components: [{ designator: 'U1', bbox: { minX: 100, minY: 100, maxX: 150, maxY: 150 } }],
+		wires: [
+			{ net: 'A', line: [80, 125, 170, 125] },
+			{ net: 'B', line: [125, 80, 125, 170] },
+			{ net: 'C', line: [80, 80, 120, 120] },
+		],
+		netflags: [
+			{ kind: 'sig', net: 'A', x: 90, y: 90, bbox: { minX: 90, minY: 90, maxX: 130, maxY: 102 } },
+			{ kind: 'sig', net: 'B', x: 95, y: 94, bbox: { minX: 95, minY: 94, maxX: 135, maxY: 106 } },
+		],
+		texts: [{ content: 'A', x: 110, y: 120, bbox: { minX: 108, minY: 112, maxX: 122, maxY: 130 } }],
+	});
+	checks.geometryRejectsCrossingsAndOverlaps = {
+		pass: ['PG1-wire-orthogonal', 'PG3-wire-crossing', 'PG4-wire-through-visible-object', 'PG5-visible-object-overlap', 'PG6-visible-object-over-component']
+			.every(rule => geometryAuditBad.findings.some(f => f.rule === rule)),
+		rules: geometryAuditBad.findings.map(f => f.rule),
+		firstFinding: geometryAuditBad.findings[0] || null,
+	};
+	assertFinding(findings, checks.geometryRejectsCrossingsAndOverlaps.pass, 'WS70-geometry-rejects-crossings-and-overlaps', 'project geometry audit must reject diagonal wires, crossings, wires through visible objects, and text/label overlaps', checks.geometryRejectsCrossingsAndOverlaps);
+
 	const labelAuditGood = validateLabelLayout({
 		assembly,
 		snap: {
@@ -739,6 +779,7 @@ try {
 		project_library_report: passReport(finalLiveSpec.projectId),
 		project_netlist_report: passReport(finalLiveSpec.projectId),
 		project_layout_report: passReport(finalLiveSpec.projectId),
+		project_geometry_report: { ...passReport(finalLiveSpec.projectId), source: 'live.json', stats: { components: 0, segments: 0, visibleObjects: 0 } },
 		project_label_layout_report: { ...passReport(finalLiveSpec.projectId), source: 'live.json', stats: { labels: 0, labelColumns: 0 } },
 		project_visual_report: passReport(finalLiveSpec.projectId),
 		report: { ...passReport(finalLiveSpec.projectId), coverage: { layoutPlanner: true } },

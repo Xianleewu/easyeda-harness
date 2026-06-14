@@ -134,6 +134,7 @@ function report() {
 		'project_netlist_report.json',
 		'project_assembly_report.json',
 		'project_layout_report.json',
+		'project_geometry_report.json',
 		'project_label_layout_report.json',
 		'project_visual_report.json',
 		'repair_actions.json',

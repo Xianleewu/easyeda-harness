@@ -17,7 +17,7 @@ A PASS on the current model only proves the current model. It does not validate 
 `project_spec.json` is the machine-readable user-intent input. `node bin/easyeda-gsd.mjs plan` writes `gsd_plan_report.json`, proving that the spec is realized by the current contract, netlist, assembly, and circuit pack. `node bin/easyeda-gsd.mjs generate` writes `gsd_generate_report.json`, refuses to generate if the plan fails, and runs full layout search by default; `generate --fast` is only a draft iteration mode. `project_contract.json` is the design contract derived from that spec. `npm run spec` checks that the contract covers the spec, and `npm run contract` / `npm run accept` continue checking the contract and generated model.
 `npm run spec:schema` validates the spec shape before contract coverage is checked.
 
-`project_contract.json` is the first machine-readable file an agent must update for a new project. Each module must declare `drawingRules` for the reusable schematic-quality rules it expects. `project_netlist.json` records the required electrical endpoints. `circuit_packs/*/cell_manifest.json` declares deterministic cell capabilities for the selected circuit pack, and `project_assembly.json` maps each contract module to those cells, refs, anchors, nets, and layout policy. `npm run contract`, `npm run contract:netlist`, `npm run contract:cells`, `npm run contract:assembly`, `npm run contract:layout`, and `npm run accept` check them; if they fail, the agent should not edit write-back scripts, apply to EasyEDA, or claim completion.
+`project_contract.json` is the first machine-readable file an agent must update for a new project. Each module must declare `drawingRules` for the reusable schematic-quality rules it expects. `project_netlist.json` records the required electrical endpoints. `circuit_packs/*/cell_manifest.json` declares deterministic cell capabilities for the selected circuit pack, and `project_assembly.json` maps each contract module to those cells, refs, anchors, nets, and layout policy. `npm run contract`, `npm run contract:netlist`, `npm run contract:cells`, `npm run contract:assembly`, `npm run contract:layout`, `npm run contract:geometry`, and `npm run accept` check them; if they fail, the agent should not edit write-back scripts, apply to EasyEDA, or claim completion.
 `circuit_packs/*/pack.mjs` owns circuit-family behavior such as cell builders, fallback anchors, and library snapshot normalization. `npm run contract:pack` verifies the selected pack before generation.
 
 ## Capabilities
@@ -35,6 +35,7 @@ A PASS on the current model only proves the current model. It does not validate 
 - Rule coverage check: `contract:rules` proves module registry, required parts, interface contracts, and core rules cover the project contract.
 - Assembly coverage check: `contract:assembly` proves every contract module is mapped to a deterministic cell, anchor, refs, and nets before generation.
 - Layout policy check: `contract:layout` proves layout search is driven by `project_assembly.json` and that `layoutPolicy.flow`, ordered `layoutPolicy.columns`, generic `anchorVariants` or project search space, module spacing, no interlock, and no unrelated wire intrusion requirements are satisfied.
+- Geometry check: `contract:geometry` audits the actual generated model for orthogonal wires, different-net or unnamed wire crossings, wires through visible objects, and overlaps among text, labels, flags, attributes, and component bodies. In live mode, `contract:geometry:live` runs the same audit against the real EasyEDA snapshot.
 - Label layout check: `contract:labels` audits actual generated label geometry, including `layoutPolicy.labelColumns`, visible label budgets, left-bottom/right-bottom origins, same-net wire endpoint attachment, fake text labels, and scattered unbudgeted labels. In live mode, `contract:labels:live` runs the same audit against the real EasyEDA snapshot.
 - Contract realization check: after `full_model.json` is generated, `contract:model` proves the model actually expresses the contract modules, parts, nets, and interfaces.
 - Visual evidence check: after offline previews are generated, `contract:visual` proves every contract visual evidence region exists and passes image inspection.
@@ -103,6 +104,7 @@ It runs local gates, live snapshot, live canvas image, EasyEDA DRC, module-level
 When a gate remains open, inspect `next_actions.json` first; it is the machine-readable handoff checklist for the next agent. Then inspect `repair_actions.json` for finding-level edit targets and rerun commands, or run `node bin/easyeda-gsd.mjs repair` to produce `repair_loop_report.json`.
 
 In live mode, `contract:live:model` checks `live.json` from the real EasyEDA canvas against `project_contract.json`. Final acceptance is not based on `full_model.json` alone.
+`contract:geometry:live` checks the real EasyEDA geometry, so local previews cannot hide live wire crossings, text overlap, or wires through symbols.
 `contract:labels:live` also checks the real EasyEDA wire `Name` geometry, so a local label contract cannot hide floating labels, wrong origins, or scattered live wire names.
 
 `node bin/easyeda-gsd.mjs deliver` writes `delivery_report.json` and is the final handoff gate. It rejects local-only `accept` output and only passes with `full-with-live` acceptance, live final evidence, `live.json`, `live_canvas.png`, live shots, live model proof, and EasyEDA DRC `0 error / 0 warning / 0 info`.
@@ -124,6 +126,7 @@ For handoff, review the global sheet and local crops for USB, LDO, RESET, BOOT, 
 - Cell manifest check: `cell_manifest_report.json` has `HARD=0 SOFT=0 INFO=0`
 - Project assembly coverage check: `project_assembly_report.json` has `HARD=0 SOFT=0 INFO=0`
 - Project layout policy check: `project_layout_report.json` has `HARD=0 SOFT=0 INFO=0`
+- Project geometry check: `project_geometry_report.json` has `HARD=0 SOFT=0 INFO=0`
 - Project label layout check: `project_label_layout_report.json` has `HARD=0 SOFT=0 INFO=0`
 - Contract realization check: `project_model_report.json` has `HARD=0 SOFT=0 INFO=0`
 - Fast local check: `HARD=0 SOFT=0 INFO=0`

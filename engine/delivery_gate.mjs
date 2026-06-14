@@ -102,6 +102,7 @@ const reports = {
 	acceptance: requireReport(findings, 'acceptance_report.json', 'live acceptance report', data => data?.pass === true && data?.mode === 'full-with-live'),
 	finalEvidence: requireReport(findings, 'final_evidence_report.json', 'live final evidence report', data => data?.pass === true && data?.mode === 'full-with-live'),
 	projectLiveModel: requireReport(findings, 'project_live_model_report.json', 'live model contract report'),
+	projectGeometry: requireReport(findings, 'project_geometry_report.json', 'live geometry report', data => data?.pass === true && data?.source === 'live.json'),
 	projectLabelLayout: requireReport(findings, 'project_label_layout_report.json', 'live label layout report', data => data?.pass === true && data?.source === 'live.json'),
 	drc: requireReport(findings, 'drc_report.json', 'EasyEDA DRC report', data => data?.pass === true && data?.drc?.strictPass === true && !(data?.drc?.errors || 0) && !(data?.drc?.warnings || 0) && !(data?.drc?.info || 0)),
 	liveShots: requireReport(findings, 'live_shots_report.json', 'live shots report', data => data?.pass === true && (data?.screenshots || 0) >= 1 && data?.fallbackDiagnosticOnly !== true),
@@ -149,6 +150,7 @@ const report = {
 		acceptance: { pass: reports.acceptance.data?.pass ?? null, mode: reports.acceptance.data?.mode || null },
 		finalEvidence: { pass: reports.finalEvidence.data?.pass ?? null, mode: reports.finalEvidence.data?.mode || null },
 		projectLiveModel: { pass: reports.projectLiveModel.data?.pass ?? null },
+		projectGeometry: { pass: reports.projectGeometry.data?.pass ?? null, source: reports.projectGeometry.data?.source || null, stats: reports.projectGeometry.data?.stats || null },
 		projectLabelLayout: { pass: reports.projectLabelLayout.data?.pass ?? null, source: reports.projectLabelLayout.data?.source || null, stats: reports.projectLabelLayout.data?.stats || null },
 		drc: { pass: reports.drc.data?.pass ?? null, counts: reports.drc.data?.drc || null },
 		liveShots: {

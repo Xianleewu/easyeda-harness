@@ -23,6 +23,7 @@ const BASE_REPORTS = [
 	{ gate: 'template', file: 'report.json', rerun: 'npm.cmd run fast' },
 	{ gate: 'pipeline', file: 'layout_planner_report.json', rerun: 'npm.cmd run pipeline' },
 	{ gate: 'project-layout', file: 'project_layout_report.json', rerun: 'npm.cmd run pipeline && npm.cmd run contract:layout' },
+	{ gate: 'project-geometry', file: 'project_geometry_report.json', rerun: 'npm.cmd run contract:geometry' },
 	{ gate: 'project-label-layout', file: 'project_label_layout_report.json', rerun: 'npm.cmd run contract:labels' },
 	{ gate: 'project-model', file: 'project_model_report.json', rerun: 'npm.cmd run contract:model' },
 	{ gate: 'project-netlist', file: 'project_netlist_report.json', rerun: 'npm.cmd run contract:netlist' },
@@ -271,6 +272,13 @@ const RULE_PLANS = [
 		inspectFiles: ['layout_planner_report.json', 'layout_planner_structure.json', 'project_layout_report.json', 'contracts/layout_contract.mjs'],
 		nextCommand: 'npm.cmd run pipeline && npm.cmd run contract:layout',
 		repairHint: 'Fix project_assembly.json layoutPolicy or planner consumption until candidate source, module gaps, interlocks, and wire intrusions pass.',
+	}],
+	[/^PG/, {
+		area: 'project-geometry',
+		editFiles: ['project_assembly.json', 'circuit_packs/<pack>/pack.mjs', 'circuit_packs/<pack>/cell_manifest.json', 'engine/apply_full.mjs', 'engine/project_geometry_gate.mjs'],
+		inspectFiles: ['project_geometry_report.json', 'full_model.json', 'live.json', 'docs/schematic-design-rules.md'],
+		nextCommand: 'npm.cmd run contract:geometry',
+		repairHint: 'Fix actual schematic geometry: no diagonal wires, no different-net or unnamed wire crossings, no wires through visible objects, and no text/label/flag/attribute overlaps. Repair deterministic cells or writer output, not manual EasyEDA edits.',
 	}],
 	[/^LL/, {
 		area: 'project-label-layout',

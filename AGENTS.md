@@ -23,6 +23,7 @@ A PASS on the bundled model only proves that the bundled model passes. It does n
 Every project-contract module must include `drawingRules` for the reusable schematic-quality rules it expects before deterministic cells are trusted. Every cell manifest entry must include matching `qualityRules` for the reusable drawing contracts it is designed to satisfy: orthogonal wiring, real net labels, text clearance, module box isolation, no fake net text, and no unnecessary single-sheet net ports. Missing `drawingRules` or `qualityRules` is a pre-generation failure, not a visual polish note.
 
 Every `project_assembly.json` layoutPolicy must include a readable `layoutPolicy.flow` string and ordered `layoutPolicy.columns` that place each assembly module into the intended left-to-right schematic reading order. New projects should use generic `layoutPolicy.anchorVariants` for candidate generation instead of AIHWDEBUGER-specific fields such as `usbX`, `mcuX`, or `relayX`. Missing columns or reversed anchor X order is a layout-contract failure.
+`contract:geometry` audits actual generated geometry for orthogonal wires, different-net or unnamed wire crossings, wires through visible objects, and overlaps among text, labels, flags, attributes, and component bodies. `contract:geometry:live` repeats that audit on the real EasyEDA snapshot, so local previews cannot hide live geometry regressions.
 Every visible signal label must be covered by `layoutPolicy.labelColumns`. Each label column declares role, side, x coordinate, tolerance, and allowed nets; `contract:labels` audits the generated model and `contract:labels:live` audits the real EasyEDA wire `Name` objects in `live.json`. Floating labels, fake `PrimitiveText` net names, wrong `alignMode`, wrong left-bottom/right-bottom origin, mid-wire labels, and unbudgeted scattered labels are hard failures. See `docs/schematic-design-rules.md`.
 
 ## Required External Skill
@@ -82,6 +83,7 @@ Acceptance requires all local gates to pass:
 - `fast`: `HARD=0 SOFT=0 INFO=0`
 - `pipeline`: `HARD=0 SOFT=0 INFO=0`
 - `contract:layout`: layout search is driven by `project_assembly.json` layout policy, `layoutPolicy.flow`, ordered `layoutPolicy.columns`, and final module spacing/interlock/intrusion checks pass
+- `contract:geometry`: actual generated geometry has no wire crossings, wires through visible objects, or visible-object overlaps
 - `contract:labels`: actual visible signal labels satisfy `layoutPolicy.labelColumns`, endpoint attachment, left-bottom/right-bottom origins, and label budgets
 - `contract:model`: generated `full_model.json` satisfies `project_contract.json`
 - `preview`: at least 10 offline preview screenshots plus visual audit PASS
@@ -100,7 +102,7 @@ node bin/easyeda-gsd.mjs live-check
 `live:image` captures the current EasyEDA canvas. `live:shots` attempts 10+ module-level EasyEDA visual evidence. It prefers true zoom-region captures. If the EasyEDA API returns the same full-page rendered image for every zoom request, it may accept coordinate crops from that real EasyEDA rendered schematic image, but only when all required crops exist, hashes are distinct, and every image-quality gate passes. When it fails, inspect `live_shots_report.json.zoomEvidence` first.
 
 `accept:live` also runs `contract:live:model`. This checks `live.json` from the real EasyEDA canvas against `project_contract.json`; local-only `full_model.json` PASS is not final acceptance.
-`accept:live` also runs `contract:labels:live`, so final evidence must prove the real EasyEDA wire `Name` geometry obeys the same label-column and origin rules as the generated model.
+`accept:live` also runs `contract:geometry:live` and `contract:labels:live`, so final evidence must prove the real EasyEDA geometry and wire `Name` placement obey the same rules as the generated model.
 
 If the report points to fixed rendered-area screenshots, run `npm run live:diagnose` and inspect `live_diagnose_report.json.zoomChecks`; matching hashes after different zoom requests prove the issue is the EasyEDA capture API behavior, not schematic coordinates.
 

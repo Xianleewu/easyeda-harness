@@ -15,7 +15,7 @@ Use this repository as an executable schematic workflow, not as permission to dr
 9. Run `npm.cmd run workflow:smoke` and keep `workflow_smoke_report.json` passing so reusable workflow regressions stay blocked.
 10. Implement deterministic cells and rules only after those contracts exist.
 11. Run `node bin/easyeda-gsd.mjs generate <project-dir>/project_spec.json` and keep `gsd_generate_report.json` passing with full layout-search evidence; use `generate --fast` only for draft iteration.
-12. Run `node bin/easyeda-gsd.mjs accept <project-dir>/project_spec.json`.
+12. Run `node bin/easyeda-gsd.mjs accept <project-dir>/project_spec.json`; this includes `contract:geometry` and `contract:labels`.
 13. Run `node bin/easyeda-gsd.mjs live-check <project-dir>/project_spec.json` before final delivery.
 14. Write back only with `node bin/easyeda-gsd.mjs apply --gated <project-dir>/project_spec.json`.
 
@@ -28,6 +28,7 @@ Use this repository as an executable schematic workflow, not as permission to dr
 - Do not trust a module contract until it declares `drawingRules`; missing drawing rules mean the project has not stated the schematic-quality constraints that deterministic cells must satisfy.
 - Do not implement a deterministic cell until its `cell_manifest.json` entry declares `qualityRules` for orthogonal wiring, real net labels, text clearance, module isolation, no fake net text, and no unnecessary net ports.
 - Do not trust layout work until `project_assembly.json` declares `layoutPolicy.flow` and ordered `layoutPolicy.columns` for every module.
+- Do not trust geometry work until `contract:geometry` passes for the generated model and `contract:geometry:live` passes for the real EasyEDA snapshot.
 - Prefer generic `layoutPolicy.anchorVariants` for new projects; do not copy the bundled USB/MCU/relay coordinate fields unless you are editing that pack.
 - Inspect `next_actions.json` first when a gate fails.
 - Use `repair_actions.json` to find the owning files and rerun command for each finding.
