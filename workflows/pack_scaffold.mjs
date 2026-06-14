@@ -66,8 +66,26 @@ process.exit(2);
 `;
 }
 
-function manifestSource(packId) {
-	return `${JSON.stringify({
+function moduleCellId(moduleId) {
+	return `${String(moduleId || 'module').replace(/[^A-Za-z0-9_]/g, '_')}_cell`;
+}
+
+function portKind(net) {
+	const name = String(net || '').toUpperCase();
+	if (name === 'GND' || name.endsWith('_GND')) return 'gnd';
+	if (['VCC', 'VDD', 'VBUS'].includes(name) || /(^|_)(3V3|5V|12V|VIN|VOUT|PWR|POWER|SUPPLY)(_|$)/.test(name)) return 'power';
+	return 'sig';
+}
+
+function portSide(moduleIndex, moduleCount, kind) {
+	if (kind !== 'sig') return kind === 'gnd' ? 'local' : 'top';
+	if (moduleCount <= 1) return 'right';
+	return moduleIndex === 0 ? 'right' : moduleIndex === moduleCount - 1 ? 'left' : 'right';
+}
+
+export function buildCellManifestTemplate(packId, spec = null) {
+	const modules = Array.isArray(spec?.modules) ? spec.modules : [];
+	return {
 		schemaVersion: 1,
 		packId,
 		purpose: `Scaffold cell contracts for the ${packId} circuit pack. Fill cells and builders before generation.`,
@@ -101,7 +119,41 @@ function manifestSource(packId) {
 				GND: { side: 'local', kind: 'gnd', label: 'optional' },
 			},
 		},
-		cells: [],
+		cells: modules.map((mod, index) => {
+			const ports = [...new Set((Array.isArray(mod.requiredNets) ? mod.requiredNets : []).filter(Boolean))];
+			const portLayout = Object.fromEntries(ports.map(net => {
+				const kind = portKind(net);
+				return [net, {
+					side: portSide(index, modules.length, kind),
+					kind,
+					label: kind === 'sig' ? 'required' : 'optional',
+				}];
+			}));
+			return {
+				id: moduleCellId(mod.id),
+				moduleType: mod.id || `module_${index + 1}`,
+				refs: ['MAIN'],
+				optionalRefs: [],
+				netArgs: [],
+				ports,
+				portLayout,
+				layoutIntent: mod.title || mod.id || `module ${index + 1}`,
+				qualityRules: [
+					'orthogonal-wiring',
+					'real-net-labels',
+					'text-clearance',
+					'module-box-isolation',
+					'no-fake-net-text',
+					'no-unnecessary-net-ports',
+				],
+			};
+		}),
+	};
+}
+
+function manifestSource(packId, spec = null) {
+	return `${JSON.stringify({
+		...buildCellManifestTemplate(packId, spec),
 	}, null, 2)}\n`;
 }
 
@@ -164,7 +216,7 @@ export function buildMinimalSpec(packId) {
 	};
 }
 
-export function writePackScaffold({ root, packId }) {
+export function writePackScaffold({ root, packId, spec = null }) {
 	const id = validatePackId(packId);
 	const dir = `${root.replace(/\\/g, '/')}/circuit_packs/${id}`;
 	mkdirSync(dir, { recursive: true });
@@ -172,7 +224,7 @@ export function writePackScaffold({ root, packId }) {
 		writeIfMissing(`${dir}/pack.mjs`, packSource(id)),
 		writeIfMissing(`${dir}/apply_writer.mjs`, applyWriterSource(id)),
 		writeIfMissing(`${dir}/apply_run.mjs`, applyRunSource(id)),
-		writeIfMissing(`${dir}/cell_manifest.json`, manifestSource(id)),
+		writeIfMissing(`${dir}/cell_manifest.json`, manifestSource(id, spec)),
 		syncPackRegistry(root),
 	];
 	return {

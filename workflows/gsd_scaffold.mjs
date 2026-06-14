@@ -1,5 +1,6 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { REQUIRED_DRAWING_RULES, REQUIRED_RULE_PROFILE } from '../contracts/module_contract.mjs';
+import { buildCellManifestTemplate } from './pack_scaffold.mjs';
 
 function asArray(value) {
 	return Array.isArray(value) ? value : [];
@@ -13,8 +14,10 @@ function moduleVisualId(id) {
 	return String(id || '').replace(/_/g, '-');
 }
 
-export function buildScaffold(spec, { pack = 'aihwdebugger' } = {}) {
+export function buildScaffold(spec, { pack = 'aihwdebugger', useGeneratedCells = false } = {}) {
 	const modules = asArray(spec.modules);
+	const generatedManifest = buildCellManifestTemplate(spec.circuitPack || pack, spec);
+	const generatedCellsByModule = new Map(asArray(generatedManifest.cells).map(cell => [cell.moduleType, cell]));
 	const visualEvidenceRegions = unique([
 		'global-sheet',
 		...modules.map(mod => moduleVisualId(mod.id)),
@@ -185,8 +188,8 @@ export function buildScaffold(spec, { pack = 'aihwdebugger' } = {}) {
 		modules: modules.map((mod, index) => ({
 			id: mod.id,
 			order: (index + 1) * 10,
-			registryModule: '',
-			cell: '',
+			registryModule: useGeneratedCells ? mod.id : '',
+			cell: useGeneratedCells ? (generatedCellsByModule.get(mod.id)?.id || '') : '',
 			anchor: mod.id,
 			refs: {},
 			netArgs: {},
@@ -197,10 +200,10 @@ export function buildScaffold(spec, { pack = 'aihwdebugger' } = {}) {
 	return { contract, netlist, assembly, libraryManifest, librarySnapshot };
 }
 
-export function writeScaffold({ outDir, spec, pack = 'aihwdebugger' }) {
+export function writeScaffold({ outDir, spec, pack = 'aihwdebugger', useGeneratedCells = false }) {
 	mkdirSync(outDir, { recursive: true });
 	const normalizedSpec = { ...spec, circuitPack: spec.circuitPack || pack };
-	const { contract, netlist, assembly, libraryManifest, librarySnapshot } = buildScaffold(normalizedSpec, { pack });
+	const { contract, netlist, assembly, libraryManifest, librarySnapshot } = buildScaffold(normalizedSpec, { pack, useGeneratedCells });
 	const files = {
 		'project_spec.json': normalizedSpec,
 		'project_contract.json': contract,

@@ -89,10 +89,11 @@ function writeInit(args) {
 		const spec = pack === 'aihwdebugger' && circuitPackIds().includes('aihwdebugger')
 			? readJson('project_spec.json')
 			: buildMinimalSpec(pack);
-		const packScaffold = circuitPackIds().includes(pack) ? null : writePackScaffold({ root: ROOT, packId: pack });
+		const packExists = circuitPackIds().includes(pack);
+		const packScaffold = packExists ? null : writePackScaffold({ root: ROOT, packId: pack, spec });
 		const target = resolve(ROOT, out).replace(/\\/g, '/');
 		if (!/\.[A-Za-z0-9]+$/.test(target)) {
-			const scaffold = writeScaffold({ outDir: target, spec, pack });
+			const scaffold = writeScaffold({ outDir: target, spec, pack, useGeneratedCells: !packExists });
 			log(JSON.stringify({ pack: packScaffold, project: scaffold }, null, 2));
 			log(`${target}/gsd_scaffold_report.json`);
 			return 0;

@@ -42,6 +42,7 @@ Follow AGENTS.md for this repository. Install/verify easyeda-api-skill first. Fo
 ## 关键门禁
 
 - `workflow:smoke`：证明坏 spec、缺库绑定、失败 generate、未完成 scaffold 都会被拦住，并写出 `workflow_smoke_report.json`。
+- 新 pack 的 `init --pack <pack> --out <project-dir>` 会生成按模块拆分的 `cell_manifest.json` cell 模板和 `portLayout`，并让 `project_assembly.json` 引用这些 cell；agent 必须实现这些 deterministic builders，不能绕回自由绘图。
 - `easyeda-gsd plan`：检查 spec 是否被合同、netlist、assembly 和 circuit pack 实现，并写出 `gsd_plan_report.json`。
 - `easyeda-gsd generate`：只有 plan 通过才生成模型，并写出 `gsd_generate_report.json`。
 - `contract:pack`：检查选中的 circuit pack 和生成 hook。

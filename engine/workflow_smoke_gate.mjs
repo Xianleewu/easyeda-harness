@@ -1807,16 +1807,28 @@ export const pack = { id: '${badBuilderPackId}', fallbackAnchors, cellBuilders, 
 		checks.badBuilderDryRunRejected,
 	);
 
-	const customPackReport = writePackScaffold({ root: ROOT, packId: CUSTOM_PACK });
-	const customPackManifest = readJson(`${CUSTOM_PACK_DIR}/cell_manifest.json`);
 	const customSpec = buildMinimalSpec(CUSTOM_PACK);
 	const customDir = `${TMP_DIR}/custom_project`;
-	const customScaffold = writeScaffold({ outDir: customDir, spec: customSpec, pack: CUSTOM_PACK });
+	const customInit = spawnSync(process.execPath, ['bin/easyeda-gsd.mjs', 'init', '--pack', CUSTOM_PACK, '--out', '_tmp_workflow_smoke/custom_project'], {
+		cwd: ROOT,
+		stdio: 'pipe',
+		shell: false,
+		env: { ...process.env, EASYEDA_GSD_LOCK_TOKEN: LOCK.token },
+		encoding: 'utf8',
+	});
+	const customInitJson = (() => {
+		const match = String(customInit.stdout || '').match(/\{[\s\S]*\}\s*(?:\r?\n|$)/);
+		if (!match) return null;
+		try { return JSON.parse(match[0]); } catch { return null; }
+	})();
+	const customPackManifest = readJson(`${CUSTOM_PACK_DIR}/cell_manifest.json`);
+	const customScaffold = existsSync(`${customDir}/gsd_scaffold_report.json`) ? readJson(`${customDir}/gsd_scaffold_report.json`) : null;
+	const customAssembly = readJson(`${customDir}/project_assembly.json`);
 	const customPlan = buildGsdPlan({
 		spec: readJson(`${customDir}/project_spec.json`),
 		contract: readJson(`${customDir}/project_contract.json`),
 		netlist: readJson(`${customDir}/project_netlist.json`),
-		assembly: readJson(`${customDir}/project_assembly.json`),
+		assembly: customAssembly,
 		libraryManifest: readJson(`${customDir}/approved_library_manifest.json`),
 		partLibSnapshot: readJson(`${customDir}/project_library_snapshot.json`),
 		model: null,
@@ -1825,14 +1837,18 @@ export const pack = { id: '${badBuilderPackId}', fallbackAnchors, cellBuilders, 
 		partLibPath: `${customDir}/project_library_snapshot.json`,
 	});
 	checks.customPackScaffold = {
-		packFiles: customPackReport.files,
-		projectScaffoldPass: customScaffold.pass,
+		initStatus: customInit.status,
+		packFiles: customInitJson?.pack?.files || [],
+		projectScaffoldPass: customScaffold?.pass ?? null,
 		planPass: customPlan.pass,
 		rules: (customPlan.findings || []).map(f => f.rule),
 		hasApplyWriterTemplate: existsSync(`${CUSTOM_PACK_DIR}/apply_writer.mjs`),
 		hasApplyRunTemplate: existsSync(`${CUSTOM_PACK_DIR}/apply_run.mjs`),
 		hasGeometryContractTemplate: customPackManifest.cellTemplate?.geometryContract?.checkedBy?.includes('contract:geometry') === true,
 		hasLabelContractTemplate: customPackManifest.cellTemplate?.labelContract?.checkedBy?.includes('contract:labels') === true,
+		cellCount: (customPackManifest.cells || []).length,
+		cellsHavePortLayout: (customPackManifest.cells || []).every(cell => cell.id && (cell.ports || []).length && cell.portLayout && (cell.ports || []).every(port => cell.portLayout[port])),
+		assemblyUsesGeneratedCells: (customAssembly.modules || []).every(mod => mod.cell && mod.registryModule),
 	};
 	const customPlanCli = spawnSync(process.execPath, ['bin/easyeda-gsd.mjs', 'plan', '_tmp_workflow_smoke/custom_project/project_spec.json'], {
 		cwd: ROOT,
@@ -2023,12 +2039,22 @@ export const pack = { id: '${NO_WRITER_PACK}', fallbackAnchors, cellBuilders, no
 		'custom circuit pack scaffold must include geometry and label contract templates so agents implement cells against executable visual-layout rules',
 		checks.customPackScaffold,
 	);
+	assertFinding(
+		findings,
+		checks.customPackScaffold.cellCount === (customSpec.modules || []).length
+			&& checks.customPackScaffold.cellsHavePortLayout
+			&& checks.customPackScaffold.assemblyUsesGeneratedCells,
+		'WS79-pack-scaffold-generates-cell-port-contracts',
+		'new custom pack init must generate per-module cell manifest templates with executable portLayout and make project_assembly.json reference those generated cells',
+		checks.customPackScaffold,
+	);
 	assertFinding(findings, customPlan.pass === false, 'WS12-custom-pack-scaffold-not-ready', 'custom pack scaffold must fail plan until contract, library, and executable cells are implemented', {
 		severity: customPlan.severity,
 		firstFinding: customPlan.findings?.[0] || null,
 	});
-	assertFinding(findings, hasRule(customPlan, 'GP-LC3-approved-parts') && hasRule(customPlan, 'GP8-assembly-executable-module'), 'WS13-custom-pack-fails-explicitly', 'custom pack scaffold must fail with explicit library and executable assembly findings', {
+	assertFinding(findings, hasRule(customPlan, 'GP-LC3-approved-parts') && (customPlanCliReport?.findings || []).some(f => f.rule === 'GP17-assembly-cell-builder'), 'WS13-custom-pack-fails-explicitly', 'custom pack scaffold must fail with explicit library and executable cell-builder findings', {
 		observedRules: checks.customPackScaffold.rules,
+		cliRules: checks.customPackCliPlan.rules,
 	});
 	assertFinding(findings, (customPlanCliReport?.findings || []).some(f => f.rule === 'GP14-pack-implemented'), 'WS17-custom-pack-scaffold-only-rejected', 'custom pack scaffold must be rejected explicitly until pack.mjs is implemented beyond scaffoldOnly on the real CLI path', {
 		observedRules: checks.customPackCliPlan.rules,
