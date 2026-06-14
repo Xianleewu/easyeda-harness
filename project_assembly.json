@@ -36,19 +36,6 @@
         ]
       },
       {
-        "id": "usb-right-data-outputs",
-        "role": "USB-C data handoff labels budgeted at the right-side output interface",
-        "module": "usb",
-        "routeEnd": "from",
-        "side": "right",
-        "x": 835,
-        "tolerance": 4,
-        "nets": [
-          "USB_DN",
-          "USB_DP"
-        ]
-      },
-      {
         "id": "reset-boot-module-outputs",
         "role": "support module output labels attached to the right endpoint of each support net",
         "module": "reset",
@@ -73,8 +60,8 @@
         ]
       },
       {
-        "id": "mcu-left-interface-labels",
-        "role": "ESP32 left-side interface labels aligned on one readable column",
+        "id": "mcu-left-input-labels",
+        "role": "ESP32 left-side input labels aligned on one readable column",
         "module": "mcu",
         "routeEnd": "to",
         "side": "left",
@@ -82,21 +69,18 @@
         "tolerance": 4,
         "nets": [
           "RESET_EN",
-          "EXT_PWR_EN",
-          "RELAY1_EN",
-          "RELAY2_EN",
           "BOOT_IO9",
           "USB_DN",
           "USB_DP"
         ]
       },
       {
-        "id": "mcu-right-output-labels",
-        "role": "ESP32 right-side output interface label budget for downstream control nets",
+        "id": "mcu-left-output-labels",
+        "role": "ESP32 left-side output labels for pins that physically leave from the left side of the MCU symbol",
         "module": "mcu",
         "routeEnd": "from",
-        "side": "right",
-        "x": 1015,
+        "side": "left",
+        "x": 760,
         "tolerance": 4,
         "nets": [
           "EXT_PWR_EN",
@@ -164,13 +148,13 @@
     "interfaceRoutes": [
       { "net": "SYS_5V", "from": "usb", "to": "ldo", "strategy": "visible-continuity", "channel": "input-power-column", "direction": "vertical" },
       { "net": "SYS_3V3", "from": "ldo", "to": "mcu", "strategy": "grouped-net-label", "channel": "power-to-control-rail", "direction": "left-to-right" },
-      { "net": "USB_DP", "from": "usb", "to": "mcu", "strategy": "grouped-net-label", "channel": "usb-data-lane", "direction": "left-to-right" },
-      { "net": "USB_DN", "from": "usb", "to": "mcu", "strategy": "grouped-net-label", "channel": "usb-data-lane", "direction": "left-to-right" },
+      { "net": "USB_DP", "from": "usb", "to": "mcu", "strategy": "grouped-net-label", "channel": "usb-data-lane", "direction": "left-to-right", "fromSide": "left", "toSide": "left" },
+      { "net": "USB_DN", "from": "usb", "to": "mcu", "strategy": "grouped-net-label", "channel": "usb-data-lane", "direction": "left-to-right", "fromSide": "left", "toSide": "left" },
       { "net": "RESET_EN", "from": "reset", "to": "mcu", "strategy": "grouped-net-label", "channel": "control-support-lane", "direction": "left-to-right" },
       { "net": "BOOT_IO9", "from": "boot", "to": "mcu", "strategy": "grouped-net-label", "channel": "control-support-lane", "direction": "left-to-right" },
-      { "net": "EXT_PWR_EN", "from": "mcu", "to": "pmos", "strategy": "grouped-net-label", "channel": "controller-to-switch-lane", "direction": "left-to-right" },
-      { "net": "RELAY1_EN", "from": "mcu", "to": "relay1", "strategy": "grouped-net-label", "channel": "controller-to-output-lane", "direction": "left-to-right" },
-      { "net": "RELAY2_EN", "from": "mcu", "to": "relay2", "strategy": "grouped-net-label", "channel": "controller-to-output-lane", "direction": "left-to-right" }
+      { "net": "EXT_PWR_EN", "from": "mcu", "to": "pmos", "strategy": "grouped-net-label", "channel": "controller-to-switch-lane", "direction": "left-to-right", "fromSide": "left", "toSide": "left" },
+      { "net": "RELAY1_EN", "from": "mcu", "to": "relay1", "strategy": "grouped-net-label", "channel": "controller-to-output-lane", "direction": "left-to-right", "fromSide": "left", "toSide": "left" },
+      { "net": "RELAY2_EN", "from": "mcu", "to": "relay2", "strategy": "grouped-net-label", "channel": "controller-to-output-lane", "direction": "left-to-right", "fromSide": "left", "toSide": "left" }
     ],
     "baseAnchors": {
       "usb": { "x": 640, "y": 1000 },

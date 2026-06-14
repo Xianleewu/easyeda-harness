@@ -140,6 +140,7 @@ function validateStaticInterfaceRoutes(contract, assembly) {
 		'PL27-interface-route-strategy': 'GP32-interface-route-strategy',
 		'PL28-interface-route-channel': 'GP33-interface-route-channel',
 		'PL29-interface-route-direction': 'GP34-interface-route-direction',
+		'PL55-interface-route-label-side': 'GP66-interface-route-label-side',
 	};
 	return validateInterfaceRoutes(contract, assembly, 'gsd-plan').map(f => ({ ...f, rule: ruleMap[f.rule] || f.rule.replace(/^PL/, 'GP') }));
 }

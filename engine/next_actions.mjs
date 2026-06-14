@@ -682,14 +682,26 @@ if (checks.projectModel.status !== 'pass') {
 	});
 }
 if (checks.projectLabelLayout.status !== 'pass') {
-	pushAction(actions, {
-		area: 'project-label-layout',
-		action: 'Make visible signal labels an executable layout contract. Declare layoutPolicy.labelColumns, keep each net label origin on a same-net wire endpoint, use left-bottom/right-bottom align modes, and remove fake text or unbudgeted scattered labels.',
-		evidence: ['project_label_layout_report.json', 'project_assembly.json', 'full_model.json', 'live.json'],
-		observed: checks.projectLabelLayout.firstFinding || checks.projectLabelLayout,
-		editFiles: ['project_assembly.json', 'circuit_packs/<pack>/pack.mjs', 'circuit_packs/<pack>/cell_manifest.json', 'engine/apply_full.mjs'],
-		nextCommand: 'npm.cmd run contract:labels',
-	});
+	const finding = checks.projectLabelLayout.firstFinding || checks.projectLabelLayout;
+	if (ruleMatches(finding, /^LL22/)) {
+		pushAction(actions, {
+			area: 'label-budget-realization',
+			action: 'Make layoutPolicy.labelColumns honest: every declared column/net budget must have an actual visible label attached to a same-net endpoint at the declared side and x. Generate the missing label in the deterministic cell, or remove/move the stale budget from project_assembly.json.',
+			evidence: ['project_label_layout_report.json', 'project_assembly.json', 'full_model.json', 'live.json', 'docs/schematic-design-rules.md'],
+			observed: finding,
+			editFiles: ['project_assembly.json', 'circuit_packs/<pack>/pack.mjs', 'circuit_packs/<pack>/cell_manifest.json'],
+			nextCommand: 'npm.cmd run contract:labels',
+		});
+	} else {
+		pushAction(actions, {
+			area: 'project-label-layout',
+			action: 'Make visible signal labels an executable layout contract. Declare layoutPolicy.labelColumns, keep each net label origin on a same-net wire endpoint, use left-bottom/right-bottom align modes, and remove fake text or unbudgeted scattered labels.',
+			evidence: ['project_label_layout_report.json', 'project_assembly.json', 'full_model.json', 'live.json'],
+			observed: finding,
+			editFiles: ['project_assembly.json', 'circuit_packs/<pack>/pack.mjs', 'circuit_packs/<pack>/cell_manifest.json', 'engine/apply_full.mjs'],
+			nextCommand: 'npm.cmd run contract:labels',
+		});
+	}
 }
 if (checks.projectNetlist.status !== 'pass') {
 	pushAction(actions, {

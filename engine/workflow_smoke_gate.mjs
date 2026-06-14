@@ -639,8 +639,24 @@ try {
 	};
 	assertFinding(findings, checks.geometryRejectsCrossingsAndOverlaps.pass, 'WS70-geometry-rejects-crossings-and-overlaps', 'project geometry audit must reject diagonal wires, crossings, wires through visible objects, and text/label overlaps', checks.geometryRejectsCrossingsAndOverlaps);
 
+	const localLabelAssembly = {
+		modules: [{ id: 'mcu' }],
+		layoutPolicy: {
+			labelColumns: [{
+				id: 'mcu-left-smoke-labels',
+				role: 'local smoke labels',
+				module: 'mcu',
+				routeEnd: 'to',
+				side: 'left',
+				x: 760,
+				tolerance: 4,
+				nets: ['RESET_EN', 'EXT_PWR_EN'],
+			}],
+			minLabelRowPitch: 10,
+		},
+	};
 	const labelAuditGood = validateLabelLayout({
-		assembly,
+		assembly: localLabelAssembly,
 		snap: {
 			wires: [
 				{ net: 'RESET_EN', line: [760, 855, 860, 855] },
@@ -660,7 +676,16 @@ try {
 	assertFinding(findings, checks.labelLayoutAcceptsAnchoredColumn.pass, 'WS66-label-layout-accepts-anchored-column', 'label layout audit must accept correctly budgeted left-bottom labels attached to same-net wire endpoints', checks.labelLayoutAcceptsAnchoredColumn);
 
 	const labelAuditBad = validateLabelLayout({
-		assembly,
+		assembly: {
+			...localLabelAssembly,
+			layoutPolicy: {
+				...localLabelAssembly.layoutPolicy,
+				labelColumns: [{
+					...localLabelAssembly.layoutPolicy.labelColumns[0],
+					nets: ['RESET_EN', 'EXT_PWR_EN', 'BOOT_IO9', 'RELAY1_EN'],
+				}],
+			},
+		},
 		snap: {
 			wires: [
 				{ net: 'RESET_EN', line: [760, 855, 860, 855] },
@@ -677,11 +702,11 @@ try {
 		},
 	});
 	checks.labelLayoutRejectsFloatingAndFakeText = {
-		pass: ['LL7-no-fake-text-net-labels', 'LL9-label-origin-mode', 'LL13-label-attached-endpoint', 'LL14-label-column-match', 'LL21-label-column-row-pitch'].every(rule => labelAuditBad.findings.some(f => f.rule === rule)),
+		pass: ['LL7-no-fake-text-net-labels', 'LL9-label-origin-mode', 'LL13-label-attached-endpoint', 'LL14-label-column-match', 'LL21-label-column-row-pitch', 'LL22-label-column-realized'].every(rule => labelAuditBad.findings.some(f => f.rule === rule)),
 		rules: labelAuditBad.findings.map(f => f.rule),
 		firstFinding: labelAuditBad.findings[0] || null,
 	};
-	assertFinding(findings, checks.labelLayoutRejectsFloatingAndFakeText.pass, 'WS67-label-layout-rejects-floating-origin-and-fake-text', 'label layout audit must reject fake text labels, floating labels, wrong origin modes, off-column labels, and unreadably tight label rows', checks.labelLayoutRejectsFloatingAndFakeText);
+	assertFinding(findings, checks.labelLayoutRejectsFloatingAndFakeText.pass, 'WS67-label-layout-rejects-floating-origin-and-fake-text', 'label layout audit must reject fake text labels, floating labels, wrong origin modes, off-column labels, unrealized column budgets, and unreadably tight label rows', checks.labelLayoutRejectsFloatingAndFakeText);
 
 	const weakLabelColumnAssembly = clone(assembly);
 	weakLabelColumnAssembly.layoutPolicy.labelColumns = (weakLabelColumnAssembly.layoutPolicy.labelColumns || []).map((col, index) => index === 0
@@ -1518,8 +1543,12 @@ try {
 			&& col.nets.length)
 			&& (scaffoldAssembly.layoutPolicy?.interfaceRoutes || [])
 				.filter(route => route.strategy === 'grouped-net-label' && !['GND', 'SYS_3V3', 'SYS_5V', 'VBUS'].includes(route.net))
-				.every(route => (scaffoldAssembly.layoutPolicy?.labelColumns || []).some(col => col.module === route.from && col.routeEnd === 'from' && col.side === 'right' && col.nets.includes(route.net))
-					&& (scaffoldAssembly.layoutPolicy?.labelColumns || []).some(col => col.module === route.to && col.routeEnd === 'to' && col.side === 'left' && col.nets.includes(route.net))),
+				.every(route => {
+					const fromSide = route.fromSide || 'right';
+					const toSide = route.toSide || 'left';
+					return (scaffoldAssembly.layoutPolicy?.labelColumns || []).some(col => col.module === route.from && col.routeEnd === 'from' && col.side === fromSide && col.nets.includes(route.net))
+						&& (scaffoldAssembly.layoutPolicy?.labelColumns || []).some(col => col.module === route.to && col.routeEnd === 'to' && col.side === toSide && col.nets.includes(route.net));
+				}),
 		'WS71-scaffold-label-columns',
 		'new project scaffolds with grouped interfaces must include module-side layoutPolicy.labelColumns so agents do not invent floating labels',
 		checks.scaffold,

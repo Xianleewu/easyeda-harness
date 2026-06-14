@@ -21,7 +21,7 @@ This file is the executable drawing rulebook for EasyEDA Harness. Agents must tr
 | DR12 | Right-side fanout labels must use EasyEDA `alignMode=8`, with the exported origin at the right-bottom text bbox corner. | `layoutPolicy.labelColumns.side=right` and label attrs | `contract:labels` / `contract:labels:live` rules `LL9-label-origin-mode`, `LL11-label-origin-corner` |
 | DR13 | Same-side labels for a module or interface group must share the declared label-column `x` within tolerance. | `layoutPolicy.labelColumns[].x` and `tolerance` | `contract:labels` / `contract:labels:live` rule `LL14-label-column-match` |
 | DR14 | Every label column must declare `module` and `routeEnd`, so visible labels are explained as a module-side interface, not a free-floating sheet decoration. | `layoutPolicy.labelColumns[].module` and `routeEnd` | `contract:labels` / `contract:labels:live` rules `LL18-label-column-module`, `LL19-label-column-route-end` |
-| DR15 | A net may not display more visible labels than its declared label-column budget. Internal nets without budget must stay hidden. | `layoutPolicy.labelColumns[].nets` | `contract:labels` / `contract:labels:live` budget checks |
+| DR15 | A net may not display more visible labels than its declared label-column budget, and every declared column/net budget must be realized by an actual visible label on a same-net endpoint. Internal nets without budget must stay hidden. | `layoutPolicy.labelColumns[].nets` | `contract:labels` / `contract:labels:live` rules `LL15-label-endpoint-budget`, `LL16-unbudgeted-visible-label`, `LL22-label-column-realized` |
 | DR16 | Labels in one declared column must keep readable row pitch; visually merged label stacks are forbidden. | `layoutPolicy.minLabelRowPitch` or default gate budget | `contract:labels` / `contract:labels:live` rule `LL21-label-column-row-pitch` |
 | DR17 | Single-sheet schematics must not use unnecessary NET PORT symbols. | `project_contract.json.qualityPolicy` and generated/live netflag objects | `contract` rule `PC25-no-net-port-default`; `contract:labels` / `contract:labels:live` rule `LL17-no-unnecessary-net-ports` |
 | DR18 | Final handoff must prove EasyEDA DRC `0 error / 0 warning / 0 info`. | live EasyEDA project | `live-check`, `accept:live`, `deliver` |
@@ -47,13 +47,14 @@ EasyEDA label placement is geometry-sensitive. The harness uses these hard rules
 - Left-side fanout labels: `side=left`, `alignMode=6`, origin equals the left-bottom bbox corner, and the origin coincides with the same-net wire endpoint.
 - Right-side fanout labels: `side=right`, `alignMode=8`, origin equals the right-bottom bbox corner, and the origin coincides with the same-net wire endpoint.
 - Every visible label must match one declared `layoutPolicy.labelColumns` entry by net, side, x tolerance, module, and routeEnd.
+- Every declared column/net budget must have a matching visible label in the generated model and live snapshot; otherwise the contract is lying about the readable interface.
 - Columns without `module` and `routeEnd` are invalid because they do not explain the interface side that owns the label.
 - Labels in one column must keep readable row pitch; if they visually merge, the fix is to move the deterministic fanout rows or split the interface column, not to add floating labels.
 - The label's visible bbox must not overlap wires from other nets, component bodies, GND flags, NC markers, or other visible labels.
 - Labels that appear in `live.json` but are not explained by `layoutPolicy.labelColumns` are hard failures.
 - Ordinary text such as `PrimitiveText("USB_DP")` is not a net label and must fail the label gate.
 - EasyEDA NET PORT symbols are forbidden on single-sheet schematics unless the project contract explicitly opts out of `singleSheetNoNetPortsByDefault`; use wire `Name` attributes or generated signal netflags attached to wire endpoints instead.
-- For grouped cross-module interfaces, the source module column should declare `module=<from>`, `routeEnd=from`, and a readable output side; the target module column should declare `module=<to>`, `routeEnd=to`, and a readable input side.
+- For grouped cross-module interfaces, the source module column declares `module=<from>` and `routeEnd=from`; the target module column declares `module=<to>` and `routeEnd=to`. If the physical symbol pins make the readable label side different from the default source-right/target-left convention, declare `fromSide` and `toSide` on the `layoutPolicy.interfaceRoutes` entry and make the columns match those sides.
 
 This rule exists because checking only the intended `alignMode` is not enough. The gate must audit actual EasyEDA exported geometry: netflag or wire `Name`, `textX`, `textY`, `alignMode`, bbox, and same-net wire endpoint.
 

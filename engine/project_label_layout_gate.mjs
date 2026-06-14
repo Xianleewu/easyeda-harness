@@ -235,6 +235,8 @@ export function validateLabelLayout({ assembly, contract = null, snap, modelForT
 	const modules = new Set(asArray(assembly?.modules).map(mod => mod.id).filter(Boolean));
 	const labelBudget = new Map();
 	const labelColumnNetKeys = new Set();
+	const columnNetExpectations = new Map();
+	const matchedColumnNetKeys = new Set();
 	const matchedLabels = [];
 	const minLabelRowPitch = Number(policy.minLabelRowPitch ?? quality.ruleProfile?.minLabelRowPitch ?? DEFAULT_LABEL_ROW_PITCH);
 
@@ -258,8 +260,9 @@ export function validateLabelLayout({ assembly, contract = null, snap, modelForT
 			hard(findings, 'LL19-label-column-route-end', 'each label column must declare routeEnd as from, to, or local so the reading-flow interface end is explicit', { index, column: col });
 		}
 		for (const net of asArray(col.nets)) {
-			labelBudget.set(String(net), (labelBudget.get(String(net)) || 0) + 1);
-			const key = `${col.module || ''}:${col.routeEnd || ''}:${col.side || ''}:${col.x ?? ''}:${net}`;
+			const netName = String(net);
+			labelBudget.set(netName, (labelBudget.get(netName) || 0) + 1);
+			const key = `${col.module || ''}:${col.routeEnd || ''}:${col.side || ''}:${col.x ?? ''}:${netName}`;
 			if (labelColumnNetKeys.has(key)) {
 				hard(findings, 'LL20-label-column-budget-unique', 'a module-side label column must not duplicate the same net budget at the same module, routeEnd, side, and x', {
 					index,
@@ -268,6 +271,15 @@ export function validateLabelLayout({ assembly, contract = null, snap, modelForT
 				});
 			}
 			labelColumnNetKeys.add(key);
+			columnNetExpectations.set(key, {
+				columnId: col.id || `label_column_${index + 1}`,
+				module: col.module || null,
+				routeEnd: col.routeEnd || null,
+				side: col.side || null,
+				x: col.x ?? null,
+				tolerance: col.tolerance ?? DEFAULT_COLUMN_TOL,
+				net: netName,
+			});
 		}
 	}
 
@@ -341,7 +353,11 @@ export function validateLabelLayout({ assembly, contract = null, snap, modelForT
 			});
 		}
 		const matchedColumns = columns.filter(col => columnMatches(label, col));
-		if (matchedColumns.length) matchedLabels.push({ label, column: matchedColumns[0] });
+		if (matchedColumns.length) {
+			const column = matchedColumns[0];
+			matchedLabels.push({ label, column });
+			matchedColumnNetKeys.add(`${column.module || ''}:${column.routeEnd || ''}:${column.side || ''}:${column.rawX ?? ''}:${label.net}`);
+		}
 		if (columns.length && !matchedColumns.length) {
 			hard(findings, 'LL14-label-column-match', 'signal label must fit one declared layoutPolicy.labelColumns entry for its net, side, and x', {
 				net: label.net,
@@ -351,6 +367,18 @@ export function validateLabelLayout({ assembly, contract = null, snap, modelForT
 				source: label.source,
 				transform: liveMode ? transform : undefined,
 				allowedColumns: columns.filter(col => col.nets.has(label.net)).map(col => ({ id: col.id, side: col.side, x: col.x, rawX: col.rawX, tolerance: col.tolerance })),
+			});
+		}
+	}
+
+	for (const [key, expected] of columnNetExpectations) {
+		if (!matchedColumnNetKeys.has(key)) {
+			hard(findings, 'LL22-label-column-realized', 'each declared label column net budget must be realized by an actual visible signal label attached to a same-net endpoint', {
+				key,
+				expected,
+				matchingLabels: labels
+					.filter(label => label.net === expected.net)
+					.map(label => ({ net: label.net, x: label.x, y: label.y, side: labelSide(label), source: label.source, alignMode: label.alignMode, bbox: label.bbox || null })),
 			});
 		}
 	}

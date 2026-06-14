@@ -139,6 +139,11 @@ export function validateInterfaceRoutes(contract, assembly, category = 'project-
 		if (!validStrategies.has(route?.strategy)) hard(findings, 'PL27-interface-route-strategy', 'interface route strategy must be visible-continuity or grouped-net-label', { index, route, validStrategies: [...validStrategies] }, category);
 		if (!route?.channel || typeof route.channel !== 'string') hard(findings, 'PL28-interface-route-channel', 'interface route must name a readable channel or lane', { index, route }, category);
 		if (!validDirections.has(route?.direction)) hard(findings, 'PL29-interface-route-direction', 'interface route direction must declare left-to-right, right-to-left, vertical, or local', { index, route, validDirections: [...validDirections] }, category);
+		for (const key of ['fromSide', 'toSide']) {
+			if (route?.[key] != null && !['left', 'right'].includes(route[key])) {
+				hard(findings, 'PL55-interface-route-label-side', 'interface route fromSide/toSide must be left or right when declared', { index, route, key }, category);
+			}
+		}
 	}
 	for (const iface of asArray(contract?.interfaces)) {
 		if (!routeByKey.has(interfaceKey(iface))) hard(findings, 'PL23-interface-route-covered', 'every contract interface must have a layoutPolicy.interfaceRoutes entry before generation', { interface: iface });
@@ -153,12 +158,19 @@ function signalRoute(route, powerNets = DEFAULT_SIGNAL_POWER_NETS) {
 	return route?.strategy === 'grouped-net-label' && net && !powerNets.has(net) && !net.startsWith('NC_');
 }
 
-function labelColumnCovers(columns, route, side, moduleId) {
+function routeEndSide(route, routeEnd) {
+	const key = routeEnd === 'from' ? 'fromSide' : 'toSide';
+	const side = route?.[key];
+	if (side === 'left' || side === 'right') return side;
+	return routeEnd === 'from' ? 'right' : 'left';
+}
+
+function labelColumnCovers(columns, route, routeEnd, moduleId, side = routeEndSide(route, routeEnd)) {
 	return asArray(columns).some(col => {
 		if (col.side !== side) return false;
 		if (!asArray(col.nets).includes(route.net)) return false;
 		if (col.module && col.module !== moduleId) return false;
-		if (col.routeEnd && col.routeEnd !== (side === 'right' ? 'from' : 'to')) return false;
+		if (col.routeEnd && col.routeEnd !== routeEnd) return false;
 		return true;
 	});
 }
@@ -213,19 +225,21 @@ export function validateGroupedRouteLabelColumns(contract, assembly, category = 
 		}, category);
 	}
 	for (const route of groupedRoutes) {
-		const fromCovered = labelColumnCovers(columns, route, 'right', route.from);
-		const toCovered = labelColumnCovers(columns, route, 'left', route.to);
+		const fromSide = routeEndSide(route, 'from');
+		const toSide = routeEndSide(route, 'to');
+		const fromCovered = labelColumnCovers(columns, route, 'from', route.from, fromSide);
+		const toCovered = labelColumnCovers(columns, route, 'to', route.to, toSide);
 		if (!fromCovered) {
-			hard(findings, 'PL31-label-column-covers-route-from', 'each grouped-net-label route needs a right-side output label column for its source module', {
+			hard(findings, 'PL31-label-column-covers-route-from', 'each grouped-net-label route needs a source module-side label column matching route.fromSide', {
 				route,
-				expected: { side: 'right', module: route.from, net: route.net, routeEnd: 'from' },
+				expected: { side: fromSide, module: route.from, net: route.net, routeEnd: 'from' },
 				candidateColumns: columns.filter(col => asArray(col.nets).includes(route.net)).map(col => ({ id: col.id || null, side: col.side || null, module: col.module || null, routeEnd: col.routeEnd || null, x: col.x ?? null })),
 			}, category);
 		}
 		if (!toCovered) {
-			hard(findings, 'PL32-label-column-covers-route-to', 'each grouped-net-label route needs a left-side input label column for its target module', {
+			hard(findings, 'PL32-label-column-covers-route-to', 'each grouped-net-label route needs a target module-side label column matching route.toSide', {
 				route,
-				expected: { side: 'left', module: route.to, net: route.net, routeEnd: 'to' },
+				expected: { side: toSide, module: route.to, net: route.net, routeEnd: 'to' },
 				candidateColumns: columns.filter(col => asArray(col.nets).includes(route.net)).map(col => ({ id: col.id || null, side: col.side || null, module: col.module || null, routeEnd: col.routeEnd || null, x: col.x ?? null })),
 			}, category);
 		}
@@ -233,7 +247,7 @@ export function validateGroupedRouteLabelColumns(contract, assembly, category = 
 	for (const iface of asArray(contract?.interfaces)) {
 		const route = groupedRoutes.find(r => r.net === iface.net && r.from === iface.from && r.to === iface.to);
 		if (!route) continue;
-		if (!labelColumnCovers(columns, route, 'right', iface.from) || !labelColumnCovers(columns, route, 'left', iface.to)) {
+		if (!labelColumnCovers(columns, route, 'from', iface.from) || !labelColumnCovers(columns, route, 'to', iface.to)) {
 			hard(findings, 'PL33-label-column-covers-interface', 'each grouped-net-label contract interface must have source and target label-column coverage', {
 				interface: iface,
 			}, category);

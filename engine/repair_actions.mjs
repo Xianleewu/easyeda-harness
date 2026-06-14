@@ -285,6 +285,13 @@ const RULE_PLANS = [
 		nextCommand: 'node bin/easyeda-gsd.mjs plan project_spec.json',
 		repairHint: 'Declare module-side layoutPolicy.labelColumns for every visible signal label and grouped-net-label interface: each column needs module, routeEnd, side, x, tolerance, and nets; duplicate module-side net budgets are forbidden.',
 	}],
+	[/^LL22/, {
+		area: 'label-budget-realization',
+		editFiles: ['project_assembly.json', 'circuit_packs/<pack>/pack.mjs', 'circuit_packs/<pack>/cell_manifest.json'],
+		inspectFiles: ['project_label_layout_report.json', 'project_assembly.json', 'full_model.json', 'live.json', 'docs/schematic-design-rules.md'],
+		nextCommand: 'npm.cmd run contract:labels',
+		repairHint: 'Use the LL22 expected column/net in project_label_layout_report.json. If the readable interface is required, generate a real same-net endpoint label in the deterministic cell at the declared side/x/module/routeEnd; if it is not required, remove or move the stale layoutPolicy.labelColumns budget instead of leaving a lying contract.',
+	}],
 	[/^PL/, {
 		area: 'project-layout',
 		editFiles: ['project_assembly.json', 'engine/layout_planner.mjs', 'contracts/layout_contract.mjs'],
