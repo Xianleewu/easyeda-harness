@@ -372,6 +372,15 @@ if (checks.gsdPlan.status !== 'pass') {
 			editFiles: ['circuit_packs/<pack>/cell_manifest.json', 'circuit_packs/<pack>/pack.mjs', 'project_assembly.json'],
 			nextCommand: 'node bin/easyeda-gsd.mjs plan project_spec.json',
 		});
+	} else if (ruleMatches(finding, /^GP2[7-9]|^GP3[0-4]/)) {
+		pushAction(actions, {
+			area: 'interface-routing-contract',
+			action: 'Declare layoutPolicy.interfaceRoutes before generation. Every project_contract interface needs net/from/to, strategy visible-continuity or grouped-net-label, a readable channel, and direction.',
+			evidence: ['gsd_plan_report.json', 'project_contract.json', 'project_assembly.json'],
+			observed: finding,
+			editFiles: ['project_assembly.json', 'project_contract.json'],
+			nextCommand: 'node bin/easyeda-gsd.mjs plan project_spec.json',
+		});
 	} else if (ruleMatches(finding, /^CB/)) {
 		pushAction(actions, {
 			area: 'cell-builder-output',
@@ -409,6 +418,17 @@ if (checks.gsdPlan.status !== 'pass') {
 			evidence: ['gsd_plan_report.json', 'cell_manifest_report.json', 'circuit_packs/<pack>/cell_manifest.json', 'circuit_packs/<pack>/pack.mjs'],
 			observed: portLayoutFinding,
 			editFiles: ['circuit_packs/<pack>/cell_manifest.json', 'circuit_packs/<pack>/pack.mjs', 'project_assembly.json'],
+			nextCommand: 'node bin/easyeda-gsd.mjs plan project_spec.json',
+		});
+	}
+	const routeFinding = planFindings.find(f => ruleMatches(f, /^GP2[7-9]|^GP3[0-4]/));
+	if (routeFinding && !hasActionArea(actions, 'interface-routing-contract')) {
+		pushAction(actions, {
+			area: 'interface-routing-contract',
+			action: 'Declare layoutPolicy.interfaceRoutes before generation. Every project_contract interface needs net/from/to, strategy visible-continuity or grouped-net-label, a readable channel, and direction.',
+			evidence: ['gsd_plan_report.json', 'project_contract.json', 'project_assembly.json'],
+			observed: routeFinding,
+			editFiles: ['project_assembly.json', 'project_contract.json'],
 			nextCommand: 'node bin/easyeda-gsd.mjs plan project_spec.json',
 		});
 	}
@@ -498,12 +518,24 @@ if (checks.projectAssembly.status !== 'pass') {
 	});
 }
 if (checks.projectLayout.status !== 'pass') {
-	pushAction(actions, {
-		area: 'project-layout',
-		action: 'Make project_assembly.json layoutPolicy drive layout_planner.mjs and satisfy module spacing, no interlock, and no unrelated wire intrusion requirements.',
-		evidence: ['project_assembly.json', 'engine/layout_planner.mjs', 'layout_planner_report.json', 'layout_planner_structure.json', 'project_layout_report.json'],
-		observed: checks.projectLayout.firstFinding || checks.projectLayout,
-	});
+	const finding = checks.projectLayout.firstFinding;
+	if (ruleMatches(finding, /^PL2[2-9]/)) {
+		pushAction(actions, {
+			area: 'interface-routing-contract',
+			action: 'Fix layoutPolicy.interfaceRoutes so every contract interface has net/from/to, strategy, readable channel, and direction before layout acceptance.',
+			evidence: ['project_layout_report.json', 'project_contract.json', 'project_assembly.json'],
+			observed: finding,
+			editFiles: ['project_assembly.json', 'project_contract.json'],
+			nextCommand: 'npm.cmd run pipeline && npm.cmd run contract:layout',
+		});
+	} else {
+		pushAction(actions, {
+			area: 'project-layout',
+			action: 'Make project_assembly.json layoutPolicy drive layout_planner.mjs and satisfy module spacing, no interlock, and no unrelated wire intrusion requirements.',
+			evidence: ['project_assembly.json', 'engine/layout_planner.mjs', 'layout_planner_report.json', 'layout_planner_structure.json', 'project_layout_report.json'],
+			observed: finding || checks.projectLayout,
+		});
+	}
 }
 if (checks.template.status !== 'pass') {
 	pushAction(actions, {

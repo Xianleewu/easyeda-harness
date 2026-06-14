@@ -71,6 +71,35 @@ export function measureColumnAnchorGaps(assembly) {
 	return { columns: measured, pairs };
 }
 
+export function interfaceKey(iface) {
+	return `${iface?.net || ''}:${iface?.from || ''}:${iface?.to || ''}`;
+}
+
+export function validateInterfaceRoutes(contract, assembly, category = 'project-layout') {
+	const findings = [];
+	const policy = assembly?.layoutPolicy || {};
+	const modules = new Set(asArray(assembly?.modules).map(mod => mod.id).filter(Boolean));
+	const routes = asArray(policy.interfaceRoutes);
+	const routeByKey = new Map();
+	const validStrategies = new Set(['visible-continuity', 'grouped-net-label']);
+	const validDirections = new Set(['left-to-right', 'right-to-left', 'vertical', 'local']);
+	for (const [index, route] of routes.entries()) {
+		const key = interfaceKey(route);
+		if (routeByKey.has(key)) hard(findings, 'PL24-interface-route-unique', 'layoutPolicy.interfaceRoutes must not duplicate a contract interface route', { route, firstIndex: routeByKey.get(key), duplicateIndex: index }, category);
+		else routeByKey.set(key, index);
+		if (!route?.net || !route?.from || !route?.to) hard(findings, 'PL25-interface-route-key', 'interface route needs net/from/to', { index, route }, category);
+		if (route?.from && !modules.has(route.from)) hard(findings, 'PL26-interface-route-module-known', 'interface route from module must exist in project_assembly.json', { index, route }, category);
+		if (route?.to && !modules.has(route.to)) hard(findings, 'PL26-interface-route-module-known', 'interface route to module must exist in project_assembly.json', { index, route }, category);
+		if (!validStrategies.has(route?.strategy)) hard(findings, 'PL27-interface-route-strategy', 'interface route strategy must be visible-continuity or grouped-net-label', { index, route, validStrategies: [...validStrategies] }, category);
+		if (!route?.channel || typeof route.channel !== 'string') hard(findings, 'PL28-interface-route-channel', 'interface route must name a readable channel or lane', { index, route }, category);
+		if (!validDirections.has(route?.direction)) hard(findings, 'PL29-interface-route-direction', 'interface route direction must declare left-to-right, right-to-left, vertical, or local', { index, route, validDirections: [...validDirections] }, category);
+	}
+	for (const iface of asArray(contract?.interfaces)) {
+		if (!routeByKey.has(interfaceKey(iface))) hard(findings, 'PL23-interface-route-covered', 'every contract interface must have a layoutPolicy.interfaceRoutes entry before generation', { interface: iface });
+	}
+	return findings;
+}
+
 export function validateLayoutContract(assembly, layout, structure, options = {}) {
 	const category = options.category || 'project-layout';
 	const findings = [];
@@ -82,6 +111,10 @@ export function validateLayoutContract(assembly, layout, structure, options = {}
 	if (!policy.candidateSource) hard(findings, 'PL1-candidate-source-declared', 'layoutPolicy.candidateSource must be declared', {}, category);
 	if (!policy.flow || typeof policy.flow !== 'string') hard(findings, 'PL14-flow-declared', 'layoutPolicy.flow must declare the intended schematic reading flow', {}, category);
 	if (!asArray(policy.columns).length) hard(findings, 'PL15-columns-declared', 'layoutPolicy.columns must declare ordered module columns before layout search', {}, category);
+	if (!asArray(policy.interfaceRoutes).length && asArray(options.contract?.interfaces).length) {
+		hard(findings, 'PL22-interface-routes-declared', 'layoutPolicy.interfaceRoutes must declare cross-module routing intent before layout search', {}, category);
+	}
+	findings.push(...validateInterfaceRoutes(options.contract, assembly, category));
 	if (layout.candidateSource !== policy.candidateSource) {
 		hard(findings, 'PL2-planner-uses-assembly-policy', 'layout planner report must prove candidates came from project_assembly.json layoutPolicy', {
 			expected: policy.candidateSource,

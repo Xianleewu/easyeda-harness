@@ -245,6 +245,13 @@ const RULE_PLANS = [
 		nextCommand: 'npm.cmd run contract:assembly',
 		repairHint: 'Map every contract module to a deterministic cell, anchor, ref roles, netArgs, and declared nets.',
 	}],
+	[/^GP2[7-9]|^GP3[0-4]|^PL2[2-9]/, {
+		area: 'interface-routing-contract',
+		editFiles: ['project_assembly.json', 'project_contract.json'],
+		inspectFiles: ['gsd_plan_report.json', 'project_layout_report.json', 'project_assembly.json'],
+		nextCommand: 'node bin/easyeda-gsd.mjs plan project_spec.json',
+		repairHint: 'Declare layoutPolicy.interfaceRoutes for every project_contract interface: net/from/to, strategy visible-continuity or grouped-net-label, readable channel, and direction before generation or layout acceptance.',
+	}],
 	[/^PL/, {
 		area: 'project-layout',
 		editFiles: ['project_assembly.json', 'engine/layout_planner.mjs', 'contracts/layout_contract.mjs'],

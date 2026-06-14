@@ -31,6 +31,17 @@
     "minColumnGap": 120,
     "maxModuleWireIntrusions": 0,
     "requireNoLaneInterlocks": true,
+    "interfaceRoutes": [
+      { "net": "SYS_5V", "from": "usb", "to": "ldo", "strategy": "visible-continuity", "channel": "input-power-column", "direction": "vertical" },
+      { "net": "SYS_3V3", "from": "ldo", "to": "mcu", "strategy": "grouped-net-label", "channel": "power-to-control-rail", "direction": "left-to-right" },
+      { "net": "USB_DP", "from": "usb", "to": "mcu", "strategy": "grouped-net-label", "channel": "usb-data-lane", "direction": "left-to-right" },
+      { "net": "USB_DN", "from": "usb", "to": "mcu", "strategy": "grouped-net-label", "channel": "usb-data-lane", "direction": "left-to-right" },
+      { "net": "RESET_EN", "from": "reset", "to": "mcu", "strategy": "grouped-net-label", "channel": "control-support-lane", "direction": "left-to-right" },
+      { "net": "BOOT_IO9", "from": "boot", "to": "mcu", "strategy": "grouped-net-label", "channel": "control-support-lane", "direction": "left-to-right" },
+      { "net": "EXT_PWR_EN", "from": "mcu", "to": "pmos", "strategy": "grouped-net-label", "channel": "controller-to-switch-lane", "direction": "left-to-right" },
+      { "net": "RELAY1_EN", "from": "mcu", "to": "relay1", "strategy": "grouped-net-label", "channel": "controller-to-output-lane", "direction": "left-to-right" },
+      { "net": "RELAY2_EN", "from": "mcu", "to": "relay2", "strategy": "grouped-net-label", "channel": "controller-to-output-lane", "direction": "left-to-right" }
+    ],
     "baseAnchors": {
       "usb": { "x": 640, "y": 1000 },
       "ldo": { "x": 440, "y": 820 },

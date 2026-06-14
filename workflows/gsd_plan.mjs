@@ -5,7 +5,7 @@ import { validateNetContract } from '../contracts/net_contract.mjs';
 import { validateLibraryContract } from '../contracts/library_contract.mjs';
 import { validateDrawingRuleBindings } from '../contracts/drawing_rule_registry.mjs';
 import { validateCellBuilderDryRun } from '../contracts/cell_builder_contract.mjs';
-import { measureColumnAnchorGaps } from '../contracts/layout_contract.mjs';
+import { interfaceKey, measureColumnAnchorGaps, validateInterfaceRoutes } from '../contracts/layout_contract.mjs';
 import { asArray as cellArray, cellContractMap, loadCellManifest, resolveCellManifestPath } from '../engine/cell_manifest.mjs';
 import { withLocalPins } from '../engine/transform.mjs';
 import { HARNESS_RULES } from '../harness/rule_registry.mjs';
@@ -113,6 +113,19 @@ function validateStaticLayoutPolicy(assembly) {
 	return findings;
 }
 
+function validateStaticInterfaceRoutes(contract, assembly) {
+	const ruleMap = {
+		'PL23-interface-route-covered': 'GP28-interface-route-covered',
+		'PL24-interface-route-unique': 'GP29-interface-route-unique',
+		'PL25-interface-route-key': 'GP30-interface-route-key',
+		'PL26-interface-route-module-known': 'GP31-interface-route-module-known',
+		'PL27-interface-route-strategy': 'GP32-interface-route-strategy',
+		'PL28-interface-route-channel': 'GP33-interface-route-channel',
+		'PL29-interface-route-direction': 'GP34-interface-route-direction',
+	};
+	return validateInterfaceRoutes(contract, assembly, 'gsd-plan').map(f => ({ ...f, rule: ruleMap[f.rule] || f.rule.replace(/^PL/, 'GP') }));
+}
+
 function validateSpecRealization(spec, contract, netlist, assembly, model = null) {
 	const findings = [];
 	const specModules = moduleById(spec);
@@ -187,6 +200,12 @@ function validateSpecRealization(spec, contract, netlist, assembly, model = null
 		});
 	}
 	findings.push(...validateStaticLayoutPolicy(assembly));
+	if (asArray(contract?.interfaces).length && !asArray(policy.interfaceRoutes).length) {
+		hard(findings, 'GP27-interface-routes-declared', 'project_assembly.json layoutPolicy.interfaceRoutes must declare cross-module routing intent before generation', {
+			interfaces: asArray(contract.interfaces).map(interfaceKey),
+		});
+	}
+	findings.push(...validateStaticInterfaceRoutes(contract, assembly));
 
 	if (model) {
 		const netResult = validateNetContract(contract, netlist, model);

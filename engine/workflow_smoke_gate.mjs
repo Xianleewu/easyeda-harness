@@ -314,12 +314,54 @@ try {
 			stats: { moduleWireIntrusions: 0 },
 			moduleWireIntrusions: [],
 		},
+		{ contract },
 	);
 	checks.layoutContractRejectsNarrowColumns = {
 		pass: narrowLayoutFindings.some(f => f.rule === 'PL21-column-gap'),
 		rules: narrowLayoutFindings.map(f => f.rule),
 	};
 	assertFinding(findings, checks.layoutContractRejectsNarrowColumns.pass, 'WS56-layout-contract-rejects-narrow-columns', 'project layout contract must reject final layouts whose adjacent columns are too close even if structure metrics otherwise pass', checks.layoutContractRejectsNarrowColumns);
+
+	const missingInterfaceRoutesAssembly = clone(assembly);
+	delete missingInterfaceRoutesAssembly.layoutPolicy.interfaceRoutes;
+	const missingInterfaceRoutesPlan = buildPlanForFiles({
+		spec,
+		contract,
+		netlist,
+		assembly: missingInterfaceRoutesAssembly,
+		libraryManifest,
+		specPath: '_tmp_workflow_smoke/missing_interface_routes_project_spec.json',
+	});
+	checks.interfaceRoutesRequired = {
+		pass: !missingInterfaceRoutesPlan.pass && hasRule(missingInterfaceRoutesPlan, 'GP27-interface-routes-declared'),
+		rules: (missingInterfaceRoutesPlan.findings || []).map(f => f.rule),
+		firstFinding: missingInterfaceRoutesPlan.findings?.find(f => f.rule === 'GP27-interface-routes-declared') || null,
+	};
+	assertFinding(findings, checks.interfaceRoutesRequired.pass, 'WS59-interface-routes-required-before-generation', 'GSD plan must reject projects whose contract interfaces have no layoutPolicy.interfaceRoutes before generation', checks.interfaceRoutesRequired);
+
+	const missingRouteLayoutFindings = validateLayoutContract(
+		missingInterfaceRoutesAssembly,
+		{
+			candidateSource: missingInterfaceRoutesAssembly.layoutPolicy.candidateSource,
+			totalCandidates: 20,
+			availableCandidates: 20,
+			policyStats: { baseAnchors: Object.keys(missingInterfaceRoutesAssembly.layoutPolicy.baseAnchors || {}).length, anchorVariants: 1 },
+			best: { pass: true, score: 1 },
+		},
+		{
+			pass: true,
+			minModuleGap: 200,
+			laneInterlocks: [],
+			stats: { moduleWireIntrusions: 0 },
+			moduleWireIntrusions: [],
+		},
+		{ contract },
+	);
+	checks.layoutContractRejectsMissingInterfaceRoutes = {
+		pass: missingRouteLayoutFindings.some(f => f.rule === 'PL22-interface-routes-declared' || f.rule === 'PL23-interface-route-covered'),
+		rules: missingRouteLayoutFindings.map(f => f.rule),
+	};
+	assertFinding(findings, checks.layoutContractRejectsMissingInterfaceRoutes.pass, 'WS60-layout-contract-rejects-missing-interface-routes', 'project layout contract must reject final layouts whose contract interfaces lack explicit route intent', checks.layoutContractRejectsMissingInterfaceRoutes);
 
 	const duplicateRefAssembly = clone(assembly);
 	if (duplicateRefAssembly.modules?.[0] && duplicateRefAssembly.modules?.[1]) {

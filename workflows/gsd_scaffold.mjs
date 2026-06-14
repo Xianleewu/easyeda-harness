@@ -105,6 +105,14 @@ export function buildScaffold(spec, { pack = 'aihwdebugger' } = {}) {
 			dy: variant.dy + (variant.stagger && index % 2 ? variant.stagger : 0),
 		}])),
 	}));
+	const interfaceRoutes = asArray(contract.interfaces).map(iface => ({
+		net: iface.net,
+		from: iface.from,
+		to: iface.to,
+		strategy: iface.strategy || 'grouped-net-label',
+		channel: `${iface.from || 'source'}-to-${iface.to || 'target'}`,
+		direction: 'left-to-right',
+	}));
 	const assembly = {
 		schemaVersion: 1,
 		projectId: contract.projectId,
@@ -128,6 +136,7 @@ export function buildScaffold(spec, { pack = 'aihwdebugger' } = {}) {
 			minColumnGap: 120,
 			maxModuleWireIntrusions: 0,
 			requireNoLaneInterlocks: true,
+			interfaceRoutes,
 			baseAnchors: anchors,
 			anchorVariants,
 			inputRows: [{ y: 600 }],
