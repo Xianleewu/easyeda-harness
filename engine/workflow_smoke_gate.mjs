@@ -664,6 +664,7 @@ try {
 		report: { ...passReport(finalLiveSpec.projectId), coverage: { layoutPlanner: true } },
 		acceptance_report: {
 			...passReport(finalLiveSpec.projectId),
+			mode: 'local-only',
 			context: {
 				specAbs: `${finalLiveEvidenceDir}/project_spec.json`,
 				contractPath: `${finalLiveEvidenceDir}/project_contract.json`,
@@ -708,6 +709,86 @@ try {
 		'WS45-final-evidence-requires-live-contract-evidence',
 		'final live evidence must reject live_shots_report.json when it passes but omits a visual evidence region required by the active project contract',
 		checks.finalEvidenceRequiresLiveContractEvidence,
+	);
+
+	const deliveryLocalOnly = spawnSync(process.execPath, [`${ROOT}/engine/delivery_gate.mjs`, 'project_spec.json'], {
+		cwd: finalLiveEvidenceDir,
+		stdio: 'pipe',
+		shell: false,
+		env: {
+			...process.env,
+			EASYEDA_DELIVERY_REPORT: `${finalLiveEvidenceDir}/delivery_local_only_report.json`,
+			EASYEDA_DELIVERY_MAX_AGE_MS: '0',
+			EASYEDA_DELIVERY_SKIP_ACTIONS: '1',
+		},
+		encoding: 'utf8',
+	});
+	const deliveryLocalOnlyReport = existsSync(`${finalLiveEvidenceDir}/delivery_local_only_report.json`) ? readJson(`${finalLiveEvidenceDir}/delivery_local_only_report.json`) : null;
+	checks.deliveryRejectsLocalOnlyEvidence = {
+		status: deliveryLocalOnly.status,
+		pass: deliveryLocalOnlyReport?.pass ?? null,
+		rules: (deliveryLocalOnlyReport?.findings || []).map(f => f.rule),
+		firstFinding: deliveryLocalOnlyReport?.findings?.[0] || null,
+	};
+	assertFinding(
+		findings,
+		deliveryLocalOnly.status !== 0 && hasRule(deliveryLocalOnlyReport, 'DL7-live-acceptance-required'),
+		'WS63-delivery-rejects-local-only-evidence',
+		'delivery gate must reject local-only acceptance so agents cannot treat npm run accept as final handoff evidence',
+		checks.deliveryRejectsLocalOnlyEvidence,
+	);
+
+	const deliveryAcceptance = readJson(`${finalLiveEvidenceDir}/acceptance_report.json`);
+	writeFileSync(`${finalLiveEvidenceDir}/acceptance_report.json`, JSON.stringify({ ...deliveryAcceptance, mode: 'full-with-live' }, null, 2) + '\n', 'utf8');
+	const deliveryLiveShots = readJson(`${finalLiveEvidenceDir}/live_shots_report.json`);
+	writeFileSync(`${finalLiveEvidenceDir}/live_shots_report.json`, JSON.stringify({
+		...deliveryLiveShots,
+		regions: [
+			...(deliveryLiveShots.regions || []),
+			{ region: 'sensor_frontend', evidenceId: 'sensor-frontend', pass: true },
+		],
+	}, null, 2) + '\n', 'utf8');
+	const deliveryFinalEvidence = spawnSync(process.execPath, [`${ROOT}/engine/final_evidence_gate.mjs`, '--live', 'project_spec.json'], {
+		cwd: finalLiveEvidenceDir,
+		stdio: 'pipe',
+		shell: false,
+		env: {
+			...process.env,
+			EASYEDA_FINAL_EVIDENCE_REPORT: `${finalLiveEvidenceDir}/final_evidence_report.json`,
+			EASYEDA_EVIDENCE_MAX_AGE_MS: '0',
+		},
+		encoding: 'utf8',
+	});
+	const deliveryFinalEvidenceReport = existsSync(`${finalLiveEvidenceDir}/final_evidence_report.json`) ? readJson(`${finalLiveEvidenceDir}/final_evidence_report.json`) : null;
+	const deliveryLivePass = spawnSync(process.execPath, [`${ROOT}/engine/delivery_gate.mjs`, 'project_spec.json'], {
+		cwd: finalLiveEvidenceDir,
+		stdio: 'pipe',
+		shell: false,
+		env: {
+			...process.env,
+			EASYEDA_DELIVERY_REPORT: `${finalLiveEvidenceDir}/delivery_report.json`,
+			EASYEDA_DELIVERY_MAX_AGE_MS: '0',
+			EASYEDA_DELIVERY_SKIP_ACTIONS: '1',
+		},
+		encoding: 'utf8',
+	});
+	const deliveryLivePassReport = existsSync(`${finalLiveEvidenceDir}/delivery_report.json`) ? readJson(`${finalLiveEvidenceDir}/delivery_report.json`) : null;
+	checks.deliveryAcceptsFullLiveEvidence = {
+		finalEvidenceStatus: deliveryFinalEvidence.status,
+		finalEvidencePass: deliveryFinalEvidenceReport?.pass ?? null,
+		deliveryStatus: deliveryLivePass.status,
+		deliveryPass: deliveryLivePassReport?.pass ?? null,
+		deliveryRules: (deliveryLivePassReport?.findings || []).map(f => f.rule),
+	};
+	assertFinding(
+		findings,
+		deliveryFinalEvidence.status === 0
+			&& deliveryFinalEvidenceReport?.mode === 'full-with-live'
+			&& deliveryLivePass.status === 0
+			&& deliveryLivePassReport?.pass === true,
+		'WS64-delivery-accepts-full-live-evidence',
+		'delivery gate must pass only when acceptance, final evidence, live model, DRC, live shots, live.json, and live canvas evidence are all live and passing',
+		checks.deliveryAcceptsFullLiveEvidence,
 	);
 
 	const oldProjectAssemblyForHarnessRules = process.env.EASYEDA_PROJECT_ASSEMBLY;

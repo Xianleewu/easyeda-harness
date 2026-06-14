@@ -103,6 +103,14 @@ If the report points to fixed rendered-area screenshots, run `npm run live:diagn
 
 `accept:live` also runs `npm run drc`; final handoff requires `drc_report.json` to prove EasyEDA DRC `0 error / 0 warning / 0 info`.
 
+After `live-check`, run the final handoff gate:
+
+```bash
+node bin/easyeda-gsd.mjs deliver
+```
+
+`deliver` writes `delivery_report.json`. It must pass before handoff or write-back claims; it rejects local-only `accept` output and requires `full-with-live` acceptance, live final evidence, `live.json`, `live_canvas.png`, live shots, live model proof, and DRC `0 error / 0 warning / 0 info`.
+
 Only after local gates pass, live snapshot/DRC checks pass, and the EasyEDA bridge is connected may the agent write back:
 
 ```powershell
@@ -138,6 +146,7 @@ Before claiming completion, produce or inspect:
 - `repair_loop_report.json` with no grouped repair actions before final delivery
 - `workflow_smoke_report.json` proving reusable workflow regressions are still blocked
 - `final_evidence_report.json` proving required local/live evidence is present, fresh, and passing
+- `delivery_report.json` proving final handoff evidence is live, not local-only
 - `gsd_generate_report.json` proving deterministic generation was plan-gated
 - Local module crops for USB, LDO, RESET, BOOT, MCU left/right, PMOS, RELAY1, RELAY2, and title/template area
 

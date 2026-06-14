@@ -3,6 +3,7 @@ import { normalizeNextActions } from '../workflows/action_schema.mjs';
 
 const DIR = (process.env.EASYEDA_WORKDIR || process.cwd()).replace(/\\/g, '/') + '/';
 const OUT = process.env.EASYEDA_NEXT_ACTIONS || DIR + 'next_actions.json';
+const INCLUDE_DELIVERY_REPORT = process.env.EASYEDA_INCLUDE_DELIVERY_REPORT === '1';
 
 function readJson(name) {
 	const normalized = String(name || '').replace(/\\/g, '/');
@@ -82,6 +83,7 @@ const liveShots = readJson('live_shots_report.json');
 const liveDiagnose = readJson('live_diagnose_report.json');
 const repair = readJson('repair_actions.json');
 const finalEvidence = readJson('final_evidence_report.json');
+const delivery = INCLUDE_DELIVERY_REPORT ? readJson('delivery_report.json') : null;
 
 const checks = {
 	agentInstructions: {
@@ -314,6 +316,14 @@ const checks = {
 		severity: finalEvidence?.severity || null,
 		firstFinding: finalEvidence?.findings?.[0] || null,
 		evidence: 'final_evidence_report.json',
+	},
+	delivery: {
+		status: status(delivery?.pass),
+		mode: delivery?.mode || null,
+		context: delivery?.context || null,
+		severity: delivery?.severity || null,
+		firstFinding: delivery?.findings?.[0] || null,
+		evidence: 'delivery_report.json',
 	},
 };
 
@@ -680,6 +690,18 @@ if (checks.finalEvidence.status !== 'pass') {
 		nextCommand: checks.acceptance.context?.spec
 			? `node bin/easyeda-gsd.mjs accept ${checks.acceptance.context.spec}`
 			: 'node bin/easyeda-gsd.mjs accept',
+	});
+}
+if (INCLUDE_DELIVERY_REPORT && checks.delivery.status === 'fail') {
+	pushAction(actions, {
+		area: 'delivery-live-evidence',
+		action: 'Run live-check for the active project spec and make the real EasyEDA snapshot, DRC, live shots, and live final evidence pass before handoff. Local-only acceptance is not delivery evidence.',
+		evidence: ['delivery_report.json', 'acceptance_report.json', 'final_evidence_report.json', 'project_live_model_report.json', 'drc_report.json', 'live_shots_report.json', 'live.json', 'live_canvas.png'],
+		observed: checks.delivery.firstFinding || checks.delivery,
+		editFiles: ['engine/delivery_gate.mjs', 'engine/final_evidence_gate.mjs', 'engine/acceptance_run.mjs', 'project_spec.json', 'project_contract.json', 'project_assembly.json'],
+		nextCommand: checks.acceptance.context?.spec
+			? `node bin/easyeda-gsd.mjs live-check ${checks.acceptance.context.spec} && node bin/easyeda-gsd.mjs deliver ${checks.acceptance.context.spec}`
+			: 'node bin/easyeda-gsd.mjs live-check && node bin/easyeda-gsd.mjs deliver',
 	});
 }
 if (checks.repairActions.status === 'fail') {

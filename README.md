@@ -49,6 +49,7 @@ node bin/easyeda-gsd.mjs generate project_spec.json
 node bin/easyeda-gsd.mjs accept project_spec.json
 node bin/easyeda-gsd.mjs repair
 node bin/easyeda-gsd.mjs live-check project_spec.json
+node bin/easyeda-gsd.mjs deliver project_spec.json
 node bin/easyeda-gsd.mjs apply --gated project_spec.json
 ```
 
@@ -67,7 +68,8 @@ node bin/easyeda-gsd.mjs apply --gated project_spec.json
 7. 运行 `node bin/easyeda-gsd.mjs generate <project-dir>/project_spec.json`，直到 `gsd_generate_report.json` 通过。
 8. 运行 `node bin/easyeda-gsd.mjs accept <project-dir>/project_spec.json`，直到本地门禁 `HARD=0 SOFT=0 INFO=0`。
 9. 最终交付前运行 `node bin/easyeda-gsd.mjs live-check <project-dir>/project_spec.json`。
-10. 只通过 `node bin/easyeda-gsd.mjs apply --gated <project-dir>/project_spec.json` 写回。
+10. 运行 `node bin/easyeda-gsd.mjs deliver <project-dir>/project_spec.json`，确认真实 live 证据通过；本地 `accept` 不能作为最终交付。
+11. 只通过 `node bin/easyeda-gsd.mjs apply --gated <project-dir>/project_spec.json` 写回。
 
 ## 主要门禁
 
@@ -81,6 +83,7 @@ node bin/easyeda-gsd.mjs apply --gated project_spec.json
 - `preview` / `contract:visual`：证明离线预览和视觉区域覆盖。
 - `live-check`：拉取真实 EasyEDA `live.json`、`live_canvas.png`、live shots 和 DRC。
 - `final:evidence`：证明所需证据新鲜、通过、且没有开放修复项。
+- `deliver`：只接受 `full-with-live` 的验收、真实 EasyEDA snapshot/canvas、live shots 和 DRC 0/0/0，拒绝 local-only PASS。
 
 ## 证据文件
 
@@ -95,6 +98,7 @@ node bin/easyeda-gsd.mjs apply --gated project_spec.json
 - `next_actions.json`
 - `repair_actions.json`
 - `final_evidence_report.json`
+- `delivery_report.json`
 - `live.json`
 - `live_canvas.png`
 - `live_shots_report.json`

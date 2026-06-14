@@ -18,6 +18,7 @@ In short:
 11. Keep `next_actions.json` on the `action:schema` contract; see `reports/README.md`.
 12. Pull EasyEDA live evidence with `node bin/easyeda-gsd.mjs live-check` before final delivery.
 13. Ensure `final_evidence_report.json` passes before final delivery; live delivery uses `npm.cmd run final:evidence:live`.
-14. Write back with `node bin/easyeda-gsd.mjs apply --gated project_spec.json` only after all gates pass.
-15. `live-check` wraps `accept:live`; `apply --gated` wraps `apply:gated`.
-16. Never bypass the fail-closed gate with low-level writer scripts for delivery.
+14. Run `node bin/easyeda-gsd.mjs deliver` and require `delivery_report.json` PASS; local-only `accept` is not final delivery evidence.
+15. Write back with `node bin/easyeda-gsd.mjs apply --gated project_spec.json` only after all gates pass.
+16. `live-check` wraps `accept:live`; `deliver` wraps the final live handoff gate; `apply --gated` wraps `apply:gated`.
+17. Never bypass the fail-closed gate with low-level writer scripts for delivery.

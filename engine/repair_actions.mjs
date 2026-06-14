@@ -3,7 +3,9 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 const DIR = (process.env.EASYEDA_WORKDIR || process.cwd()).replace(/\\/g, '/') + '/';
 const OUT = process.env.EASYEDA_REPAIR_ACTIONS || DIR + 'repair_actions.json';
 
-const REPORTS = [
+const INCLUDE_DELIVERY_REPORT = process.env.EASYEDA_INCLUDE_DELIVERY_REPORT === '1';
+
+const BASE_REPORTS = [
 	{ gate: 'entrypoints', file: 'entrypoint_audit_report.json', rerun: 'npm.cmd run entrypoints' },
 	{ gate: 'agent-instructions', file: 'agent_instruction_report.json', rerun: 'npm.cmd run agent:instructions' },
 	{ gate: 'workflow-smoke', file: 'workflow_smoke_report.json', rerun: 'npm.cmd run workflow:smoke' },
@@ -32,6 +34,9 @@ const REPORTS = [
 	{ gate: 'final-evidence', file: 'final_evidence_report.json', rerun: 'npm.cmd run final:evidence' },
 	{ gate: 'acceptance', file: 'acceptance_report.json', rerun: 'npm.cmd run accept' },
 ];
+const REPORTS = INCLUDE_DELIVERY_REPORT
+	? [...BASE_REPORTS, { gate: 'delivery', file: 'delivery_report.json', rerun: 'npm.cmd run deliver' }]
+	: BASE_REPORTS;
 
 function readJson(name) {
 	const normalized = normalizePath(name);
@@ -384,6 +389,13 @@ const RULE_PLANS = [
 		inspectFiles: ['final_evidence_report.json', 'acceptance_report.json', 'gsd_plan_report.json', 'gsd_generate_report.json', 'repair_actions.json', 'next_actions.json'],
 		nextCommand: 'npm.cmd run accept',
 		repairHint: 'Regenerate evidence for the active project spec context; stale or mismatched root-project reports must not be used as final proof.',
+	}],
+	[/^DL/, {
+		area: 'delivery-live-evidence',
+		editFiles: ['engine/delivery_gate.mjs', 'engine/final_evidence_gate.mjs', 'engine/acceptance_run.mjs', 'project_spec.json', 'project_contract.json', 'project_assembly.json'],
+		inspectFiles: ['delivery_report.json', 'acceptance_report.json', 'final_evidence_report.json', 'project_live_model_report.json', 'drc_report.json', 'live_shots_report.json', 'live.json', 'live_canvas.png'],
+		nextCommand: 'npm.cmd run accept:live && npm.cmd run deliver',
+		repairHint: 'Run live-check for the active project spec and fix real EasyEDA snapshot, DRC, or live-shot evidence; local-only PASS is never final delivery proof.',
 	}],
 ];
 

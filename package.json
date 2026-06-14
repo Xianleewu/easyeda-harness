@@ -31,6 +31,7 @@
     "contract:rules": "node engine/project_rule_gate.mjs",
     "final:evidence": "node engine/final_evidence_gate.mjs",
     "final:evidence:live": "node engine/final_evidence_gate.mjs --live",
+    "deliver": "node engine/delivery_gate.mjs",
     "accept": "node engine/acceptance_run.mjs",
     "accept:live": "node engine/acceptance_run.mjs --live",
     "next:actions": "node engine/next_actions.mjs",

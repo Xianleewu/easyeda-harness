@@ -26,7 +26,8 @@ Safe order:
   2. generate deterministic model artifacts
   3. accept local gates
   4. live-check with EasyEDA bridge evidence
-  5. apply --gated
+  5. deliver final live evidence
+  6. apply --gated
 
 Commands:
   help                         Show this help.
@@ -36,13 +37,14 @@ Commands:
   generate [--fast] [spec]     Plan-gated deterministic generation without write-back; full layout search by default.
   accept [spec]                Run local acceptance gates for the selected spec context.
   live-check [spec]            Run live EasyEDA snapshot, image, DRC, and live shot checks.
+  deliver [spec]               Verify final handoff evidence from live-check; rejects local-only PASS.
   apply --gated [spec]         Write back through the fail-closed gated entrypoint for the selected spec context.
   repair [--max-iterations N]  Write repair_loop_report.json from next_actions/repair_actions.
   report                       Summarize latest acceptance and repair artifacts.
 
 Notes:
   - Do not free-draw in EasyEDA for delivery.
-  - Local accept is not final delivery evidence; live-check is required before apply.
+  - Local accept is not final delivery evidence; live-check and deliver are required before apply.
   - Stateful commands share report artifacts and are protected by a workspace lock; run them serially.
   - Low-level writer scripts are debugging-only.`);
 }
@@ -208,6 +210,9 @@ switch (cmd) {
 		break;
 	case 'live-check':
 		runNode(['engine/acceptance_run.mjs', '--live', ...args]);
+		break;
+	case 'deliver':
+		runNode(['engine/delivery_gate.mjs', ...args]);
 		break;
 	case 'apply':
 		if (!args.includes('--gated')) {

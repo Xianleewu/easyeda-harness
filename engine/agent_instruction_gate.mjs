@@ -78,6 +78,8 @@ if (docs['AGENTS.md']) {
 		'contract:live:model',
 		'final_evidence_report.json',
 		'final:evidence',
+		'delivery_report.json',
+		'deliver',
 		'apply:gated',
 		'accept:live',
 		'repair_actions.json',
@@ -117,6 +119,7 @@ if (docs['CLAUDE.md']) {
 		'contract:assembly',
 		'contract:layout',
 		'final_evidence_report.json',
+		'deliver',
 		'accept:live',
 		'apply:gated',
 	], 'Claude Code needs a complete short path, not only a pointer');
@@ -150,6 +153,8 @@ for (const file of ['README.md', 'README.en.md']) {
 		'docs/agent-runner-guide.md',
 		'action:schema',
 		'apply:gated',
+		'deliver',
+		'delivery_report.json',
 		'repair_actions.json',
 	], 'the public README must tell users what the harness does and how an agent should use it');
 	requireToken(findings, file, docs[file], file === 'README.md' ? 'AI9-readme-agent-oriented-zh' : 'AI10-readme-agent-oriented-en', ['Codex', 'Claude Code'], 'this is agent-oriented rather than a manual command checklist');

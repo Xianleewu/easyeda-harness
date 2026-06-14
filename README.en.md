@@ -81,10 +81,11 @@ Preferred agent commands:
 node bin/easyeda-gsd.mjs accept
 node bin/easyeda-gsd.mjs repair
 node bin/easyeda-gsd.mjs live-check
+node bin/easyeda-gsd.mjs deliver
 node bin/easyeda-gsd.mjs apply --gated project_spec.json
 ```
 
-For an external project directory, pass that same spec path through every context-aware command, including final write-back: `node bin/easyeda-gsd.mjs apply --gated <project-dir>/project_spec.json`.
+For an external project directory, pass that same spec path through every context-aware command, including final handoff and write-back: `node bin/easyeda-gsd.mjs deliver <project-dir>/project_spec.json` and `node bin/easyeda-gsd.mjs apply --gated <project-dir>/project_spec.json`.
 
 For a new project, the first implementation step is updating `project_spec.json`, realizing it in `project_contract.json` with module-level `drawingRules`, defining required endpoints in `project_netlist.json`, declaring/choosing a circuit-pack `cell_manifest.json`, then mapping the contract and layout policy in `project_assembly.json`. Only then should the agent implement project-specific deterministic cells and rules.
 For a new project directory, `node bin/easyeda-gsd.mjs init --pack <pack> --out <project-dir>` writes scaffold versions of those files plus `approved_library_manifest.json` and `gsd_scaffold_report.json`. If `<pack>` does not exist, it also creates `circuit_packs/<pack>/pack.mjs`, `circuit_packs/<pack>/cell_manifest.json`, and updates the pack registry. The scaffold emits generic `layoutPolicy.anchorVariants` with enough candidates for the layout planner's minimum search-space gate, so new projects do not depend on the bundled USB/MCU/relay coordinate fields. The scaffold is intentionally incomplete and must not be treated as ready for generation until pack builders, cell manifest, contracts, netlist, library bindings, and assembly mappings make `plan` pass.
@@ -101,6 +102,8 @@ It runs local gates, live snapshot, live canvas image, EasyEDA DRC, module-level
 When a gate remains open, inspect `next_actions.json` first; it is the machine-readable handoff checklist for the next agent. Then inspect `repair_actions.json` for finding-level edit targets and rerun commands, or run `node bin/easyeda-gsd.mjs repair` to produce `repair_loop_report.json`.
 
 In live mode, `contract:live:model` checks `live.json` from the real EasyEDA canvas against `project_contract.json`. Final acceptance is not based on `full_model.json` alone.
+
+`node bin/easyeda-gsd.mjs deliver` writes `delivery_report.json` and is the final handoff gate. It rejects local-only `accept` output and only passes with `full-with-live` acceptance, live final evidence, `live.json`, `live_canvas.png`, live shots, live model proof, and EasyEDA DRC `0 error / 0 warning / 0 info`.
 
 `live:shots` is fail-closed. It first tries requested EasyEDA zoom-region captures. If the EasyEDA API returns the same full-page rendered image for every zoom request, the harness falls back to coordinate crops from that real EasyEDA rendered schematic image. Those crops are accepted only when at least 10 module images exist, all required crops are inside the real rendered image, hashes are distinct, and every image-quality gate passes.
 
@@ -136,6 +139,7 @@ For handoff, review the global sheet and local crops for USB, LDO, RESET, BOOT, 
 - `repair_actions.json` has no finding-level repair actions
 - `repair_loop_report.json` has no grouped repair actions
 - `final_evidence_report.json` proves required local/live evidence is present, fresh, and passing
+- `delivery_report.json` proves final handoff evidence is live, not local-only
 - No fake text net labels
 - No unnecessary NET PORT symbols on a single-sheet schematic
 - Readable wire `Name` anchors: left-side labels use bottom-left origin, right-side labels use bottom-right origin
