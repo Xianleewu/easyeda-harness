@@ -374,7 +374,7 @@ if (checks.gsdPlan.status !== 'pass') {
 			editFiles: ['contracts/drawing_rule_registry.mjs', 'harness/rule_registry.mjs', 'project_contract.json', 'circuit_packs/<pack>/cell_manifest.json'],
 			nextCommand: 'node bin/easyeda-gsd.mjs plan project_spec.json',
 		});
-	} else if (ruleMatches(finding, /^GP6|^PC12/)) {
+	} else if (ruleMatches(finding, /^GP6-contract-parts$|^PC12/)) {
 		pushAction(actions, {
 			area: 'module-contract-bootstrap',
 			action: 'Fill the module contract from the user intent before drawing. Each module needs concrete requiredParts, requiredNets, drawingRules, visualEvidence, and matching structured netlist endpoints.',
@@ -410,10 +410,10 @@ if (checks.gsdPlan.status !== 'pass') {
 			editFiles: ['project_contract.json', 'contracts/module_contract.mjs', 'harness/config.mjs'],
 			nextCommand: 'node bin/easyeda-gsd.mjs plan project_spec.json',
 		});
-	} else if (ruleMatches(finding, /^GP4[4-6]/)) {
+	} else if (ruleMatches(finding, /^GP4[4-6]|^GP6[3-5]/)) {
 		pushAction(actions, {
 			area: 'interface-label-columns',
-			action: 'Declare module-side layoutPolicy.labelColumns for each grouped-net-label interface. The source side needs module=<from> and routeEnd=from; the target side needs module=<to> and routeEnd=to, with the interface net listed in nets.',
+			action: 'Declare module-side layoutPolicy.labelColumns for each visible signal label and grouped-net-label interface. Every column needs module, routeEnd, side, x, tolerance, and allowed nets; duplicate module-side net budgets are forbidden.',
 			evidence: ['gsd_plan_report.json', 'project_assembly.json', 'docs/schematic-design-rules.md'],
 			observed: finding,
 			editFiles: ['project_assembly.json'],
@@ -477,11 +477,11 @@ if (checks.gsdPlan.status !== 'pass') {
 			nextCommand: 'node bin/easyeda-gsd.mjs plan project_spec.json',
 		});
 	}
-	const labelColumnFinding = planFindings.find(f => ruleMatches(f, /^GP4[4-6]/));
+	const labelColumnFinding = planFindings.find(f => ruleMatches(f, /^GP4[4-6]|^GP6[3-5]/));
 	if (labelColumnFinding && !hasActionArea(actions, 'interface-label-columns')) {
 		pushAction(actions, {
 			area: 'interface-label-columns',
-			action: 'Declare module-side layoutPolicy.labelColumns for each grouped-net-label interface. The source side needs module=<from> and routeEnd=from; the target side needs module=<to> and routeEnd=to, with the interface net listed in nets.',
+			action: 'Declare module-side layoutPolicy.labelColumns for each visible signal label and grouped-net-label interface. Every column needs module, routeEnd, side, x, tolerance, and allowed nets; duplicate module-side net budgets are forbidden.',
 			evidence: ['gsd_plan_report.json', 'project_assembly.json', 'docs/schematic-design-rules.md'],
 			observed: labelColumnFinding,
 			editFiles: ['project_assembly.json'],
@@ -620,10 +620,10 @@ if (checks.projectAssembly.status !== 'pass') {
 }
 if (checks.projectLayout.status !== 'pass') {
 	const finding = checks.projectLayout.firstFinding;
-	if (ruleMatches(finding, /^PL3[0-3]/)) {
+	if (ruleMatches(finding, /^PL3[0-3]|^PL5[2-4]/)) {
 		pushAction(actions, {
 			area: 'interface-label-columns',
-			action: 'Fix layoutPolicy.labelColumns so grouped-net-label interfaces have both source and target module-side columns with module, routeEnd, side, x, tolerance, and nets.',
+			action: 'Fix layoutPolicy.labelColumns so visible signal labels and grouped-net-label interfaces have concrete module-side columns with module, routeEnd, side, x, tolerance, and nets. Duplicate module-side net budgets are not allowed.',
 			evidence: ['project_layout_report.json', 'project_assembly.json', 'docs/schematic-design-rules.md'],
 			observed: finding,
 			editFiles: ['project_assembly.json'],

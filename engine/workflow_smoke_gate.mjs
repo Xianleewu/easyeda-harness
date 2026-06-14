@@ -2472,6 +2472,7 @@ export const pack = { id: '${NO_WRITER_PACK}', fallbackAnchors, cellBuilders, no
 			{ rule: 'GP6-contract-parts', severity: 'hard', msg: 'module contract parts missing smoke', where: { module: 'sensor_frontend' } },
 			{ rule: 'GP8-assembly-executable-module', severity: 'hard', msg: 'assembly executable module missing smoke', where: { module: 'sensor_frontend', key: 'cell' } },
 			{ rule: 'GP-DR1-drawing-rule-known', severity: 'hard', msg: 'unknown drawing rule smoke', where: { drawingRule: 'pretty-but-not-executable' } },
+			{ rule: 'GP63-label-column-module', severity: 'hard', msg: 'label column module missing smoke', where: { column: 'sensor_to_left_labels' } },
 			{ rule: 'CB8-wire-orthogonal', severity: 'hard', msg: 'cell builder diagonal wire smoke', where: { module: 'sensor_frontend', cell: 'sensorCell' } },
 			{ rule: 'CB14-port-flag-required', severity: 'hard', msg: 'cell builder real netflag missing smoke', where: { module: 'sensor_frontend', cell: 'sensorCell', port: 'sigOut' } },
 		],
@@ -2535,6 +2536,7 @@ export const pack = { id: '${NO_WRITER_PACK}', fallbackAnchors, cellBuilders, no
 		hasModuleBootstrapAction: (customRepairReport?.actions || []).some(a => a.area === 'module-contract-bootstrap' && (a.editFiles || []).includes('project_contract.json') && (a.editFiles || []).includes('project_netlist.json')),
 		hasCellBootstrapAction: (customRepairReport?.actions || []).some(a => a.area === 'cell-builder-bootstrap' && (a.editFiles || []).includes(`circuit_packs/${CUSTOM_PACK}/cell_manifest.json`)),
 		hasPortLayoutAction: (customRepairReport?.actions || []).some(a => a.area === 'cell-port-layout' && (a.editFiles || []).includes(`circuit_packs/${CUSTOM_PACK}/cell_manifest.json`) && /alignMode=6/.test(a.repairHint || '')),
+		hasInterfaceLabelColumnAction: (customRepairReport?.actions || []).some(a => a.area === 'interface-label-columns' && (a.editFiles || []).includes('project_assembly.json') && /module.*routeEnd/.test(a.repairHint || '')),
 		hasDrawingRuleAction: (customRepairReport?.actions || []).some(a => a.area === 'drawing-rule-bindings' && (a.editFiles || []).includes('contracts/drawing_rule_registry.mjs')),
 		hasCellBuilderAction: (customRepairReport?.actions || []).some(a => a.area === 'cell-builder-output' && (a.editFiles || []).includes(`circuit_packs/${CUSTOM_PACK}/pack.mjs`)),
 		hasApplyWriterAction: (customRepairReport?.actions || []).some(a => a.area === 'apply-writer' && (a.editFiles || []).includes(`circuit_packs/${CUSTOM_PACK}/pack.mjs`) && /apply --gated --context-only/.test(a.nextCommand || '')),
@@ -2573,9 +2575,10 @@ export const pack = { id: '${NO_WRITER_PACK}', fallbackAnchors, cellBuilders, no
 			&& checks.customRepairContext.hasModuleBootstrapAction
 			&& checks.customRepairContext.hasCellBootstrapAction
 			&& checks.customRepairContext.hasPortLayoutAction
+			&& checks.customRepairContext.hasInterfaceLabelColumnAction
 			&& checks.customRepairContext.hasApplyWriterAction,
 		'WS50-repair-actions-cover-executable-failure-classes',
-		'repair actions must map scaffold bootstrap, drawing-rule, cell-builder, port-layout, and apply-writer failures to concrete deterministic source files and context-aware rerun commands',
+		'repair actions must map scaffold bootstrap, drawing-rule, cell-builder, port-layout, interface-label-column, and apply-writer failures to concrete deterministic source files and context-aware rerun commands',
 		checks.customRepairContext,
 	);
 
@@ -2602,6 +2605,7 @@ export const pack = { id: '${NO_WRITER_PACK}', fallbackAnchors, cellBuilders, no
 		hasModuleBootstrapAction: (customNextReport?.actions || []).some(a => a.area === 'module-contract-bootstrap' && (a.suggestedFix?.files || []).includes('project_contract.json') && (a.suggestedFix?.files || []).includes('project_netlist.json')),
 		hasCellBootstrapAction: (customNextReport?.actions || []).some(a => a.area === 'cell-builder-bootstrap' && (a.suggestedFix?.files || []).includes(`circuit_packs/${CUSTOM_PACK}/cell_manifest.json`)),
 		hasPortLayoutAction: (customNextReport?.actions || []).some(a => a.area === 'cell-port-layout' && (a.suggestedFix?.files || []).includes(`circuit_packs/${CUSTOM_PACK}/cell_manifest.json`) && /alignMode=6/.test(a.action || a.title || '')),
+		hasInterfaceLabelColumnAction: (customNextReport?.actions || []).some(a => a.area === 'interface-label-columns' && (a.suggestedFix?.files || []).includes('project_assembly.json') && /module.*routeEnd/.test(a.action || a.title || '')),
 		hasDrawingRuleAction: (customNextReport?.actions || []).some(a => a.area === 'drawing-rule-bindings' && (a.suggestedFix?.files || []).includes('contracts/drawing_rule_registry.mjs')),
 		hasApplyWriterAction: (customNextReport?.actions || []).some(a => a.area === 'apply-writer' && /apply --gated --context-only/.test(a.nextCommand || a.suggestedFix?.command || '')),
 	};
@@ -2626,9 +2630,10 @@ export const pack = { id: '${NO_WRITER_PACK}', fallbackAnchors, cellBuilders, no
 			&& checks.customNextActionsPackTargets.hasModuleBootstrapAction
 			&& checks.customNextActionsPackTargets.hasCellBootstrapAction
 			&& checks.customNextActionsPackTargets.hasPortLayoutAction
+			&& checks.customNextActionsPackTargets.hasInterfaceLabelColumnAction
 			&& checks.customNextActionsPackTargets.hasApplyWriterAction,
 		'WS51-next-actions-cover-executable-failure-classes',
-		'next actions must expose scaffold bootstrap, drawing-rule, port-layout, and apply-writer repair targets directly to agents instead of hiding them behind generic acceptance failure',
+		'next actions must expose scaffold bootstrap, drawing-rule, port-layout, interface-label-column, and apply-writer repair targets directly to agents instead of hiding them behind generic acceptance failure',
 		checks.customNextActionsPackTargets,
 	);
 

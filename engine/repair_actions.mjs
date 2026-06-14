@@ -166,7 +166,7 @@ const RULE_PLANS = [
 		nextCommand: 'node bin/easyeda-gsd.mjs plan project_spec.json',
 		repairHint: 'Declare qualityPolicy.ruleProfile from the executable harness budgets: module gap, wire-intrusion budget, component/text clearance, named-stub length, wire-name origins, no fake text nets, and no unnecessary NET PORTs.',
 	}],
-	[/^PC12|^GP6/, {
+	[/^PC12|^GP6-contract-parts$/, {
 		area: 'module-contract-bootstrap',
 		editFiles: ['project_spec.json', 'project_contract.json', 'project_netlist.json'],
 		inspectFiles: ['project_spec.json', 'project_contract.json', 'project_contract_report.json', 'gsd_plan_report.json'],
@@ -278,12 +278,12 @@ const RULE_PLANS = [
 		nextCommand: 'node bin/easyeda-gsd.mjs plan project_spec.json',
 		repairHint: 'Declare layoutPolicy.moduleRegions for every module as anchor-relative minimum readable rectangles and keep each generated structure module bbox inside its planned rectangle. For PL45/PL46, use project_layout_report.json plannedBox/actualBox/tolerance to repair project_assembly.json or deterministic cell geometry.',
 	}],
-	[/^GP4[4-6]|^PL3[0-3]/, {
+	[/^GP4[4-6]|^GP6[3-5]|^PL3[0-3]|^PL5[2-4]/, {
 		area: 'interface-label-columns',
 		editFiles: ['project_assembly.json'],
 		inspectFiles: ['gsd_plan_report.json', 'project_layout_report.json', 'project_assembly.json', 'docs/schematic-design-rules.md'],
 		nextCommand: 'node bin/easyeda-gsd.mjs plan project_spec.json',
-		repairHint: 'Declare module-side layoutPolicy.labelColumns for every grouped-net-label interface: source column uses module=<from>, routeEnd=from; target column uses module=<to>, routeEnd=to; each column lists the interface net and has side/x/tolerance.',
+		repairHint: 'Declare module-side layoutPolicy.labelColumns for every visible signal label and grouped-net-label interface: each column needs module, routeEnd, side, x, tolerance, and nets; duplicate module-side net budgets are forbidden.',
 	}],
 	[/^PL/, {
 		area: 'project-layout',
