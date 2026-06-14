@@ -11,6 +11,18 @@ export const REQUIRED_DRAWING_RULES = [
 	'no-unnecessary-net-ports',
 ];
 
+export const REQUIRED_RULE_PROFILE = {
+	minModuleGap: 90,
+	maxModuleWireIntrusions: 0,
+	minComponentGap: 12,
+	minTextClearance: 8,
+	maxNamedStubLen: 55,
+	wireNameLeftAlignMode: 6,
+	wireNameRightAlignMode: 8,
+	singleSheetNoNetPortsByDefault: true,
+	fakeTextNetLabelsAllowed: false,
+};
+
 function hard(findings, rule, msg, where = {}, category = 'project-contract') {
 	findings.push({ rule, severity: 'hard', category, msg, where });
 }
@@ -100,6 +112,18 @@ export function validateModuleContract(contract, options = {}) {
 			wireNameLeftAlignMode: quality.wireNameLeftAlignMode,
 			wireNameRightAlignMode: quality.wireNameRightAlignMode,
 		}, category);
+	}
+	const profile = quality.ruleProfile || {};
+	if (!quality.ruleProfile || typeof quality.ruleProfile !== 'object') {
+		hard(findings, 'PC29-rule-profile-present', 'qualityPolicy.ruleProfile must declare executable schematic-quality budgets before generation', {}, category);
+	} else {
+		for (const [key, expected] of Object.entries(REQUIRED_RULE_PROFILE)) {
+			if (profile[key] !== expected) hard(findings, 'PC30-rule-profile-value', `qualityPolicy.ruleProfile.${key} must be ${expected}`, {
+				key,
+				expected,
+				actual: profile[key],
+			}, category);
+		}
 	}
 	return findings;
 }

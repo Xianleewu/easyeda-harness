@@ -1,5 +1,5 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
-import { REQUIRED_DRAWING_RULES } from '../contracts/module_contract.mjs';
+import { REQUIRED_DRAWING_RULES, REQUIRED_RULE_PROFILE } from '../contracts/module_contract.mjs';
 
 function asArray(value) {
 	return Array.isArray(value) ? value : [];
@@ -49,6 +49,7 @@ export function buildScaffold(spec, { pack = 'aihwdebugger' } = {}) {
 			fakeTextNetLabelsAllowed: false,
 			wireNameLeftAlignMode: 6,
 			wireNameRightAlignMode: 8,
+			ruleProfile: { ...REQUIRED_RULE_PROFILE },
 			...(spec.qualityPolicy || {}),
 		},
 	};

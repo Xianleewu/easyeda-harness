@@ -303,6 +303,17 @@
     "singleSheetNoNetPortsByDefault": true,
     "fakeTextNetLabelsAllowed": false,
     "wireNameLeftAlignMode": 6,
-    "wireNameRightAlignMode": 8
+    "wireNameRightAlignMode": 8,
+    "ruleProfile": {
+      "minModuleGap": 90,
+      "maxModuleWireIntrusions": 0,
+      "minComponentGap": 12,
+      "minTextClearance": 8,
+      "maxNamedStubLen": 55,
+      "wireNameLeftAlignMode": 6,
+      "wireNameRightAlignMode": 8,
+      "singleSheetNoNetPortsByDefault": true,
+      "fakeTextNetLabelsAllowed": false
+    }
   }
 }

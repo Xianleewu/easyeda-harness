@@ -789,6 +789,44 @@ try {
 		observedRules: checks.moduleDrawingRulesRequired.rules,
 	});
 
+	const noRuleProfileContract = clone(contract);
+	delete noRuleProfileContract.qualityPolicy.ruleProfile;
+	const noRuleProfilePlan = buildPlanForFiles({
+		spec,
+		contract: noRuleProfileContract,
+		netlist,
+		assembly,
+		libraryManifest,
+		specPath: '_tmp_workflow_smoke/no_rule_profile_project_spec.json',
+	});
+	checks.ruleProfileRequired = {
+		pass: !noRuleProfilePlan.pass && hasRule(noRuleProfilePlan, 'PC29-rule-profile-present'),
+		rules: (noRuleProfilePlan.findings || []).map(f => f.rule),
+	};
+	assertFinding(findings, checks.ruleProfileRequired.pass, 'WS61-rule-profile-required', 'GSD plan must reject contracts that do not declare executable qualityPolicy.ruleProfile budgets before generation', {
+		observedRules: checks.ruleProfileRequired.rules,
+	});
+
+	const badRuleProfileContract = clone(contract);
+	badRuleProfileContract.qualityPolicy.ruleProfile.minModuleGap = 10;
+	const badRuleProfilePlan = buildPlanForFiles({
+		spec,
+		contract: badRuleProfileContract,
+		netlist,
+		assembly,
+		libraryManifest,
+		specPath: '_tmp_workflow_smoke/bad_rule_profile_project_spec.json',
+	});
+	checks.ruleProfileValuesRequired = {
+		pass: !badRuleProfilePlan.pass && hasRule(badRuleProfilePlan, 'PC30-rule-profile-value'),
+		rules: (badRuleProfilePlan.findings || []).map(f => f.rule),
+		firstFinding: badRuleProfilePlan.findings?.find(f => f.rule === 'PC30-rule-profile-value') || null,
+	};
+	assertFinding(findings, checks.ruleProfileValuesRequired.pass, 'WS62-rule-profile-values-required', 'GSD plan must reject contracts whose qualityPolicy.ruleProfile drifts from executable harness budgets', {
+		observedRules: checks.ruleProfileValuesRequired.rules,
+		firstFinding: checks.ruleProfileValuesRequired.firstFinding,
+	});
+
 	const missingBuilderAssembly = clone(assembly);
 	if (missingBuilderAssembly.modules?.[0]) missingBuilderAssembly.modules[0].cell = 'notImplementedCell';
 	const missingBuilderPlan = buildPlanForFiles({

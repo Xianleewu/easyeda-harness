@@ -372,6 +372,15 @@ if (checks.gsdPlan.status !== 'pass') {
 			editFiles: ['circuit_packs/<pack>/cell_manifest.json', 'circuit_packs/<pack>/pack.mjs', 'project_assembly.json'],
 			nextCommand: 'node bin/easyeda-gsd.mjs plan project_spec.json',
 		});
+	} else if (ruleMatches(finding, /^PC29|^PC30|^GP-PC29|^GP-PC30/)) {
+		pushAction(actions, {
+			area: 'quality-rule-profile',
+			action: 'Declare qualityPolicy.ruleProfile from the executable harness budgets before generation: module gap, wire intrusions, component/text clearance, named-stub length, wire-name origins, fake-text-net ban, and NET PORT policy.',
+			evidence: ['gsd_plan_report.json', 'project_contract.json', 'harness/config.mjs'],
+			observed: finding,
+			editFiles: ['project_contract.json', 'contracts/module_contract.mjs', 'harness/config.mjs'],
+			nextCommand: 'node bin/easyeda-gsd.mjs plan project_spec.json',
+		});
 	} else if (ruleMatches(finding, /^GP2[7-9]|^GP3[0-4]/)) {
 		pushAction(actions, {
 			area: 'interface-routing-contract',
@@ -432,6 +441,17 @@ if (checks.gsdPlan.status !== 'pass') {
 			nextCommand: 'node bin/easyeda-gsd.mjs plan project_spec.json',
 		});
 	}
+	const ruleProfileFinding = planFindings.find(f => ruleMatches(f, /^PC29|^PC30|^GP-PC29|^GP-PC30/));
+	if (ruleProfileFinding && !hasActionArea(actions, 'quality-rule-profile')) {
+		pushAction(actions, {
+			area: 'quality-rule-profile',
+			action: 'Declare qualityPolicy.ruleProfile from the executable harness budgets before generation: module gap, wire intrusions, component/text clearance, named-stub length, wire-name origins, fake-text-net ban, and NET PORT policy.',
+			evidence: ['gsd_plan_report.json', 'project_contract.json', 'harness/config.mjs'],
+			observed: ruleProfileFinding,
+			editFiles: ['project_contract.json', 'contracts/module_contract.mjs', 'harness/config.mjs'],
+			nextCommand: 'node bin/easyeda-gsd.mjs plan project_spec.json',
+		});
+	}
 }
 if (checks.gsdGenerate.status !== 'pass') {
 	pushAction(actions, {
@@ -458,12 +478,24 @@ if (checks.spec.status !== 'pass') {
 	});
 }
 if (checks.contract.status !== 'pass') {
-	pushAction(actions, {
-		area: 'project-contract',
-		action: 'Create or fix project_contract.json before editing schematic cells or writing back. The contract must define modules, required parts/nets, interfaces, visual evidence regions, and no-free-draw policy.',
-		evidence: ['project_contract.json', 'project_contract_report.json'],
-		observed: checks.contract.firstFinding || checks.contract,
-	});
+	const finding = checks.contract.firstFinding;
+	if (ruleMatches(finding, /^PC29|^PC30/)) {
+		pushAction(actions, {
+			area: 'quality-rule-profile',
+			action: 'Declare qualityPolicy.ruleProfile from the executable harness budgets before drawing: module gap, wire intrusions, component/text clearance, named-stub length, wire-name origins, fake-text-net ban, and NET PORT policy.',
+			evidence: ['project_contract.json', 'project_contract_report.json', 'harness/config.mjs'],
+			observed: finding,
+			editFiles: ['project_contract.json', 'contracts/module_contract.mjs', 'harness/config.mjs'],
+			nextCommand: 'npm.cmd run contract',
+		});
+	} else {
+		pushAction(actions, {
+			area: 'project-contract',
+			action: 'Create or fix project_contract.json before editing schematic cells or writing back. The contract must define modules, required parts/nets, interfaces, visual evidence regions, and no-free-draw policy.',
+			evidence: ['project_contract.json', 'project_contract_report.json'],
+			observed: finding || checks.contract,
+		});
+	}
 }
 if (checks.projectRules.status !== 'pass') {
 	const finding = checks.projectRules.firstFinding;

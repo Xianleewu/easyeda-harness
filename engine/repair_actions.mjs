@@ -154,6 +154,13 @@ const RULE_PLANS = [
 		nextCommand: 'npm.cmd run spec',
 		repairHint: 'Update user-intent modules, nets, interfaces, or contract coverage before touching schematic geometry.',
 	}],
+	[/^PC29|^PC30|^GP-PC29|^GP-PC30/, {
+		area: 'quality-rule-profile',
+		editFiles: ['project_contract.json', 'contracts/module_contract.mjs', 'harness/config.mjs'],
+		inspectFiles: ['project_contract_report.json', 'gsd_plan_report.json', 'project_contract.json', 'harness/config.mjs'],
+		nextCommand: 'node bin/easyeda-gsd.mjs plan project_spec.json',
+		repairHint: 'Declare qualityPolicy.ruleProfile from the executable harness budgets: module gap, wire-intrusion budget, component/text clearance, named-stub length, wire-name origins, no fake text nets, and no unnecessary NET PORTs.',
+	}],
 	[/^PC12|^GP6/, {
 		area: 'module-contract-bootstrap',
 		editFiles: ['project_spec.json', 'project_contract.json', 'project_netlist.json'],
