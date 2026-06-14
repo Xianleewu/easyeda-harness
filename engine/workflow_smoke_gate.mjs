@@ -79,6 +79,31 @@ function hasRule(report, rule) {
 	return (report?.findings || []).some(f => f.rule === rule);
 }
 
+function actualModulesFromPlannedRegions(assembly) {
+	const anchors = assembly?.anchors || {};
+	const moduleById = new Map((assembly?.modules || []).map(mod => [mod.id, mod]));
+	return (assembly?.layoutPolicy?.moduleRegions || [])
+		.map(region => {
+			const mod = moduleById.get(region.module) || {};
+			const anchor = anchors[region.anchor || mod.anchor];
+			if (!anchor || !Number.isFinite(anchor.x) || !Number.isFinite(anchor.y) || !Number.isFinite(region.width) || !Number.isFinite(region.height)) return null;
+			const cx = anchor.x + Number(region.dx || 0);
+			const cy = anchor.y + Number(region.dy || 0);
+			const width = Number(region.width);
+			const height = Number(region.height);
+			return {
+				name: mod.registryModule || mod.id || region.module,
+				box: {
+					minX: cx - width / 2,
+					maxX: cx + width / 2,
+					minY: cy - height / 2,
+					maxY: cy + height / 2,
+				},
+			};
+		})
+		.filter(Boolean);
+}
+
 function buildPlanForFiles({ spec, contract, netlist, assembly, libraryManifest, specPath, assemblyPath = '' }) {
 	const modelPath = `${ROOT}/full_model.json`;
 	const model = existsSync(modelPath) ? readJson(modelPath) : null;
@@ -361,6 +386,41 @@ try {
 		'WS75-module-regions-reject-overlap',
 		'planned module regions must keep the declared minimum gap before plan/layout can pass',
 		checks.moduleRegionsRejectOverlap,
+	);
+
+	const actualOutOfRegionModules = actualModulesFromPlannedRegions(assembly).map(actual => actual.name === 'usb'
+		? { ...actual, box: { ...actual.box, maxX: actual.box.maxX + 32 } }
+		: actual);
+	const actualOutOfRegionFindings = validateLayoutContract(
+		assembly,
+		{
+			candidateSource: assembly.layoutPolicy.candidateSource,
+			totalCandidates: 20,
+			availableCandidates: 20,
+			policyStats: { baseAnchors: Object.keys(assembly.layoutPolicy.baseAnchors || {}).length, anchorVariants: 1 },
+			best: { pass: true, score: 1 },
+		},
+		{
+			pass: true,
+			minModuleGap: 200,
+			laneInterlocks: [],
+			stats: { moduleWireIntrusions: 0 },
+			moduleWireIntrusions: [],
+			modules: actualOutOfRegionModules,
+		},
+		{ contract },
+	);
+	checks.moduleRegionsRejectActualEscape = {
+		pass: actualOutOfRegionFindings.some(f => f.rule === 'PL46-module-region-contains-actual'),
+		rules: actualOutOfRegionFindings.map(f => f.rule),
+		firstFinding: actualOutOfRegionFindings.find(f => f.rule === 'PL46-module-region-contains-actual') || null,
+	};
+	assertFinding(
+		findings,
+		checks.moduleRegionsRejectActualEscape.pass,
+		'WS77-module-regions-contain-actual-bbox',
+		'project layout contract must reject generated module bboxes that escape their planned layoutPolicy.moduleRegions rectangle',
+		checks.moduleRegionsRejectActualEscape,
 	);
 
 	const narrowLayoutFindings = validateLayoutContract(

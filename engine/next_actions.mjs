@@ -629,10 +629,10 @@ if (checks.projectLayout.status !== 'pass') {
 			editFiles: ['project_assembly.json'],
 			nextCommand: 'npm.cmd run pipeline && npm.cmd run contract:layout',
 		});
-	} else if (ruleMatches(finding, /^PL3[4-9]|^PL4[0-4]/)) {
+	} else if (ruleMatches(finding, /^PL3[4-9]|^PL4[0-6]/)) {
 		pushAction(actions, {
 			area: 'module-region-contract',
-			action: 'Fix layoutPolicy.moduleRegions so every module has one non-overlapping planned rectangle with module, anchor, column, dx/dy, width, height, and role.',
+			action: 'Fix layoutPolicy.moduleRegions so every module has one non-overlapping planned rectangle and the generated structure bbox stays inside it. Use the reported module, plannedBox, actualBox, and tolerance instead of moving labels or wires by guesswork.',
 			evidence: ['project_layout_report.json', 'project_assembly.json', 'docs/schematic-design-rules.md'],
 			observed: finding,
 			editFiles: ['project_assembly.json'],
@@ -771,24 +771,6 @@ if (checks.liveShots.status === 'fail') {
 		});
 	}
 }
-if (checks.acceptance.status === 'fail' && !actions.length) {
-	pushAction(actions, {
-		area: 'acceptance',
-		action: 'Inspect acceptance_report.json for failed required steps.',
-		evidence: ['acceptance_report.json'],
-	});
-}
-if (checks.finalEvidence.status !== 'pass') {
-	pushAction(actions, {
-		area: 'final-evidence',
-		action: 'Regenerate and inspect evidence for the active project spec context. Final evidence must not reuse stale reports from another spec or project.',
-		evidence: ['final_evidence_report.json', 'acceptance_report.json', 'gsd_plan_report.json', 'gsd_generate_report.json'],
-		observed: checks.finalEvidence.firstFinding || checks.finalEvidence,
-		nextCommand: checks.acceptance.context?.spec
-			? `node bin/easyeda-gsd.mjs accept ${checks.acceptance.context.spec}`
-			: 'node bin/easyeda-gsd.mjs accept',
-	});
-}
 if (INCLUDE_DELIVERY_REPORT && checks.delivery.status === 'fail') {
 	pushAction(actions, {
 		area: 'delivery-live-evidence',
@@ -802,7 +784,9 @@ if (INCLUDE_DELIVERY_REPORT && checks.delivery.status === 'fail') {
 	});
 }
 if (checks.repairActions.status === 'fail') {
-	for (const action of (repair.actions || []).slice(0, 5)) {
+	const sourceRepairActions = (repair.actions || [])
+		.filter(action => !['final-evidence', 'acceptance'].includes(action.area));
+	for (const action of sourceRepairActions.slice(0, 5)) {
 		pushAction(actions, {
 			area: `repair:${action.area}`,
 			action: action.repairHint,

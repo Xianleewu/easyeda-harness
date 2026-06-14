@@ -49,6 +49,25 @@ function rectGap(a, b) {
 	return Number(Math.hypot(dx, dy).toFixed(3));
 }
 
+function finiteRect(rect) {
+	if (!rect) return null;
+	const minX = Number(rect.minX);
+	const maxX = Number(rect.maxX);
+	const minY = Number(rect.minY);
+	const maxY = Number(rect.maxY);
+	if (![minX, maxX, minY, maxY].every(Number.isFinite)) return null;
+	if (maxX < minX || maxY < minY) return null;
+	return { minX, maxX, minY, maxY };
+}
+
+function rectContains(outer, inner, tolerance = 0) {
+	if (!outer || !inner) return false;
+	return inner.minX >= outer.minX - tolerance
+		&& inner.maxX <= outer.maxX + tolerance
+		&& inner.minY >= outer.minY - tolerance
+		&& inner.maxY <= outer.maxY + tolerance;
+}
+
 export function measureColumnAnchorGaps(assembly) {
 	const policy = assembly?.layoutPolicy || {};
 	const modules = asArray(assembly?.modules);
@@ -185,7 +204,7 @@ export function validateGroupedRouteLabelColumns(contract, assembly, category = 
 	return findings;
 }
 
-export function validateModuleRegions(assembly, category = 'project-layout') {
+export function validateModuleRegions(assembly, category = 'project-layout', options = {}) {
 	const findings = [];
 	const policy = assembly?.layoutPolicy || {};
 	const modules = asArray(assembly?.modules);
@@ -193,6 +212,7 @@ export function validateModuleRegions(assembly, category = 'project-layout') {
 	const columns = columnIndexByModule(policy);
 	const regions = asArray(policy.moduleRegions);
 	const moduleIds = new Set(modules.map(mod => mod.id).filter(Boolean));
+	const moduleById = new Map(modules.map(mod => [mod.id, mod]).filter(([id]) => Boolean(id)));
 	const regionByModule = new Map();
 	const minGap = policy.minModuleGap ?? 90;
 	if (!regions.length) {
@@ -264,6 +284,46 @@ export function validateModuleRegions(assembly, category = 'project-layout') {
 			}
 		}
 	}
+	const actualModules = Array.isArray(options.structure?.modules) ? options.structure.modules : [];
+	if (actualModules.length && regionByModule.size) {
+		const actualByName = new Map();
+		for (const actual of actualModules) {
+			const name = actual?.name || actual?.id;
+			if (name) actualByName.set(name, actual);
+		}
+		const fitTolerance = policy.moduleRegionFitTolerance ?? 4;
+		for (const planned of regionByModule.values()) {
+			const mod = moduleById.get(planned.module) || {};
+			const actualName = mod.registryModule || mod.id || planned.module;
+			const actual = actualByName.get(actualName) || actualByName.get(planned.module);
+			if (!actual) {
+				hard(findings, 'PL45-module-region-actual-present', 'final structure metrics must report the actual generated bbox for every planned module region', {
+					module: planned.module,
+					expectedActualNames: [...new Set([actualName, planned.module].filter(Boolean))],
+					availableActualModules: [...actualByName.keys()],
+				}, category);
+				continue;
+			}
+			const actualBox = finiteRect(actual.box);
+			if (!actualBox) {
+				hard(findings, 'PL45-module-region-actual-present', 'final structure metrics module bbox must be finite before module region fit can be trusted', {
+					module: planned.module,
+					actualName: actual.name || actual.id || null,
+					actualBox: actual.box || null,
+				}, category);
+				continue;
+			}
+			if (!rectContains(planned.box, actualBox, fitTolerance)) {
+				hard(findings, 'PL46-module-region-contains-actual', 'actual generated module bbox must stay inside its planned module region; adjust the cell geometry or enlarge/move layoutPolicy.moduleRegions before accepting the layout', {
+					module: planned.module,
+					actualName: actual.name || actual.id || null,
+					tolerance: fitTolerance,
+					plannedBox: planned.box,
+					actualBox,
+				}, category);
+			}
+		}
+	}
 	return findings;
 }
 
@@ -283,7 +343,7 @@ export function validateLayoutContract(assembly, layout, structure, options = {}
 	}
 	findings.push(...validateInterfaceRoutes(options.contract, assembly, category));
 	findings.push(...validateGroupedRouteLabelColumns(options.contract, assembly, category));
-	findings.push(...validateModuleRegions(assembly, category));
+	findings.push(...validateModuleRegions(assembly, category, { structure }));
 	if (layout.candidateSource !== policy.candidateSource) {
 		hard(findings, 'PL2-planner-uses-assembly-policy', 'layout planner report must prove candidates came from project_assembly.json layoutPolicy', {
 			expected: policy.candidateSource,

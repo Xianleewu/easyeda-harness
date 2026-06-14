@@ -33,8 +33,6 @@ const BASE_REPORTS = [
 	{ gate: 'drc', file: 'drc_report.json', rerun: 'npm.cmd run drc' },
 	{ gate: 'apply-gated', file: 'apply_report.json', rerun: 'npm.cmd run apply:gated' },
 	{ gate: 'live-shots', file: 'live_shots_report.json', rerun: 'npm.cmd run live:shots' },
-	{ gate: 'final-evidence', file: 'final_evidence_report.json', rerun: 'npm.cmd run final:evidence' },
-	{ gate: 'acceptance', file: 'acceptance_report.json', rerun: 'npm.cmd run accept' },
 ];
 const REPORTS = INCLUDE_DELIVERY_REPORT
 	? [...BASE_REPORTS, { gate: 'delivery', file: 'delivery_report.json', rerun: 'npm.cmd run deliver' }]
@@ -273,12 +271,12 @@ const RULE_PLANS = [
 		nextCommand: 'node bin/easyeda-gsd.mjs plan project_spec.json',
 		repairHint: 'Declare layoutPolicy.interfaceRoutes for every project_contract interface: net/from/to, strategy visible-continuity or grouped-net-label, readable channel, and direction before generation or layout acceptance.',
 	}],
-	[/^GP4[7-9]|^GP5[0-7]|^PL3[4-9]|^PL4[0-4]/, {
+	[/^GP4[7-9]|^GP5[0-7]|^PL3[4-9]|^PL4[0-6]/, {
 		area: 'module-region-contract',
 		editFiles: ['project_assembly.json'],
 		inspectFiles: ['gsd_plan_report.json', 'project_layout_report.json', 'project_assembly.json', 'docs/schematic-design-rules.md'],
 		nextCommand: 'node bin/easyeda-gsd.mjs plan project_spec.json',
-		repairHint: 'Declare layoutPolicy.moduleRegions for every module as anchor-relative minimum readable rectangles: module, anchor, column, dx/dy, width, height, role, and enough minModuleGap between planned regions.',
+		repairHint: 'Declare layoutPolicy.moduleRegions for every module as anchor-relative minimum readable rectangles and keep each generated structure module bbox inside its planned rectangle. For PL45/PL46, use project_layout_report.json plannedBox/actualBox/tolerance to repair project_assembly.json or deterministic cell geometry.',
 	}],
 	[/^GP4[4-6]|^PL3[0-3]/, {
 		area: 'interface-label-columns',
