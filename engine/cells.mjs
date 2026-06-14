@@ -241,8 +241,14 @@ export function buttonCell(byDes, roles, A, nets) {
 	const s6 = pinOf(SW, 6) ? W(SW, place[roles.SW], 6) : s2;
 	const rBot = W(Rpu, place[roles.Rpu], 1), rTop = W(Rpu, place[roles.Rpu], 2);
 	const wires = [];
+	const pushSignalRail = (...extraYs) => {
+		const ys = [...new Set([s5[1], s6[1], rBot[1], ...extraYs].filter(Number.isFinite))].sort((a, b) => a - b);
+		for (let i = 0; i + 1 < ys.length; i++) {
+			if (ys[i] !== ys[i + 1]) wires.push({ net: '', line: [s6[0], ys[i], s6[0], ys[i + 1]] });
+		}
+	};
 	// 信号节点连接等效脚，但避开相邻 NC 标记。
-	wires.push({ net: '', line: [s5[0], s5[1], s6[0], s6[1], rBot[0], rBot[1]] });
+	wires.push({ net: '', line: [s5[0], s5[1], s6[0], s6[1]] });
 	// 3V3：上拉上端朝上
 	const v3 = [rTop[0], q10(rTop[1] + 20)];
 	wires.push({ net: 'SYS_3V3', line: [rTop[0], rTop[1], v3[0], v3[1]] });
@@ -254,6 +260,7 @@ export function buttonCell(byDes, roles, A, nets) {
 	const sigPin = Cap ? s6 : s5;
 	const sigX = A.x + (Cap ? 115 : 95);
 	wires.push({ net: nets.SIG, line: [sigPin[0], sigPin[1], sigX, sigPin[1]] });
+	if (!Cap) pushSignalRail();
 	const flags = [
 		{
 			kind: 'sig',
@@ -274,7 +281,8 @@ export function buttonCell(byDes, roles, A, nets) {
 	if (Cap) {
 		const cSig = W(Cap, place[roles.Cap], 1), cGnd = W(Cap, place[roles.Cap], 2); // 左=信号 右=GND
 		// 信号竖线在 cSig 高度抽头右接电容信号脚
-		wires.push({ net: '', line: [s6[0], s6[1], s6[0], cSig[1], cSig[0], cSig[1]] });
+		pushSignalRail(cSig[1]);
+		wires.push({ net: '', line: [s6[0], cSig[1], cSig[0], cSig[1]] });
 		const cg = [cGnd[0], q10(cGnd[1] + 35)];
 		wires.push({ net: 'GND', line: [cGnd[0], cGnd[1], cg[0], cg[1]] });
 		flags.push({ kind: 'gnd', net: 'GND', x: cg[0], y: cg[1], rot: 180 });

@@ -245,6 +245,13 @@ const RULE_PLANS = [
 		nextCommand: 'node bin/easyeda-gsd.mjs plan project_spec.json',
 		repairHint: 'Bootstrap executable cell mappings: every assembly module needs cell, refs, anchor, netArgs/nets, and a selected manifest cell implemented by the active circuit pack before generation runs.',
 	}],
+	[/^CBG-PG/, {
+		area: 'cell-builder-geometry',
+		editFiles: ['circuit_packs/<pack>/pack.mjs', 'circuit_packs/<pack>/cell_manifest.json', 'project_assembly.json'],
+		inspectFiles: ['gsd_plan_report.json', 'full_model.json', 'project_geometry_report.json'],
+		nextCommand: 'node bin/easyeda-gsd.mjs plan project_spec.json',
+		repairHint: 'Fix deterministic cell builder geometry before generation: no local wire crossings, no wires through component bodies or visible labels, and no text/flag/attribute overlaps inside the cell output.',
+	}],
 	[/^CB/, {
 		area: 'cell-builder-output',
 		editFiles: ['circuit_packs/<pack>/pack.mjs', 'circuit_packs/<pack>/cell_manifest.json', 'project_assembly.json', 'project_contract.json'],

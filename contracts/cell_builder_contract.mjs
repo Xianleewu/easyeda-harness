@@ -1,4 +1,5 @@
 import { asArray } from './module_contract.mjs';
+import { validateProjectGeometry } from '../engine/project_geometry_gate.mjs';
 
 function hard(findings, rule, msg, where = {}) {
 	findings.push({ rule, severity: 'hard', category: 'cell-builder-contract', msg, where });
@@ -31,6 +32,36 @@ function portLayoutFor(manifestCell, port) {
 
 function matchingFlags(output, net) {
 	return asArray(output?.flags).filter(flag => flag?.net === net);
+}
+
+function cloneBox(box) {
+	if (!box || ![box.minX, box.minY, box.maxX, box.maxY].every(Number.isFinite)) return null;
+	return { minX: box.minX, minY: box.minY, maxX: box.maxX, maxY: box.maxY };
+}
+
+function outputSnapForGeometry(output, mod, moduleByDes) {
+	const refs = new Set(refValues(mod.refs));
+	const components = [...refs]
+		.map(ref => moduleByDes.get(ref))
+		.filter(part => part?.bbox)
+		.map(part => ({
+			id: part.id || part.designator,
+			designator: part.designator,
+			name: part.name || part.value || '',
+			bbox: cloneBox(part.bbox),
+			attrs: asArray(part.attrs),
+		}));
+	if (!components.length) return null;
+	return {
+		components,
+		wires: asArray(output?.wires),
+		netflags: asArray(output?.flags).map(flag => ({
+			...flag,
+			type: flag.type || (flag.kind === 'sig' ? 'netport' : 'netflag'),
+			bbox: cloneBox(flag.bbox),
+		})),
+		texts: asArray(output?.texts),
+	};
 }
 
 function validatePortFlagLayout(findings, flag, mod, manifestCell, port, net, layout, anchor) {
@@ -93,7 +124,7 @@ function validatePortFlagLayout(findings, flag, mod, manifestCell, port, net, la
 	}
 }
 
-function validateCellOutput(output, mod, manifestCell, anchor) {
+function validateCellOutput(output, mod, manifestCell, anchor, moduleByDes = new Map()) {
 	const findings = [];
 	const refs = new Set(refValues(mod.refs));
 	if (!output || typeof output !== 'object') {
@@ -219,6 +250,18 @@ function validateCellOutput(output, mod, manifestCell, anchor) {
 		}
 		for (const flag of flags) validatePortFlagLayout(findings, flag, mod, manifestCell, port, net, layout, anchor);
 	}
+	const geometrySnap = outputSnapForGeometry(output, mod, moduleByDes);
+	if (geometrySnap) {
+		const geometry = validateProjectGeometry(geometrySnap);
+		for (const finding of geometry.findings) {
+			hard(findings, `CBG-${finding.rule}`, `${mod.id} builder geometry failed: ${finding.msg}`, {
+				module: mod.id,
+				cell: mod.cell,
+				geometryRule: finding.rule,
+				...finding.where,
+			});
+		}
+	}
 	return findings;
 }
 
@@ -243,7 +286,7 @@ export function validateCellBuilderDryRun({ assembly, manifest, pack, byDes = nu
 			});
 			continue;
 		}
-		findings.push(...validateCellOutput(output, mod, manifestCell, anchor));
+		findings.push(...validateCellOutput(output, mod, manifestCell, anchor, moduleByDes));
 	}
 	return findings;
 }

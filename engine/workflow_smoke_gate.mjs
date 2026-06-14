@@ -1459,7 +1459,11 @@ export const cellBuilders = {
 \tbadCell() {
 \t\treturn {
 \t\t\tplace: { U99: { x: 100, y: 100, rot: 0, mirror: false } },
-\t\t\twires: [{ net: 'UNDECLARED', line: [100, 100, 130, 140] }],
+\t\t\twires: [
+\t\t\t\t{ net: 'UNDECLARED', line: [100, 100, 130, 140] },
+\t\t\t\t{ net: 'SENSE_OUT', line: [-20, 0, 20, 0] },
+\t\t\t\t{ net: 'GND', line: [0, -20, 0, 20] },
+\t\t\t],
 \t\t\tflags: [{ kind: 'sig', content: 'TEXT_ONLY' }],
 \t\t};
 \t},
@@ -1571,10 +1575,12 @@ export const pack = { id: '${badBuilderPackId}', fallbackAnchors, cellBuilders, 
 		badBuilderPlanCli.status !== 0
 			&& badBuilderPlan?.pass === false
 			&& hasRule(badBuilderPlan, 'CB8-wire-orthogonal')
+			&& hasRule(badBuilderPlan, 'CBG-PG3-wire-crossing')
+			&& hasRule(badBuilderPlan, 'CBG-PG4-wire-through-visible-object')
 			&& hasRule(badBuilderPlan, 'CB10-flag-shape')
 			&& hasRule(badBuilderPlan, 'CB13-output-nets-declared'),
 		'WS48-cell-builder-output-contract',
-		'GSD plan must dry-run implemented cell builders and reject non-orthogonal wires, fake labels, or undeclared output nets before generation',
+		'GSD plan must dry-run implemented cell builders and reject non-orthogonal wires, crossings, wires through bodies, fake labels, or undeclared output nets before generation',
 		checks.badBuilderDryRunRejected,
 	);
 	assertFinding(
