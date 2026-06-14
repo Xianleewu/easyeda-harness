@@ -613,20 +613,53 @@ try {
 	const labelAuditBad = validateLabelLayout({
 		assembly,
 		snap: {
-			wires: [{ net: 'RESET_EN', line: [760, 855, 860, 855] }],
+			wires: [
+				{ net: 'RESET_EN', line: [760, 855, 860, 855] },
+				{ net: 'BOOT_IO9', line: [760, 849, 860, 849] },
+				{ net: 'RELAY1_EN', line: [760, 853, 860, 853] },
+			],
 			netflags: [
 				{ kind: 'sig', net: 'RESET_EN', x: 730, y: 855, textX: 730, textY: 855, alignMode: 6, bbox: { minX: 730, minY: 855, maxX: 794, maxY: 863 } },
 				{ kind: 'sig', net: 'EXT_PWR_EN', x: 760, y: 845, textX: 760, textY: 845, alignMode: 2, bbox: { minX: 720, minY: 840, maxX: 800, maxY: 852 } },
+				{ kind: 'sig', net: 'BOOT_IO9', x: 760, y: 849, textX: 760, textY: 849, alignMode: 6, bbox: { minX: 760, minY: 849, maxX: 824, maxY: 857 } },
+				{ kind: 'sig', net: 'RELAY1_EN', x: 760, y: 853, textX: 760, textY: 853, alignMode: 6, bbox: { minX: 760, minY: 853, maxX: 830, maxY: 861 } },
 			],
 			texts: [{ content: 'RESET_EN', x: 700, y: 820, bbox: { minX: 700, minY: 812, maxX: 765, maxY: 828 } }],
 		},
 	});
 	checks.labelLayoutRejectsFloatingAndFakeText = {
-		pass: ['LL7-no-fake-text-net-labels', 'LL9-label-origin-mode', 'LL13-label-attached-endpoint', 'LL14-label-column-match'].every(rule => labelAuditBad.findings.some(f => f.rule === rule)),
+		pass: ['LL7-no-fake-text-net-labels', 'LL9-label-origin-mode', 'LL13-label-attached-endpoint', 'LL14-label-column-match', 'LL21-label-column-row-pitch'].every(rule => labelAuditBad.findings.some(f => f.rule === rule)),
 		rules: labelAuditBad.findings.map(f => f.rule),
 		firstFinding: labelAuditBad.findings[0] || null,
 	};
-	assertFinding(findings, checks.labelLayoutRejectsFloatingAndFakeText.pass, 'WS67-label-layout-rejects-floating-origin-and-fake-text', 'label layout audit must reject fake text labels, floating labels, wrong origin modes, and off-column labels', checks.labelLayoutRejectsFloatingAndFakeText);
+	assertFinding(findings, checks.labelLayoutRejectsFloatingAndFakeText.pass, 'WS67-label-layout-rejects-floating-origin-and-fake-text', 'label layout audit must reject fake text labels, floating labels, wrong origin modes, off-column labels, and unreadably tight label rows', checks.labelLayoutRejectsFloatingAndFakeText);
+
+	const weakLabelColumnAssembly = clone(assembly);
+	weakLabelColumnAssembly.layoutPolicy.labelColumns = (weakLabelColumnAssembly.layoutPolicy.labelColumns || []).map((col, index) => index === 0
+		? { ...col, module: undefined, routeEnd: undefined }
+		: col);
+	const weakLabelColumnAudit = validateLabelLayout({
+		assembly: weakLabelColumnAssembly,
+		snap: {
+			wires: [{ net: 'USB_DN', line: [405, 1040, 520, 1040] }],
+			netflags: [
+				{ kind: 'sig', net: 'USB_DN', x: 405, y: 1040, textX: 405, textY: 1040, alignMode: 6, bbox: { minX: 405, minY: 1040, maxX: 457, maxY: 1048 } },
+			],
+			texts: [],
+		},
+	});
+	checks.labelLayoutRequiresModuleSideColumns = {
+		pass: ['LL18-label-column-module', 'LL19-label-column-route-end'].every(rule => weakLabelColumnAudit.findings.some(f => f.rule === rule)),
+		rules: weakLabelColumnAudit.findings.map(f => f.rule),
+		firstFinding: weakLabelColumnAudit.findings[0] || null,
+	};
+	assertFinding(
+		findings,
+		checks.labelLayoutRequiresModuleSideColumns.pass,
+		'WS80-label-layout-requires-module-route-columns',
+		'label layout audit must reject weak labelColumns that do not tie visible labels to a module and routeEnd',
+		checks.labelLayoutRequiresModuleSideColumns,
+	);
 
 	const liveLabelAuditBad = validateLabelLayout({
 		assembly,

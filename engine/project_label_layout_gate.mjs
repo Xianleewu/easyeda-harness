@@ -12,6 +12,7 @@ const SOURCE = RUN_LIVE ? LIVE : MODEL;
 const SOURCE_LABEL = RUN_LIVE ? 'live.json' : 'full_model.json';
 const EPS = 2;
 const DEFAULT_COLUMN_TOL = 4;
+const DEFAULT_LABEL_ROW_PITCH = 10;
 const POWER_NETS = new Set(['GND', 'SYS_5V', 'SYS_3V3', 'VIN_12_19V', 'VOUT_SW', 'VBUS']);
 
 function readJson(path) {
@@ -191,6 +192,8 @@ function declaredColumns(assembly, transform) {
 		index,
 		id: col.id || `label_column_${index + 1}`,
 		role: col.role || '',
+		module: col.module || '',
+		routeEnd: col.routeEnd || '',
 		side: col.side || '',
 		x: finite(col.x) ? Number(col.x) + (transform?.dx || 0) : null,
 		rawX: col.x,
@@ -204,6 +207,10 @@ function columnMatches(label, col) {
 	if (col.side && col.side !== labelSide(label)) return false;
 	if (!finite(col.x) || !finite(label.x)) return false;
 	return Math.abs(label.x - col.x) <= col.tolerance;
+}
+
+function labelColumnKey(label, col) {
+	return col?.id || `${col?.module || 'module'}:${col?.routeEnd || 'route'}:${col?.side || labelSide(label)}:${col?.rawX ?? col?.x ?? 'x'}`;
 }
 
 function expectedCorner(label) {
@@ -225,7 +232,11 @@ export function validateLabelLayout({ assembly, contract = null, snap, modelForT
 	const quality = contract?.qualityPolicy || {};
 	const netPortsForbidden = quality.singleSheetNoNetPortsByDefault !== false;
 	const requiredCols = asArray(policy.labelColumns);
+	const modules = new Set(asArray(assembly?.modules).map(mod => mod.id).filter(Boolean));
 	const labelBudget = new Map();
+	const labelColumnNetKeys = new Set();
+	const matchedLabels = [];
+	const minLabelRowPitch = Number(policy.minLabelRowPitch ?? quality.ruleProfile?.minLabelRowPitch ?? DEFAULT_LABEL_ROW_PITCH);
 
 	if (labels.length && !requiredCols.length) {
 		hard(findings, 'LL1-label-columns-declared', 'layoutPolicy.labelColumns must explain every visible signal label column', {
@@ -238,7 +249,26 @@ export function validateLabelLayout({ assembly, contract = null, snap, modelForT
 		if (!finite(col.x)) hard(findings, 'LL4-label-column-x', 'each label column must declare finite x', { index, column: col });
 		if (!asArray(col.nets).length) hard(findings, 'LL5-label-column-nets', 'each label column must declare the nets it is allowed to display', { index, column: col });
 		if (!col.role || typeof col.role !== 'string') hard(findings, 'LL6-label-column-role', 'each label column must explain its reading-flow role', { index, column: col });
-		for (const net of asArray(col.nets)) labelBudget.set(String(net), (labelBudget.get(String(net)) || 0) + 1);
+		if (!col.module || typeof col.module !== 'string') {
+			hard(findings, 'LL18-label-column-module', 'each label column must declare the owning module so visible labels are tied to a module interface instead of a free-floating sheet column', { index, column: col });
+		} else if (modules.size && !modules.has(col.module)) {
+			hard(findings, 'LL18-label-column-module', 'label column module must exist in project_assembly.json modules', { index, column: col, knownModules: [...modules] });
+		}
+		if (!['from', 'to', 'local'].includes(col.routeEnd)) {
+			hard(findings, 'LL19-label-column-route-end', 'each label column must declare routeEnd as from, to, or local so the reading-flow interface end is explicit', { index, column: col });
+		}
+		for (const net of asArray(col.nets)) {
+			labelBudget.set(String(net), (labelBudget.get(String(net)) || 0) + 1);
+			const key = `${col.module || ''}:${col.routeEnd || ''}:${col.side || ''}:${col.x ?? ''}:${net}`;
+			if (labelColumnNetKeys.has(key)) {
+				hard(findings, 'LL20-label-column-budget-unique', 'a module-side label column must not duplicate the same net budget at the same module, routeEnd, side, and x', {
+					index,
+					key,
+					column: col,
+				});
+			}
+			labelColumnNetKeys.add(key);
+		}
 	}
 
 	for (const t of fakeTextLabels(snap || {})) {
@@ -310,7 +340,9 @@ export function validateLabelLayout({ assembly, contract = null, snap, modelForT
 				nearestEndpoints: endpointsForNet(wires, label.net).slice(0, 8),
 			});
 		}
-		if (columns.length && !columns.some(col => columnMatches(label, col))) {
+		const matchedColumns = columns.filter(col => columnMatches(label, col));
+		if (matchedColumns.length) matchedLabels.push({ label, column: matchedColumns[0] });
+		if (columns.length && !matchedColumns.length) {
 			hard(findings, 'LL14-label-column-match', 'signal label must fit one declared layoutPolicy.labelColumns entry for its net, side, and x', {
 				net: label.net,
 				x: label.x,
@@ -320,6 +352,34 @@ export function validateLabelLayout({ assembly, contract = null, snap, modelForT
 				transform: liveMode ? transform : undefined,
 				allowedColumns: columns.filter(col => col.nets.has(label.net)).map(col => ({ id: col.id, side: col.side, x: col.x, rawX: col.rawX, tolerance: col.tolerance })),
 			});
+		}
+	}
+
+	if (Number.isFinite(minLabelRowPitch) && minLabelRowPitch > 0) {
+		const byColumn = new Map();
+		for (const item of matchedLabels) {
+			const key = labelColumnKey(item.label, item.column);
+			if (!byColumn.has(key)) byColumn.set(key, []);
+			byColumn.get(key).push(item);
+		}
+		for (const [key, items] of byColumn) {
+			const sorted = items
+				.filter(item => finite(item.label.y))
+				.sort((a, b) => a.label.y - b.label.y);
+			for (let i = 0; i + 1 < sorted.length; i++) {
+				const a = sorted[i];
+				const b = sorted[i + 1];
+				const pitch = Math.abs(b.label.y - a.label.y);
+				if (pitch < minLabelRowPitch - EPS) {
+					hard(findings, 'LL21-label-column-row-pitch', 'labels in the same declared column must keep a readable row pitch instead of visually merging into a clump', {
+						column: key,
+						minLabelRowPitch,
+						pitch,
+						a: { net: a.label.net, x: a.label.x, y: a.label.y, bbox: a.label.bbox || null },
+						b: { net: b.label.net, x: b.label.x, y: b.label.y, bbox: b.label.bbox || null },
+					});
+				}
+			}
 		}
 	}
 
@@ -344,9 +404,10 @@ export function validateLabelLayout({ assembly, contract = null, snap, modelForT
 			netPorts: netPorts.length,
 			labelColumns: columns.length,
 			liveTransform: liveMode ? transform : null,
+			minLabelRowPitch,
 		},
 		labels: labels.map(l => ({ source: l.source, net: l.net, x: l.x, y: l.y, alignMode: l.alignMode, bbox: l.bbox || null, estimatedBBox: !!l.estimatedBBox })),
-		columns: columns.map(c => ({ id: c.id, role: c.role, side: c.side, x: c.x, rawX: c.rawX, tolerance: c.tolerance, nets: [...c.nets] })),
+		columns: columns.map(c => ({ id: c.id, role: c.role, module: c.module || null, routeEnd: c.routeEnd || null, side: c.side, x: c.x, rawX: c.rawX, tolerance: c.tolerance, nets: [...c.nets] })),
 	};
 }
 

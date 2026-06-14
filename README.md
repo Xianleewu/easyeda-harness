@@ -100,6 +100,8 @@ Follow AGENTS.md for this repository. Install/verify easyeda-api-skill first. Fo
 - `workflows/`：GSD plan/generate/scaffold/repair 流程。
 - `reports/README.md`：生成报告和 action contract 说明。
 
+Agent rule index: wire crossings, object overlap, left-bottom/right-bottom origins.
+
 ## License
 
 正式公开发布前请补充 LICENSE 文件。

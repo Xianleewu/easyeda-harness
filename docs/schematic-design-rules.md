@@ -20,9 +20,11 @@ This file is the executable drawing rulebook for EasyEDA Harness. Agents must tr
 | DR11 | Left-side fanout labels must use EasyEDA `alignMode=6`, with the exported origin at the left-bottom text bbox corner. | `layoutPolicy.labelColumns.side=left` and label attrs | `contract:labels` / `contract:labels:live` rules `LL9-label-origin-mode`, `LL11-label-origin-corner` |
 | DR12 | Right-side fanout labels must use EasyEDA `alignMode=8`, with the exported origin at the right-bottom text bbox corner. | `layoutPolicy.labelColumns.side=right` and label attrs | `contract:labels` / `contract:labels:live` rules `LL9-label-origin-mode`, `LL11-label-origin-corner` |
 | DR13 | Same-side labels for a module or interface group must share the declared label-column `x` within tolerance. | `layoutPolicy.labelColumns[].x` and `tolerance` | `contract:labels` / `contract:labels:live` rule `LL14-label-column-match` |
-| DR14 | A net may not display more visible labels than its declared label-column budget. Internal nets without budget must stay hidden. | `layoutPolicy.labelColumns[].nets` | `contract:labels` / `contract:labels:live` budget checks |
-| DR15 | Single-sheet schematics must not use unnecessary NET PORT symbols. | `project_contract.json.qualityPolicy` and generated/live netflag objects | `contract` rule `PC25-no-net-port-default`; `contract:labels` / `contract:labels:live` rule `LL17-no-unnecessary-net-ports` |
-| DR16 | Final handoff must prove EasyEDA DRC `0 error / 0 warning / 0 info`. | live EasyEDA project | `live-check`, `accept:live`, `deliver` |
+| DR14 | Every label column must declare `module` and `routeEnd`, so visible labels are explained as a module-side interface, not a free-floating sheet decoration. | `layoutPolicy.labelColumns[].module` and `routeEnd` | `contract:labels` / `contract:labels:live` rules `LL18-label-column-module`, `LL19-label-column-route-end` |
+| DR15 | A net may not display more visible labels than its declared label-column budget. Internal nets without budget must stay hidden. | `layoutPolicy.labelColumns[].nets` | `contract:labels` / `contract:labels:live` budget checks |
+| DR16 | Labels in one declared column must keep readable row pitch; visually merged label stacks are forbidden. | `layoutPolicy.minLabelRowPitch` or default gate budget | `contract:labels` / `contract:labels:live` rule `LL21-label-column-row-pitch` |
+| DR17 | Single-sheet schematics must not use unnecessary NET PORT symbols. | `project_contract.json.qualityPolicy` and generated/live netflag objects | `contract` rule `PC25-no-net-port-default`; `contract:labels` / `contract:labels:live` rule `LL17-no-unnecessary-net-ports` |
+| DR18 | Final handoff must prove EasyEDA DRC `0 error / 0 warning / 0 info`. | live EasyEDA project | `live-check`, `accept:live`, `deliver` |
 
 ## Layout Contract
 
@@ -44,6 +46,9 @@ EasyEDA label placement is geometry-sensitive. The harness uses these hard rules
 
 - Left-side fanout labels: `side=left`, `alignMode=6`, origin equals the left-bottom bbox corner, and the origin coincides with the same-net wire endpoint.
 - Right-side fanout labels: `side=right`, `alignMode=8`, origin equals the right-bottom bbox corner, and the origin coincides with the same-net wire endpoint.
+- Every visible label must match one declared `layoutPolicy.labelColumns` entry by net, side, x tolerance, module, and routeEnd.
+- Columns without `module` and `routeEnd` are invalid because they do not explain the interface side that owns the label.
+- Labels in one column must keep readable row pitch; if they visually merge, the fix is to move the deterministic fanout rows or split the interface column, not to add floating labels.
 - The label's visible bbox must not overlap wires from other nets, component bodies, GND flags, NC markers, or other visible labels.
 - Labels that appear in `live.json` but are not explained by `layoutPolicy.labelColumns` are hard failures.
 - Ordinary text such as `PrimitiveText("USB_DP")` is not a net label and must fail the label gate.
