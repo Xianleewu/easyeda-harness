@@ -135,7 +135,7 @@ if (docs['CLAUDE.md']) {
 	requireToken(findings, 'CLAUDE.md', docs['CLAUDE.md'], 'AI6-claude-fail-closed', ['never bypass', 'fail-closed', 'only after all gates pass'], 'that write-back is fail-closed');
 }
 
-for (const file of ['README.en.md']) {
+for (const file of ['README.md', 'README.en.md']) {
 	if (!docs[file]) continue;
 	requireAll(findings, file, docs[file], file === 'README.md' ? 'AI7-readme-zh' : 'AI8-readme-en', [
 		'easyeda-api-skill',

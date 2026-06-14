@@ -1,29 +1,68 @@
 # Schematic Design Rules
 
-This file defines the layout rules that agents must treat as executable delivery requirements, not visual preferences.
+This file is the executable drawing rulebook for EasyEDA Harness. Agents must treat these requirements as delivery gates, not visual preferences or prompt guidance.
 
-## Required Geometry
+## Rule Contract
 
-- Wires are orthogonal and must not cross different nets.
-- Wires must not pass through component bodies, symbols, text, net labels, GND flags, or NC markers.
-- Component attributes, document text, net names, GND symbols, and NC markers must not overlap other visible schematic objects.
-- Each functional module occupies its own compact rectangular area. Module rectangles must keep the declared minimum gap and must not interlock with neighboring modules.
-- Inter-module nets must follow the declared reading flow in `layoutPolicy.flow`, `layoutPolicy.columns`, and `layoutPolicy.interfaceRoutes`.
+| ID | Requirement | Contract Source | Gate Evidence |
+| --- | --- | --- | --- |
+| DR1 | Wires must be orthogonal. Diagonal wire segments are forbidden. | deterministic cell output and writer output | `contract:geometry` / `contract:geometry:live` rule `PG1-wire-orthogonal` |
+| DR2 | Different-net wires and unnamed wires must not cross or touch mid-segment. | deterministic routing and `layoutPolicy.interfaceRoutes` | `contract:geometry` / `contract:geometry:live` rule `PG3-wire-crossing` |
+| DR3 | Wires must not pass through component bodies, symbols, visible text, net labels, GND flags, or NC markers. | component geometry plus cell routing | `contract:geometry` / `contract:geometry:live` rule `PG4-wire-through-visible-object` |
+| DR4 | Text, component attributes, net names, GND symbols, NC markers, and other visible objects must not overlap. | text/attribute/flag geometry | `contract:geometry` / `contract:geometry:live` rule `PG5-visible-object-overlap` |
+| DR5 | Text, net labels, flags, and attributes must not overlap component bodies. | component body bbox and visible object bbox | `contract:geometry` / `contract:geometry:live` rule `PG6-visible-object-over-component` |
+| DR6 | Each functional module must occupy its own compact module rectangle; module rectangles must keep the declared minimum gap and must not interlock. | `project_contract.json` modules plus `project_assembly.json` anchors | `contract:layout`, `pipeline`, page-composition checks |
+| DR7 | Cross-module interfaces must follow `layoutPolicy.flow`, ordered `layoutPolicy.columns`, and declared `layoutPolicy.interfaceRoutes`. | `project_assembly.json` | `contract:layout` |
+| DR8 | Every visible signal label must be budgeted in `layoutPolicy.labelColumns`; scattered labels are forbidden. | `project_assembly.json` | `contract:labels` / `contract:labels:live` rules `LL1-label-columns-declared`, `LL14-label-column-match`, `LL16-unbudgeted-visible-label` |
+| DR9 | Single-sheet net labels must be real EasyEDA wire `Name` attributes or generated model signal netflags; fake `PrimitiveText` net labels are forbidden. | writer output and live snapshot | `contract:labels` / `contract:labels:live` rule `LL7-no-fake-text-net-labels` |
+| DR10 | A visible signal label origin must land on a same-net wire endpoint. Floating labels and mid-wire labels are forbidden. | label geometry and wire endpoints | `contract:labels` / `contract:labels:live` endpoint checks |
+| DR11 | Left-side fanout labels must use EasyEDA `alignMode=6`, with the exported origin at the left-bottom text bbox corner. | `layoutPolicy.labelColumns.side=left` and label attrs | `contract:labels` / `contract:labels:live` rules `LL9-label-origin-mode`, `LL11-label-origin-corner` |
+| DR12 | Right-side fanout labels must use EasyEDA `alignMode=8`, with the exported origin at the right-bottom text bbox corner. | `layoutPolicy.labelColumns.side=right` and label attrs | `contract:labels` / `contract:labels:live` rules `LL9-label-origin-mode`, `LL11-label-origin-corner` |
+| DR13 | Same-side labels for a module or interface group must share the declared label-column `x` within tolerance. | `layoutPolicy.labelColumns[].x` and `tolerance` | `contract:labels` / `contract:labels:live` rule `LL14-label-column-match` |
+| DR14 | A net may not display more visible labels than its declared label-column budget. Internal nets without budget must stay hidden. | `layoutPolicy.labelColumns[].nets` | `contract:labels` / `contract:labels:live` budget checks |
+| DR15 | Single-sheet schematics must not use unnecessary NET PORT symbols. | `project_contract.json.qualityPolicy` and writer output | `contract`, `contract:labels`, live visual review |
+| DR16 | Final handoff must prove EasyEDA DRC `0 error / 0 warning / 0 info`. | live EasyEDA project | `live-check`, `accept:live`, `deliver` |
 
-## Signal Labels
+## Layout Contract
 
-- Single-sheet signal labels use real EasyEDA wire `Name` attributes or generated model signal netflags. Free `PrimitiveText` objects are not net labels.
-- Every visible signal label must be listed in `project_assembly.json` under `layoutPolicy.labelColumns`.
-- A visible signal label origin must land on a same-net wire endpoint. Floating labels and mid-wire labels are forbidden.
-- Left-side labels use EasyEDA `alignMode=6`, meaning the exported origin is the lower-left text corner.
-- Right-side labels use EasyEDA `alignMode=8`, meaning the exported origin is the lower-right text corner.
-- Same-side labels for a module or interface group must share the declared label-column `x` within tolerance.
-- A net may not display more visible labels than its declared `layoutPolicy.labelColumns` budget.
-- Internal nets without a declared label-column budget must not become visible wire names during write-back.
+Every project must explain its reading flow before generation:
 
-## Evidence
+- `layoutPolicy.flow` names the intended sheet reading order.
+- `layoutPolicy.columns` places modules into ordered page columns.
+- `layoutPolicy.interfaceRoutes` explains cross-module net ownership, direction, and route strategy.
+- `layoutPolicy.labelColumns` explains every visible signal label column: role, side, x coordinate, tolerance, and allowed nets.
+- `minModuleGap`, `minColumnGap`, `maxModuleWireIntrusions`, and `requireNoLaneInterlocks` turn module spacing and no-interlock requirements into measurable checks.
 
-The following gates are responsible for these rules:
+If a new project omits these fields, the correct fix is to update `project_assembly.json`, not to ask the agent to "make it look cleaner" in prose.
+
+## Label Geometry
+
+EasyEDA label placement is geometry-sensitive. The harness uses these hard rules:
+
+- Left-side fanout labels: `side=left`, `alignMode=6`, origin equals the left-bottom bbox corner, and the origin coincides with the same-net wire endpoint.
+- Right-side fanout labels: `side=right`, `alignMode=8`, origin equals the right-bottom bbox corner, and the origin coincides with the same-net wire endpoint.
+- The label's visible bbox must not overlap wires from other nets, component bodies, GND flags, NC markers, or other visible labels.
+- Labels that appear in `live.json` but are not explained by `layoutPolicy.labelColumns` are hard failures.
+- Ordinary text such as `PrimitiveText("USB_DP")` is not a net label and must fail the label gate.
+
+This rule exists because checking only the intended `alignMode` is not enough. The gate must audit actual EasyEDA exported geometry: netflag or wire `Name`, `textX`, `textY`, `alignMode`, bbox, and same-net wire endpoint.
+
+## Geometry Audit
+
+The geometry gate must audit actual generated and live objects, not only JSON intent:
+
+- wire segment endpoints and orientation
+- component and symbol bboxes
+- visible text and attribute bboxes
+- GND/NC/netflag bboxes
+- EasyEDA wire `Name` attribute bboxes when available
+- crossing points and overlap samples in the failure report
+
+Failure reports must identify the rule id, net or object names, x/y coordinates, and sample bboxes so the next agent can make a deterministic edit without guessing.
+
+## Evidence Chain
+
+The following gates are responsible for this rulebook:
 
 - `contract:layout`: module columns, spacing, no interlocks, and no unrelated wire intrusion.
 - `contract:geometry`: generated-model wire crossings, wires through visible objects, and text/label/flag/attribute overlaps.
@@ -35,4 +74,4 @@ The following gates are responsible for these rules:
 - `live-check`: live model, live label geometry, live screenshots, and EasyEDA DRC `0 error / 0 warning / 0 info`.
 - `deliver`: final live evidence gate; local-only PASS is not delivery evidence.
 
-When a rule fails, agents must repair the deterministic source: `project_assembly.json`, the selected circuit pack, cell manifest, label placement logic, or the gated writer. Manual EasyEDA edits are not accepted as the source of truth.
+When a rule fails, agents must repair the deterministic source: `project_assembly.json`, the selected circuit pack, `cell_manifest.json`, label placement logic, geometry gate, or the gated writer. Manual EasyEDA edits are not accepted as the source of truth.
