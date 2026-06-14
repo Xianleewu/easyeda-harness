@@ -163,6 +163,44 @@ function labelColumnCovers(columns, route, side, moduleId) {
 	});
 }
 
+export function validateLabelColumnContracts(assembly, category = 'project-layout') {
+	const findings = [];
+	const policy = assembly?.layoutPolicy || {};
+	const columns = asArray(policy.labelColumns);
+	const modules = new Set(asArray(assembly?.modules).map(mod => mod.id).filter(Boolean));
+	const ids = new Set();
+	const budgetKeys = new Set();
+	for (const [index, col] of columns.entries()) {
+		const id = col.id || `label_column_${index + 1}`;
+		if (ids.has(id)) hard(findings, 'PL47-label-column-id-unique', 'layoutPolicy.labelColumns ids must be unique', { index, id, column: col }, category);
+		ids.add(id);
+		if (!col.role || typeof col.role !== 'string') hard(findings, 'PL48-label-column-role', 'layoutPolicy.labelColumns entries must explain their reading-flow role', { index, column: col }, category);
+		if (!['left', 'right'].includes(col.side)) hard(findings, 'PL49-label-column-side', 'layoutPolicy.labelColumns entries must declare side left or right', { index, column: col }, category);
+		if (!finiteNumber(col.x)) hard(findings, 'PL50-label-column-x', 'layoutPolicy.labelColumns entries must declare finite x', { index, column: col }, category);
+		if (!asArray(col.nets).length) hard(findings, 'PL51-label-column-nets', 'layoutPolicy.labelColumns entries must declare allowed nets', { index, column: col }, category);
+		if (!col.module || typeof col.module !== 'string') {
+			hard(findings, 'PL52-label-column-module', 'layoutPolicy.labelColumns entries must declare the owning module before generation', { index, column: col }, category);
+		} else if (modules.size && !modules.has(col.module)) {
+			hard(findings, 'PL52-label-column-module', 'layoutPolicy.labelColumns module must exist in project_assembly.json modules', { index, column: col, knownModules: [...modules] }, category);
+		}
+		if (!['from', 'to', 'local'].includes(col.routeEnd)) {
+			hard(findings, 'PL53-label-column-route-end', 'layoutPolicy.labelColumns entries must declare routeEnd as from, to, or local', { index, column: col }, category);
+		}
+		for (const net of asArray(col.nets)) {
+			const key = `${col.module || ''}:${col.routeEnd || ''}:${col.side || ''}:${col.x ?? ''}:${net}`;
+			if (budgetKeys.has(key)) {
+				hard(findings, 'PL54-label-column-budget-unique', 'layoutPolicy.labelColumns must not duplicate the same module-side net budget at the same side and x', {
+					index,
+					key,
+					column: col,
+				}, category);
+			}
+			budgetKeys.add(key);
+		}
+	}
+	return findings;
+}
+
 export function validateGroupedRouteLabelColumns(contract, assembly, category = 'project-layout', options = {}) {
 	const findings = [];
 	const policy = assembly?.layoutPolicy || {};
@@ -342,6 +380,7 @@ export function validateLayoutContract(assembly, layout, structure, options = {}
 		hard(findings, 'PL22-interface-routes-declared', 'layoutPolicy.interfaceRoutes must declare cross-module routing intent before layout search', {}, category);
 	}
 	findings.push(...validateInterfaceRoutes(options.contract, assembly, category));
+	findings.push(...validateLabelColumnContracts(assembly, category));
 	findings.push(...validateGroupedRouteLabelColumns(options.contract, assembly, category));
 	findings.push(...validateModuleRegions(assembly, category, { structure }));
 	if (layout.candidateSource !== policy.candidateSource) {

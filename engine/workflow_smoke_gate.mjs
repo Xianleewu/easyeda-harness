@@ -551,6 +551,55 @@ try {
 		checks.labelColumnsMustCoverRouteEnds,
 	);
 
+	const weakLayoutLabelColumnsAssembly = clone(assembly);
+	weakLayoutLabelColumnsAssembly.layoutPolicy.labelColumns = (weakLayoutLabelColumnsAssembly.layoutPolicy.labelColumns || []).map((col, index) => index === 0
+		? { ...col, module: undefined, routeEnd: undefined }
+		: col);
+	const weakLayoutLabelColumnsPlan = buildPlanForFiles({
+		spec,
+		contract,
+		netlist,
+		assembly: weakLayoutLabelColumnsAssembly,
+		libraryManifest,
+		specPath: '_tmp_workflow_smoke/weak_label_columns_project_spec.json',
+	});
+	const weakLayoutLabelColumnFindings = validateLayoutContract(
+		weakLayoutLabelColumnsAssembly,
+		{
+			candidateSource: weakLayoutLabelColumnsAssembly.layoutPolicy.candidateSource,
+			totalCandidates: 20,
+			availableCandidates: 20,
+			policyStats: { baseAnchors: Object.keys(weakLayoutLabelColumnsAssembly.layoutPolicy.baseAnchors || {}).length, anchorVariants: 1 },
+			best: { pass: true, score: 1 },
+		},
+		{
+			pass: true,
+			minModuleGap: 200,
+			laneInterlocks: [],
+			stats: { moduleWireIntrusions: 0 },
+			moduleWireIntrusions: [],
+		},
+		{ contract },
+	);
+	checks.labelColumnsRequireModuleAndRouteEndBeforeGeneration = {
+		planPass: weakLayoutLabelColumnsPlan.pass,
+		planRules: (weakLayoutLabelColumnsPlan.findings || []).map(f => f.rule),
+		layoutRules: weakLayoutLabelColumnFindings.map(f => f.rule),
+		firstPlanFinding: weakLayoutLabelColumnsPlan.findings?.find(f => f.rule === 'GP63-label-column-module' || f.rule === 'GP64-label-column-route-end') || null,
+		firstLayoutFinding: weakLayoutLabelColumnFindings.find(f => f.rule === 'PL52-label-column-module' || f.rule === 'PL53-label-column-route-end') || null,
+	};
+	assertFinding(
+		findings,
+		!weakLayoutLabelColumnsPlan.pass
+			&& hasRule(weakLayoutLabelColumnsPlan, 'GP63-label-column-module')
+			&& hasRule(weakLayoutLabelColumnsPlan, 'GP64-label-column-route-end')
+			&& weakLayoutLabelColumnFindings.some(f => f.rule === 'PL52-label-column-module')
+			&& weakLayoutLabelColumnFindings.some(f => f.rule === 'PL53-label-column-route-end'),
+		'WS81-label-columns-require-module-route-before-generation',
+		'plan/layout gates must reject labelColumns that do not declare module and routeEnd before deterministic generation',
+		checks.labelColumnsRequireModuleAndRouteEndBeforeGeneration,
+	);
+
 	const geometryAuditGood = validateProjectGeometry({
 		components: [
 			{ designator: 'U1', bbox: { minX: 100, minY: 100, maxX: 140, maxY: 140 } },

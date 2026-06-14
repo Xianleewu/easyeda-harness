@@ -5,7 +5,7 @@ import { validateNetContract } from '../contracts/net_contract.mjs';
 import { validateLibraryContract } from '../contracts/library_contract.mjs';
 import { validateDrawingRuleBindings } from '../contracts/drawing_rule_registry.mjs';
 import { validateCellBuilderDryRun } from '../contracts/cell_builder_contract.mjs';
-import { interfaceKey, measureColumnAnchorGaps, validateGroupedRouteLabelColumns, validateInterfaceRoutes, validateModuleRegions } from '../contracts/layout_contract.mjs';
+import { interfaceKey, measureColumnAnchorGaps, validateGroupedRouteLabelColumns, validateInterfaceRoutes, validateLabelColumnContracts, validateModuleRegions } from '../contracts/layout_contract.mjs';
 import { asArray as cellArray, cellContractMap, loadCellManifest, resolveCellManifestPath } from '../engine/cell_manifest.mjs';
 import { withLocalPins } from '../engine/transform.mjs';
 import { HARNESS_RULES } from '../harness/rule_registry.mjs';
@@ -165,6 +165,19 @@ function validateStaticLabelColumns(contract, assembly) {
 		if (!['left', 'right'].includes(col.side)) hard(findings, 'GP38-label-column-side', 'layoutPolicy.labelColumns entries must declare side left or right', { index, column: col });
 		if (!Number.isFinite(col.x)) hard(findings, 'GP39-label-column-x', 'layoutPolicy.labelColumns entries must declare finite x', { index, column: col });
 		if (!asArray(col.nets).length) hard(findings, 'GP40-label-column-nets', 'layoutPolicy.labelColumns entries must declare allowed nets', { index, column: col });
+	}
+	const labelColumnRuleMap = {
+		'PL47-label-column-id-unique': 'GP58-label-column-id-unique',
+		'PL48-label-column-role': 'GP59-label-column-role',
+		'PL49-label-column-side': 'GP60-label-column-side',
+		'PL50-label-column-x': 'GP61-label-column-x',
+		'PL51-label-column-nets': 'GP62-label-column-nets',
+		'PL52-label-column-module': 'GP63-label-column-module',
+		'PL53-label-column-route-end': 'GP64-label-column-route-end',
+		'PL54-label-column-budget-unique': 'GP65-label-column-budget-unique',
+	};
+	for (const finding of validateLabelColumnContracts(assembly, 'gsd-plan')) {
+		findings.push({ ...finding, rule: labelColumnRuleMap[finding.rule] || finding.rule.replace(/^PL/, 'GP') });
 	}
 	for (const route of groupedRoutes) {
 		const covered = columns.some(col => asArray(col.nets).includes(route.net));
