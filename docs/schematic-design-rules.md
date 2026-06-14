@@ -14,6 +14,7 @@ This file is the executable drawing rulebook for EasyEDA Harness. Agents must tr
 | DR6 | Each functional module must occupy its own compact module rectangle; module rectangles must keep the declared minimum gap and must not interlock. | `project_contract.json` modules plus `project_assembly.json` anchors | `contract:layout`, `pipeline`, page-composition checks |
 | DR7 | Cross-module interfaces must follow `layoutPolicy.flow`, ordered `layoutPolicy.columns`, and declared `layoutPolicy.interfaceRoutes`. | `project_assembly.json` | `contract:layout` |
 | DR8 | Every visible signal label must be budgeted in `layoutPolicy.labelColumns`; scattered labels are forbidden. | `project_assembly.json` | `contract:labels` / `contract:labels:live` rules `LL1-label-columns-declared`, `LL14-label-column-match`, `LL16-unbudgeted-visible-label` |
+| DR8A | Every grouped-net-label interface must declare source and target module-side label columns before generation. | `layoutPolicy.interfaceRoutes` and `layoutPolicy.labelColumns` | `gsd:plan` rules `GP44-label-column-covers-route-from`, `GP45-label-column-covers-route-to`; `contract:layout` rules `PL31-label-column-covers-route-from`, `PL32-label-column-covers-route-to` |
 | DR9 | Single-sheet net labels must be real EasyEDA wire `Name` attributes or generated model signal netflags; fake `PrimitiveText` net labels are forbidden. | writer output and live snapshot | `contract:labels` / `contract:labels:live` rule `LL7-no-fake-text-net-labels` |
 | DR10 | A visible signal label origin must land on a same-net wire endpoint. Floating labels and mid-wire labels are forbidden. | label geometry and wire endpoints | `contract:labels` / `contract:labels:live` endpoint checks |
 | DR11 | Left-side fanout labels must use EasyEDA `alignMode=6`, with the exported origin at the left-bottom text bbox corner. | `layoutPolicy.labelColumns.side=left` and label attrs | `contract:labels` / `contract:labels:live` rules `LL9-label-origin-mode`, `LL11-label-origin-corner` |
@@ -30,7 +31,7 @@ Every project must explain its reading flow before generation:
 - `layoutPolicy.flow` names the intended sheet reading order.
 - `layoutPolicy.columns` places modules into ordered page columns.
 - `layoutPolicy.interfaceRoutes` explains cross-module net ownership, direction, and route strategy.
-- `layoutPolicy.labelColumns` explains every visible signal label column: role, side, x coordinate, tolerance, and allowed nets.
+- `layoutPolicy.labelColumns` explains every visible signal label column: role, module, routeEnd, side, x coordinate, tolerance, and allowed nets.
 - `minModuleGap`, `minColumnGap`, `maxModuleWireIntrusions`, and `requireNoLaneInterlocks` turn module spacing and no-interlock requirements into measurable checks.
 
 If a new project omits these fields, the correct fix is to update `project_assembly.json`, not to ask the agent to "make it look cleaner" in prose.
@@ -44,6 +45,7 @@ EasyEDA label placement is geometry-sensitive. The harness uses these hard rules
 - The label's visible bbox must not overlap wires from other nets, component bodies, GND flags, NC markers, or other visible labels.
 - Labels that appear in `live.json` but are not explained by `layoutPolicy.labelColumns` are hard failures.
 - Ordinary text such as `PrimitiveText("USB_DP")` is not a net label and must fail the label gate.
+- For grouped cross-module interfaces, the source module column should declare `module=<from>`, `routeEnd=from`, and a readable output side; the target module column should declare `module=<to>`, `routeEnd=to`, and a readable input side.
 
 This rule exists because checking only the intended `alignMode` is not enough. The gate must audit actual EasyEDA exported geometry: netflag or wire `Name`, `textX`, `textY`, `alignMode`, bbox, and same-net wire endpoint.
 

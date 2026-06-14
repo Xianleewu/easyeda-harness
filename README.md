@@ -33,7 +33,7 @@ Follow AGENTS.md for this repository. Install/verify easyeda-api-skill first. Fo
 - `project_contract.json`：模块矩形、关键器件、接口、视觉证据区域和禁止自由绘制约束。
 - `project_netlist.json`：关键网络必须连接到哪些器件引脚。
 - `project_assembly.json`：模块到确定性 cell、锚点、网络和 `layoutPolicy.flow` / `layoutPolicy.columns` / `anchorVariants` 的映射。
-- `layoutPolicy.labelColumns`：可见 net label 的列、方向、预算、端点和原点策略。
+- `layoutPolicy.labelColumns`：可见 net label 的列、module、routeEnd、方向、预算、端点和原点策略。
 - `circuit_packs/<pack>/cell_manifest.json`：cell 能力、端口、refs、布局意图和 `qualityRules`。
 
 当前模板 PASS 只证明当前模板。换项目时，Agent 必须先补合同、netlist、cell manifest、assembly、规则覆盖和库绑定，不能把示例坐标当成通用设计器。
@@ -47,6 +47,7 @@ Follow AGENTS.md for this repository. Install/verify easyeda-api-skill first. Fo
 - `contract:library`：检查器件 Symbol、Device、Footprint、名称、值和 BOM/PCB 状态。
 - `contract:geometry` / `contract:geometry:live`：检查正交导线、异网交叉、导线穿越可见对象、文字/属性/符号/器件 bbox 重叠。
 - `contract:labels` / `contract:labels:live`：检查真实 wire `Name`，禁止 fake `PrimitiveText` net label，检查左侧 `alignMode=6`、右侧 `alignMode=8`、同类标签成列、端点贴合、禁止散点 label。
+- grouped-net-label 接口必须在生成前声明 source/target 两侧的 `layoutPolicy.labelColumns`，并用 `module` 与 `routeEnd` 解释标签属于哪个模块接口。
 - `action:schema`：检查 `next_actions.json` 的稳定修复动作结构。
 - `deliver`：最终交付门禁，写出 `delivery_report.json`，要求 live 证据而不是 local-only 结果。
 

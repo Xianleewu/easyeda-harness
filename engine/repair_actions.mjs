@@ -273,6 +273,13 @@ const RULE_PLANS = [
 		nextCommand: 'node bin/easyeda-gsd.mjs plan project_spec.json',
 		repairHint: 'Declare layoutPolicy.interfaceRoutes for every project_contract interface: net/from/to, strategy visible-continuity or grouped-net-label, readable channel, and direction before generation or layout acceptance.',
 	}],
+	[/^GP4[4-6]|^PL3[0-3]/, {
+		area: 'interface-label-columns',
+		editFiles: ['project_assembly.json'],
+		inspectFiles: ['gsd_plan_report.json', 'project_layout_report.json', 'project_assembly.json', 'docs/schematic-design-rules.md'],
+		nextCommand: 'node bin/easyeda-gsd.mjs plan project_spec.json',
+		repairHint: 'Declare module-side layoutPolicy.labelColumns for every grouped-net-label interface: source column uses module=<from>, routeEnd=from; target column uses module=<to>, routeEnd=to; each column lists the interface net and has side/x/tolerance.',
+	}],
 	[/^PL/, {
 		area: 'project-layout',
 		editFiles: ['project_assembly.json', 'engine/layout_planner.mjs', 'contracts/layout_contract.mjs'],

@@ -410,7 +410,16 @@ if (checks.gsdPlan.status !== 'pass') {
 			editFiles: ['project_contract.json', 'contracts/module_contract.mjs', 'harness/config.mjs'],
 			nextCommand: 'node bin/easyeda-gsd.mjs plan project_spec.json',
 		});
-	} else if (ruleMatches(finding, /^GP2[7-9]|^GP3[0-4]/)) {
+	} else if (ruleMatches(finding, /^GP4[4-6]/)) {
+		pushAction(actions, {
+			area: 'interface-label-columns',
+			action: 'Declare module-side layoutPolicy.labelColumns for each grouped-net-label interface. The source side needs module=<from> and routeEnd=from; the target side needs module=<to> and routeEnd=to, with the interface net listed in nets.',
+			evidence: ['gsd_plan_report.json', 'project_assembly.json', 'docs/schematic-design-rules.md'],
+			observed: finding,
+			editFiles: ['project_assembly.json'],
+			nextCommand: 'node bin/easyeda-gsd.mjs plan project_spec.json',
+		});
+	} else if (ruleMatches(finding, /^GP2[7-9]|^GP3[0-4]|^GP4[3-6]/)) {
 		pushAction(actions, {
 			area: 'interface-routing-contract',
 			action: 'Declare layoutPolicy.interfaceRoutes before generation. Every project_contract interface needs net/from/to, strategy visible-continuity or grouped-net-label, a readable channel, and direction.',
@@ -456,6 +465,17 @@ if (checks.gsdPlan.status !== 'pass') {
 			evidence: ['gsd_plan_report.json', 'cell_manifest_report.json', 'circuit_packs/<pack>/cell_manifest.json', 'circuit_packs/<pack>/pack.mjs'],
 			observed: portLayoutFinding,
 			editFiles: ['circuit_packs/<pack>/cell_manifest.json', 'circuit_packs/<pack>/pack.mjs', 'project_assembly.json'],
+			nextCommand: 'node bin/easyeda-gsd.mjs plan project_spec.json',
+		});
+	}
+	const labelColumnFinding = planFindings.find(f => ruleMatches(f, /^GP4[4-6]/));
+	if (labelColumnFinding && !hasActionArea(actions, 'interface-label-columns')) {
+		pushAction(actions, {
+			area: 'interface-label-columns',
+			action: 'Declare module-side layoutPolicy.labelColumns for each grouped-net-label interface. The source side needs module=<from> and routeEnd=from; the target side needs module=<to> and routeEnd=to, with the interface net listed in nets.',
+			evidence: ['gsd_plan_report.json', 'project_assembly.json', 'docs/schematic-design-rules.md'],
+			observed: labelColumnFinding,
+			editFiles: ['project_assembly.json'],
 			nextCommand: 'node bin/easyeda-gsd.mjs plan project_spec.json',
 		});
 	}
@@ -580,7 +600,16 @@ if (checks.projectAssembly.status !== 'pass') {
 }
 if (checks.projectLayout.status !== 'pass') {
 	const finding = checks.projectLayout.firstFinding;
-	if (ruleMatches(finding, /^PL2[2-9]/)) {
+	if (ruleMatches(finding, /^PL3[0-3]/)) {
+		pushAction(actions, {
+			area: 'interface-label-columns',
+			action: 'Fix layoutPolicy.labelColumns so grouped-net-label interfaces have both source and target module-side columns with module, routeEnd, side, x, tolerance, and nets.',
+			evidence: ['project_layout_report.json', 'project_assembly.json', 'docs/schematic-design-rules.md'],
+			observed: finding,
+			editFiles: ['project_assembly.json'],
+			nextCommand: 'npm.cmd run pipeline && npm.cmd run contract:layout',
+		});
+	} else if (ruleMatches(finding, /^PL2[2-9]/)) {
 		pushAction(actions, {
 			area: 'interface-routing-contract',
 			action: 'Fix layoutPolicy.interfaceRoutes so every contract interface has net/from/to, strategy, readable channel, and direction before layout acceptance.',

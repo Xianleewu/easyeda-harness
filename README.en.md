@@ -36,7 +36,7 @@ A PASS on the current model only proves the current model. It does not validate 
 - Assembly coverage check: `contract:assembly` proves every contract module is mapped to a deterministic cell, anchor, refs, and nets before generation.
 - Layout policy check: `contract:layout` proves layout search is driven by `project_assembly.json` and that `layoutPolicy.flow`, ordered `layoutPolicy.columns`, generic `anchorVariants` or project search space, module spacing, no interlock, and no unrelated wire intrusion requirements are satisfied.
 - Geometry check: `contract:geometry` audits the actual generated model for orthogonal wires, different-net or unnamed wire crossings, wires through visible objects, and overlaps among text, labels, flags, attributes, and component bodies. In live mode, `contract:geometry:live` runs the same audit against the real EasyEDA snapshot.
-- Label layout check: `contract:labels` audits actual generated label geometry, including `layoutPolicy.labelColumns`, visible label budgets, left-bottom/right-bottom origins, same-net wire endpoint attachment, fake text labels, and scattered unbudgeted labels. In live mode, `contract:labels:live` runs the same audit against the real EasyEDA snapshot.
+- Label layout check: `contract:labels` audits actual generated label geometry, including `layoutPolicy.labelColumns`, visible label budgets, left-bottom/right-bottom origins, same-net wire endpoint attachment, fake text labels, and scattered unbudgeted labels. Grouped cross-module interfaces must declare source and target module-side label columns with `module` and `routeEnd`. In live mode, `contract:labels:live` runs the same audit against the real EasyEDA snapshot.
 - Contract realization check: after `full_model.json` is generated, `contract:model` proves the model actually expresses the contract modules, parts, nets, and interfaces.
 - Visual evidence check: after offline previews are generated, `contract:visual` proves every contract visual evidence region exists and passes image inspection.
 - Fast offline check: validates the schematic model on local CPU and is intended for daily coordinate and rule iteration.
@@ -149,7 +149,7 @@ For handoff, review the global sheet and local crops for USB, LDO, RESET, BOOT, 
 - No fake text net labels
 - No unnecessary NET PORT symbols on a single-sheet schematic
 - Readable wire `Name` anchors: left-side labels use bottom-left origin, right-side labels use bottom-right origin
-- Declared label columns: every visible signal label is covered by `layoutPolicy.labelColumns`
+- Declared label columns: every visible signal label is covered by `layoutPolicy.labelColumns`, and grouped interfaces have source/target module-side columns
 - Functional modules occupy clean rectangular regions with reasonable gaps
 - No overlap among text, component attributes, net names, GND symbols, and NC markers
 
