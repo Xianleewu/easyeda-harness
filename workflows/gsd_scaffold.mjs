@@ -14,6 +14,12 @@ function moduleVisualId(id) {
 	return String(id || '').replace(/_/g, '-');
 }
 
+const SCAFFOLD_MODULE_WIDTH = 180;
+const SCAFFOLD_MODULE_HEIGHT = 140;
+const SCAFFOLD_MODULE_GAP = 90;
+const SCAFFOLD_COLUMN_PITCH = SCAFFOLD_MODULE_WIDTH + SCAFFOLD_MODULE_GAP + 50;
+const SCAFFOLD_LABEL_GUTTER = SCAFFOLD_MODULE_WIDTH / 2 + 45;
+
 export function buildScaffold(spec, { pack = 'aihwdebugger', useGeneratedCells = false } = {}) {
 	const modules = asArray(spec.modules);
 	const generatedManifest = buildCellManifestTemplate(spec.circuitPack || pack, spec);
@@ -90,7 +96,7 @@ export function buildScaffold(spec, { pack = 'aihwdebugger', useGeneratedCells =
 		texts: [],
 	};
 
-	const anchors = Object.fromEntries(modules.map((mod, index) => [mod.id, { x: 300 + index * 240, y: 600 }]));
+	const anchors = Object.fromEntries(modules.map((mod, index) => [mod.id, { x: 300 + index * SCAFFOLD_COLUMN_PITCH, y: 600 }]));
 	const columns = modules.map((mod, index) => ({
 		id: `column_${index + 1}`,
 		role: mod.title || mod.id,
@@ -102,8 +108,8 @@ export function buildScaffold(spec, { pack = 'aihwdebugger', useGeneratedCells =
 		column: columns[index].id,
 		dx: 0,
 		dy: 0,
-		width: 180,
-		height: 140,
+		width: SCAFFOLD_MODULE_WIDTH,
+		height: SCAFFOLD_MODULE_HEIGHT,
 		role: mod.title || mod.id,
 	}));
 	const anchorVariants = [
@@ -135,7 +141,7 @@ export function buildScaffold(spec, { pack = 'aihwdebugger', useGeneratedCells =
 	const groupedSignalRoutes = interfaceRoutes.filter(route => route.strategy === 'grouped-net-label' && route.net && !['GND', 'SYS_3V3', 'SYS_5V', 'VBUS'].includes(route.net));
 	const labelColumnMap = new Map();
 	function addLabelColumn({ moduleId, side, routeEnd, net }) {
-		const x = anchors[moduleId]?.x == null ? (side === 'left' ? 540 : 300) : anchors[moduleId].x + (side === 'left' ? -90 : 90);
+		const x = anchors[moduleId]?.x == null ? (side === 'left' ? 540 : 300) : anchors[moduleId].x + (side === 'left' ? -SCAFFOLD_LABEL_GUTTER : SCAFFOLD_LABEL_GUTTER);
 		const key = `${moduleId || 'module'}:${side}:${routeEnd}:${x}`;
 		if (!labelColumnMap.has(key)) {
 			labelColumnMap.set(key, {

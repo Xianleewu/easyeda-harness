@@ -1503,6 +1503,13 @@ try {
 	);
 	assertFinding(
 		findings,
+		!['GP26-layout-column-gap', 'GP57-module-region-gap', 'GP63-label-column-module', 'GP64-label-column-route-end'].some(rule => hasRule(scaffoldPlan, rule)),
+		'WS82-scaffold-layout-baseline-clean',
+		'fresh scaffold may fail because project details are incomplete, but its default layout contract must not start with overlapping module regions, narrow columns, or weak label columns',
+		checks.scaffold,
+	);
+	assertFinding(
+		findings,
 		(scaffoldAssembly.layoutPolicy?.labelColumns || []).every(col => ['left', 'right'].includes(col.side)
 			&& ['from', 'to'].includes(col.routeEnd)
 			&& col.module
