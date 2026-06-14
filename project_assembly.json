@@ -147,6 +147,16 @@
       { "id": "switching", "role": "high-side power switching", "modules": ["pmos"] },
       { "id": "outputs", "role": "external relay outputs", "modules": ["relay1", "relay2"] }
     ],
+    "moduleRegions": [
+      { "module": "usb", "anchor": "usb", "column": "input", "dx": -144, "dy": 10.25, "width": 373, "height": 144.5, "role": "USB-C input minimum readable rectangle" },
+      { "module": "ldo", "anchor": "ldo", "column": "input", "dx": 56.5, "dy": -22.75, "width": 208, "height": 89.5, "role": "5V to 3V3 power minimum readable rectangle" },
+      { "module": "reset", "anchor": "btn1", "column": "control", "dx": 47.5, "dy": 22.75, "width": 140, "height": 109.5, "role": "reset support minimum readable rectangle" },
+      { "module": "boot", "anchor": "btn2", "column": "control", "dx": 7, "dy": 22.75, "width": 90, "height": 109.5, "role": "boot support minimum readable rectangle" },
+      { "module": "mcu", "anchor": "mcu", "column": "control", "dx": 0, "dy": 0, "width": 120, "height": 170, "role": "ESP32 MCU minimum readable rectangle" },
+      { "module": "pmos", "anchor": "pmos", "column": "switching", "dx": -37.5, "dy": -47.5, "width": 289, "height": 290, "role": "high-side switch minimum readable rectangle" },
+      { "module": "relay1", "anchor": "relay1", "column": "outputs", "dx": 14.75, "dy": 12.5, "width": 234.5, "height": 140, "role": "relay output 1 minimum readable rectangle" },
+      { "module": "relay2", "anchor": "relay2", "column": "outputs", "dx": 14.75, "dy": 12.5, "width": 234.5, "height": 140, "role": "relay output 2 minimum readable rectangle" }
+    ],
     "minModuleGap": 90,
     "minColumnGap": 120,
     "maxModuleWireIntrusions": 0,

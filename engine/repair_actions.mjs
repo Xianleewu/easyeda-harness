@@ -273,6 +273,13 @@ const RULE_PLANS = [
 		nextCommand: 'node bin/easyeda-gsd.mjs plan project_spec.json',
 		repairHint: 'Declare layoutPolicy.interfaceRoutes for every project_contract interface: net/from/to, strategy visible-continuity or grouped-net-label, readable channel, and direction before generation or layout acceptance.',
 	}],
+	[/^GP4[7-9]|^GP5[0-7]|^PL3[4-9]|^PL4[0-4]/, {
+		area: 'module-region-contract',
+		editFiles: ['project_assembly.json'],
+		inspectFiles: ['gsd_plan_report.json', 'project_layout_report.json', 'project_assembly.json', 'docs/schematic-design-rules.md'],
+		nextCommand: 'node bin/easyeda-gsd.mjs plan project_spec.json',
+		repairHint: 'Declare layoutPolicy.moduleRegions for every module as anchor-relative minimum readable rectangles: module, anchor, column, dx/dy, width, height, role, and enough minModuleGap between planned regions.',
+	}],
 	[/^GP4[4-6]|^PL3[0-3]/, {
 		area: 'interface-label-columns',
 		editFiles: ['project_assembly.json'],

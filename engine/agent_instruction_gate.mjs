@@ -56,6 +56,7 @@ if (docs['AGENTS.md']) {
 		'project_assembly.json',
 		'layoutPolicy.flow',
 		'layoutPolicy.columns',
+		'layoutPolicy.moduleRegions',
 		'anchorVariants',
 		'cell_manifest.json',
 		'qualityRules',
@@ -106,6 +107,7 @@ if (docs['CLAUDE.md']) {
 		'project_assembly.json',
 		'layoutPolicy.flow',
 		'layoutPolicy.columns',
+		'layoutPolicy.moduleRegions',
 		'anchorVariants',
 		'cell_manifest.json',
 		'qualityRules',
@@ -149,6 +151,7 @@ for (const file of ['README.md', 'README.en.md']) {
 		'project_assembly.json',
 		'layoutPolicy.flow',
 		'layoutPolicy.columns',
+		'layoutPolicy.moduleRegions',
 		'anchorVariants',
 		'cell_manifest.json',
 		'qualityRules',
@@ -189,6 +192,7 @@ if (docs['docs/schematic-design-rules.md']) {
 		'PrimitiveText',
 		'wire endpoint',
 		'module rectangles',
+		'layoutPolicy.moduleRegions',
 		'DRC `0 error / 0 warning / 0 info`',
 	], 'schematic design rules must be executable and evidence-linked');
 }

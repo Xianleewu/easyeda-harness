@@ -88,6 +88,21 @@ export function buildScaffold(spec, { pack = 'aihwdebugger' } = {}) {
 	};
 
 	const anchors = Object.fromEntries(modules.map((mod, index) => [mod.id, { x: 300 + index * 240, y: 600 }]));
+	const columns = modules.map((mod, index) => ({
+		id: `column_${index + 1}`,
+		role: mod.title || mod.id,
+		modules: [mod.id],
+	}));
+	const moduleRegions = modules.map((mod, index) => ({
+		module: mod.id,
+		anchor: mod.id,
+		column: columns[index].id,
+		dx: 0,
+		dy: 0,
+		width: 180,
+		height: 140,
+		role: mod.title || mod.id,
+	}));
 	const anchorVariants = [
 		{ id: 'base', dxStep: 0, dy: 0 },
 		{ id: 'compact-right', dxStep: 20, dy: 0 },
@@ -153,11 +168,8 @@ export function buildScaffold(spec, { pack = 'aihwdebugger' } = {}) {
 		layoutPolicy: {
 			candidateSource: 'project_assembly.layoutPolicy',
 			flow: 'left-to-right: fill ordered functional columns before generation',
-			columns: modules.map((mod, index) => ({
-				id: `column_${index + 1}`,
-				role: mod.title || mod.id,
-				modules: [mod.id],
-			})),
+			columns,
+			moduleRegions,
 			minModuleGap: 90,
 			minColumnGap: 120,
 			maxModuleWireIntrusions: 0,

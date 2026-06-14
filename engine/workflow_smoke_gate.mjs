@@ -300,6 +300,69 @@ try {
 		firstFinding: checks.layoutColumnsNeedReadableGap.firstFinding,
 	});
 
+	const noModuleRegionsAssembly = clone(assembly);
+	delete noModuleRegionsAssembly.layoutPolicy.moduleRegions;
+	const noModuleRegionsPlan = buildPlanForFiles({
+		spec,
+		contract,
+		netlist,
+		assembly: noModuleRegionsAssembly,
+		libraryManifest,
+		specPath: '_tmp_workflow_smoke/no_module_regions_project_spec.json',
+	});
+	checks.moduleRegionsRequired = {
+		pass: !noModuleRegionsPlan.pass && hasRule(noModuleRegionsPlan, 'GP47-module-regions-declared'),
+		rules: (noModuleRegionsPlan.findings || []).map(f => f.rule),
+		firstFinding: noModuleRegionsPlan.findings?.find(f => f.rule === 'GP47-module-regions-declared') || null,
+	};
+	assertFinding(findings, checks.moduleRegionsRequired.pass, 'WS74-module-regions-required-before-generation', 'GSD plan must reject projects without layoutPolicy.moduleRegions before generation', checks.moduleRegionsRequired);
+
+	const overlappingModuleRegionsAssembly = clone(assembly);
+	overlappingModuleRegionsAssembly.layoutPolicy.moduleRegions = (overlappingModuleRegionsAssembly.layoutPolicy.moduleRegions || []).map(region => {
+		if (region.module === 'ldo') return { ...region, anchor: 'usb', dx: -144, dy: 10.25, width: 208, height: 89.5 };
+		return region;
+	});
+	const overlappingModuleRegionsPlan = buildPlanForFiles({
+		spec,
+		contract,
+		netlist,
+		assembly: overlappingModuleRegionsAssembly,
+		libraryManifest,
+		specPath: '_tmp_workflow_smoke/overlapping_module_regions_project_spec.json',
+	});
+	const overlappingModuleRegionsLayoutFindings = validateLayoutContract(
+		overlappingModuleRegionsAssembly,
+		{
+			candidateSource: overlappingModuleRegionsAssembly.layoutPolicy.candidateSource,
+			totalCandidates: 20,
+			availableCandidates: 20,
+			policyStats: { baseAnchors: Object.keys(overlappingModuleRegionsAssembly.layoutPolicy.baseAnchors || {}).length, anchorVariants: 1 },
+			best: { pass: true, score: 1 },
+		},
+		{
+			pass: true,
+			minModuleGap: 200,
+			laneInterlocks: [],
+			stats: { moduleWireIntrusions: 0 },
+			moduleWireIntrusions: [],
+		},
+		{ contract },
+	);
+	checks.moduleRegionsRejectOverlap = {
+		planPass: overlappingModuleRegionsPlan.pass,
+		planRules: (overlappingModuleRegionsPlan.findings || []).map(f => f.rule),
+		layoutRules: overlappingModuleRegionsLayoutFindings.map(f => f.rule),
+	};
+	assertFinding(
+		findings,
+		!overlappingModuleRegionsPlan.pass
+			&& hasRule(overlappingModuleRegionsPlan, 'GP57-module-region-gap')
+			&& overlappingModuleRegionsLayoutFindings.some(f => f.rule === 'PL44-module-region-gap'),
+		'WS75-module-regions-reject-overlap',
+		'planned module regions must keep the declared minimum gap before plan/layout can pass',
+		checks.moduleRegionsRejectOverlap,
+	);
+
 	const narrowLayoutFindings = validateLayoutContract(
 		narrowColumnsAssembly,
 		{
@@ -1235,6 +1298,7 @@ try {
 		missingFiles: missingScaffoldFiles,
 		planPass: scaffoldPlan.pass,
 		labelColumns: (scaffoldAssembly.layoutPolicy?.labelColumns || []).map(col => ({ id: col.id, side: col.side, x: col.x, nets: col.nets })),
+		moduleRegions: (scaffoldAssembly.layoutPolicy?.moduleRegions || []).map(region => ({ module: region.module, anchor: region.anchor, column: region.column, width: region.width, height: region.height })),
 		rules: (scaffoldPlan.findings || []).map(f => f.rule),
 	};
 	assertFinding(findings, missingScaffoldFiles.length === 0, 'WS6-scaffold-files-present', 'GSD scaffold must emit all editable project contract files', {
@@ -1265,6 +1329,14 @@ try {
 		'WS10-generic-layout-variants',
 		'layout planner must support enough generic anchorVariants for new project scaffolds instead of only AIHWDEBUGER-specific coordinate fields',
 		checks.genericLayoutCandidates,
+	);
+	assertFinding(
+		findings,
+		(scaffoldAssembly.layoutPolicy?.moduleRegions || []).length === (scaffoldAssembly.modules || []).length
+			&& (scaffoldAssembly.layoutPolicy?.moduleRegions || []).every(region => region.module && region.anchor && region.column && Number.isFinite(region.width) && Number.isFinite(region.height) && region.width > 0 && region.height > 0),
+		'WS76-scaffold-module-regions',
+		'new project scaffolds must include editable layoutPolicy.moduleRegions so module rectangles are planned before generation',
+		checks.scaffold,
 	);
 	assertFinding(
 		findings,

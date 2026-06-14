@@ -419,6 +419,15 @@ if (checks.gsdPlan.status !== 'pass') {
 			editFiles: ['project_assembly.json'],
 			nextCommand: 'node bin/easyeda-gsd.mjs plan project_spec.json',
 		});
+	} else if (ruleMatches(finding, /^GP4[7-9]|^GP5[0-7]/)) {
+		pushAction(actions, {
+			area: 'module-region-contract',
+			action: 'Declare layoutPolicy.moduleRegions before generation. Every assembly module needs one anchor-relative readable rectangle with module, anchor, column, dx/dy, width, height, and enough gap from other module regions.',
+			evidence: ['gsd_plan_report.json', 'project_assembly.json', 'docs/schematic-design-rules.md'],
+			observed: finding,
+			editFiles: ['project_assembly.json'],
+			nextCommand: 'node bin/easyeda-gsd.mjs plan project_spec.json',
+		});
 	} else if (ruleMatches(finding, /^GP2[7-9]|^GP3[0-4]|^GP4[3-6]/)) {
 		pushAction(actions, {
 			area: 'interface-routing-contract',
@@ -487,6 +496,17 @@ if (checks.gsdPlan.status !== 'pass') {
 			evidence: ['gsd_plan_report.json', 'project_contract.json', 'project_assembly.json'],
 			observed: routeFinding,
 			editFiles: ['project_assembly.json', 'project_contract.json'],
+			nextCommand: 'node bin/easyeda-gsd.mjs plan project_spec.json',
+		});
+	}
+	const moduleRegionFinding = planFindings.find(f => ruleMatches(f, /^GP4[7-9]|^GP5[0-7]/));
+	if (moduleRegionFinding && !hasActionArea(actions, 'module-region-contract')) {
+		pushAction(actions, {
+			area: 'module-region-contract',
+			action: 'Declare layoutPolicy.moduleRegions before generation. Every assembly module needs one anchor-relative readable rectangle with module, anchor, column, dx/dy, width, height, and enough gap from other module regions.',
+			evidence: ['gsd_plan_report.json', 'project_assembly.json', 'docs/schematic-design-rules.md'],
+			observed: moduleRegionFinding,
+			editFiles: ['project_assembly.json'],
 			nextCommand: 'node bin/easyeda-gsd.mjs plan project_spec.json',
 		});
 	}
@@ -604,6 +624,15 @@ if (checks.projectLayout.status !== 'pass') {
 		pushAction(actions, {
 			area: 'interface-label-columns',
 			action: 'Fix layoutPolicy.labelColumns so grouped-net-label interfaces have both source and target module-side columns with module, routeEnd, side, x, tolerance, and nets.',
+			evidence: ['project_layout_report.json', 'project_assembly.json', 'docs/schematic-design-rules.md'],
+			observed: finding,
+			editFiles: ['project_assembly.json'],
+			nextCommand: 'npm.cmd run pipeline && npm.cmd run contract:layout',
+		});
+	} else if (ruleMatches(finding, /^PL3[4-9]|^PL4[0-4]/)) {
+		pushAction(actions, {
+			area: 'module-region-contract',
+			action: 'Fix layoutPolicy.moduleRegions so every module has one non-overlapping planned rectangle with module, anchor, column, dx/dy, width, height, and role.',
 			evidence: ['project_layout_report.json', 'project_assembly.json', 'docs/schematic-design-rules.md'],
 			observed: finding,
 			editFiles: ['project_assembly.json'],

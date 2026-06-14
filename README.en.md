@@ -34,7 +34,7 @@ A PASS on the current model only proves the current model. It does not validate 
 - Cell manifest gate: `circuit_packs/*/cell_manifest.json` declares circuit-pack cell roles, required refs, net args, ports, layout intent, and `qualityRules`, while project-contract modules declare matching `drawingRules`; this moves drawing rules such as orthogonal wiring, real net labels, text clearance, and module isolation into the contract before assembly can use those cells.
 - Rule coverage check: `contract:rules` proves module registry, required parts, interface contracts, and core rules cover the project contract.
 - Assembly coverage check: `contract:assembly` proves every contract module is mapped to a deterministic cell, anchor, refs, and nets before generation.
-- Layout policy check: `contract:layout` proves layout search is driven by `project_assembly.json` and that `layoutPolicy.flow`, ordered `layoutPolicy.columns`, generic `anchorVariants` or project search space, module spacing, no interlock, and no unrelated wire intrusion requirements are satisfied.
+- Layout policy check: `contract:layout` proves layout search is driven by `project_assembly.json` and that `layoutPolicy.flow`, ordered `layoutPolicy.columns`, `layoutPolicy.moduleRegions`, generic `anchorVariants` or project search space, module spacing, no interlock, and no unrelated wire intrusion requirements are satisfied.
 - Geometry check: `contract:geometry` audits the actual generated model for orthogonal wires, different-net or unnamed wire crossings, wires through visible objects, and overlaps among text, labels, flags, attributes, and component bodies. In live mode, `contract:geometry:live` runs the same audit against the real EasyEDA snapshot.
 - Label layout check: `contract:labels` audits actual generated label geometry, including `layoutPolicy.labelColumns`, visible label budgets, left-bottom/right-bottom origins, same-net wire endpoint attachment, fake text labels, and scattered unbudgeted labels. Grouped cross-module interfaces must declare source and target module-side label columns with `module` and `routeEnd`. In live mode, `contract:labels:live` runs the same audit against the real EasyEDA snapshot.
 - Contract realization check: after `full_model.json` is generated, `contract:model` proves the model actually expresses the contract modules, parts, nets, and interfaces.
@@ -150,7 +150,7 @@ For handoff, review the global sheet and local crops for USB, LDO, RESET, BOOT, 
 - No unnecessary NET PORT symbols on a single-sheet schematic
 - Readable wire `Name` anchors: left-side labels use bottom-left origin, right-side labels use bottom-right origin
 - Declared label columns: every visible signal label is covered by `layoutPolicy.labelColumns`, and grouped interfaces have source/target module-side columns
-- Functional modules occupy clean rectangular regions with reasonable gaps
+- Functional modules occupy clean rectangular regions declared by `layoutPolicy.moduleRegions` with reasonable gaps
 - No overlap among text, component attributes, net names, GND symbols, and NC markers
 
 ## Lessons Captured

@@ -33,6 +33,7 @@ Follow AGENTS.md for this repository. Install/verify easyeda-api-skill first. Fo
 - `project_contract.json`：模块矩形、关键器件、接口、视觉证据区域和禁止自由绘制约束。
 - `project_netlist.json`：关键网络必须连接到哪些器件引脚。
 - `project_assembly.json`：模块到确定性 cell、锚点、网络和 `layoutPolicy.flow` / `layoutPolicy.columns` / `anchorVariants` 的映射。
+- `layoutPolicy.moduleRegions`：每个模块自己的最小可读矩形空间，生成前就检查覆盖、列归属、尺寸、间距和重叠。
 - `layoutPolicy.labelColumns`：可见 net label 的列、module、routeEnd、方向、预算、端点和原点策略。
 - `circuit_packs/<pack>/cell_manifest.json`：cell 能力、端口、refs、布局意图和 `qualityRules`。
 

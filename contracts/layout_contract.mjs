@@ -22,6 +22,33 @@ function columnIndexByModule(policy) {
 	return result;
 }
 
+function finiteNumber(value) {
+	return typeof value === 'number' && Number.isFinite(value);
+}
+
+function rectFromRegion(region, anchor) {
+	if (!region || !finitePoint(anchor) || !finiteNumber(region.width) || !finiteNumber(region.height)) return null;
+	const cx = anchor.x + Number(region.dx || 0);
+	const cy = anchor.y + Number(region.dy || 0);
+	const w = Number(region.width);
+	const h = Number(region.height);
+	if (w <= 0 || h <= 0) return null;
+	return {
+		minX: cx - w / 2,
+		maxX: cx + w / 2,
+		minY: cy - h / 2,
+		maxY: cy + h / 2,
+	};
+}
+
+function rectGap(a, b) {
+	if (!a || !b) return null;
+	const dx = Math.max(0, Math.max(a.minX - b.maxX, b.minX - a.maxX));
+	const dy = Math.max(0, Math.max(a.minY - b.maxY, b.minY - a.maxY));
+	if (dx === 0 && dy === 0) return 0;
+	return Number(Math.hypot(dx, dy).toFixed(3));
+}
+
 export function measureColumnAnchorGaps(assembly) {
 	const policy = assembly?.layoutPolicy || {};
 	const modules = asArray(assembly?.modules);
@@ -158,6 +185,88 @@ export function validateGroupedRouteLabelColumns(contract, assembly, category = 
 	return findings;
 }
 
+export function validateModuleRegions(assembly, category = 'project-layout') {
+	const findings = [];
+	const policy = assembly?.layoutPolicy || {};
+	const modules = asArray(assembly?.modules);
+	const anchors = assembly?.anchors || {};
+	const columns = columnIndexByModule(policy);
+	const regions = asArray(policy.moduleRegions);
+	const moduleIds = new Set(modules.map(mod => mod.id).filter(Boolean));
+	const regionByModule = new Map();
+	const minGap = policy.minModuleGap ?? 90;
+	if (!regions.length) {
+		hard(findings, 'PL34-module-regions-declared', 'layoutPolicy.moduleRegions must declare the minimum readable rectangle for every module before generation', {
+			modules: [...moduleIds],
+		}, category);
+		return findings;
+	}
+	for (const [index, region] of regions.entries()) {
+		const moduleId = region.module || region.id;
+		if (!moduleId) {
+			hard(findings, 'PL35-module-region-id', 'each module region must name module', { index, region }, category);
+			continue;
+		}
+		if (!moduleIds.has(moduleId)) {
+			hard(findings, 'PL36-module-region-known', 'layoutPolicy.moduleRegions references an unknown assembly module', { module: moduleId, region }, category);
+			continue;
+		}
+		if (regionByModule.has(moduleId)) {
+			hard(findings, 'PL37-module-region-unique', 'each module must have exactly one module region', { module: moduleId, first: regionByModule.get(moduleId), duplicate: region }, category);
+			continue;
+		}
+		const mod = modules.find(item => item.id === moduleId) || {};
+		if (region.anchor && region.anchor !== mod.anchor) {
+			hard(findings, 'PL38-module-region-anchor', 'module region anchor must match the assembly module anchor', { module: moduleId, expected: mod.anchor || null, actual: region.anchor }, category);
+		}
+		if (!columns.has(moduleId)) {
+			hard(findings, 'PL39-module-region-column', 'module region cannot be checked until layoutPolicy.columns covers the module', { module: moduleId }, category);
+		} else if (region.column && region.column !== columns.get(moduleId).id) {
+			hard(findings, 'PL39-module-region-column', 'module region column must match layoutPolicy.columns', { module: moduleId, expected: columns.get(moduleId).id, actual: region.column }, category);
+		}
+		if (!finiteNumber(region.width) || !finiteNumber(region.height) || region.width <= 0 || region.height <= 0) {
+			hard(findings, 'PL40-module-region-size', 'module region must declare positive finite width and height', { module: moduleId, region }, category);
+		} else {
+			const aspect = Math.max(region.width / Math.max(1, region.height), region.height / Math.max(1, region.width));
+			if (aspect > (policy.maxModuleRegionAspect ?? 4)) {
+				hard(findings, 'PL41-module-region-aspect', 'module region aspect ratio is too extreme for a readable schematic block', {
+					module: moduleId,
+					width: region.width,
+					height: region.height,
+					aspect: Number(aspect.toFixed(3)),
+					maxAspect: policy.maxModuleRegionAspect ?? 4,
+				}, category);
+			}
+		}
+		const anchor = anchors[mod.anchor];
+		const box = rectFromRegion(region, anchor);
+		if (!box) {
+			hard(findings, 'PL42-module-region-box', 'module region must resolve to a finite rectangle from module anchor, dx/dy, width, and height', { module: moduleId, anchor: mod.anchor || null, region }, category);
+			continue;
+		}
+		regionByModule.set(moduleId, { module: moduleId, region, box, column: columns.get(moduleId)?.id || null });
+	}
+	const missing = [...moduleIds].filter(id => !regionByModule.has(id));
+	if (missing.length) hard(findings, 'PL43-module-region-covers-modules', 'layoutPolicy.moduleRegions must cover every assembly module', { missing }, category);
+	const resolved = [...regionByModule.values()];
+	for (let i = 0; i < resolved.length; i++) {
+		for (let j = i + 1; j < resolved.length; j++) {
+			const a = resolved[i];
+			const b = resolved[j];
+			const gap = rectGap(a.box, b.box);
+			if (gap != null && gap < minGap) {
+				hard(findings, 'PL44-module-region-gap', 'planned module regions must not overlap or interlock; keep the declared minimum gap before generation', {
+					minModuleGap: minGap,
+					gap,
+					a: { module: a.module, column: a.column, box: a.box },
+					b: { module: b.module, column: b.column, box: b.box },
+				}, category);
+			}
+		}
+	}
+	return findings;
+}
+
 export function validateLayoutContract(assembly, layout, structure, options = {}) {
 	const category = options.category || 'project-layout';
 	const findings = [];
@@ -174,6 +283,7 @@ export function validateLayoutContract(assembly, layout, structure, options = {}
 	}
 	findings.push(...validateInterfaceRoutes(options.contract, assembly, category));
 	findings.push(...validateGroupedRouteLabelColumns(options.contract, assembly, category));
+	findings.push(...validateModuleRegions(assembly, category));
 	if (layout.candidateSource !== policy.candidateSource) {
 		hard(findings, 'PL2-planner-uses-assembly-policy', 'layout planner report must prove candidates came from project_assembly.json layoutPolicy', {
 			expected: policy.candidateSource,

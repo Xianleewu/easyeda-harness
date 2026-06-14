@@ -5,7 +5,7 @@ import { validateNetContract } from '../contracts/net_contract.mjs';
 import { validateLibraryContract } from '../contracts/library_contract.mjs';
 import { validateDrawingRuleBindings } from '../contracts/drawing_rule_registry.mjs';
 import { validateCellBuilderDryRun } from '../contracts/cell_builder_contract.mjs';
-import { interfaceKey, measureColumnAnchorGaps, validateGroupedRouteLabelColumns, validateInterfaceRoutes } from '../contracts/layout_contract.mjs';
+import { interfaceKey, measureColumnAnchorGaps, validateGroupedRouteLabelColumns, validateInterfaceRoutes, validateModuleRegions } from '../contracts/layout_contract.mjs';
 import { asArray as cellArray, cellContractMap, loadCellManifest, resolveCellManifestPath } from '../engine/cell_manifest.mjs';
 import { withLocalPins } from '../engine/transform.mjs';
 import { HARNESS_RULES } from '../harness/rule_registry.mjs';
@@ -111,6 +111,22 @@ function validateStaticLayoutPolicy(assembly) {
 			narrowColumnGaps,
 			columns: columnGaps.columns.map(col => ({ id: col.id, centerX: col.centerX, modules: col.modules })),
 		});
+	}
+	const moduleRegionRules = {
+		'PL34-module-regions-declared': 'GP47-module-regions-declared',
+		'PL35-module-region-id': 'GP48-module-region-id',
+		'PL36-module-region-known': 'GP49-module-region-known',
+		'PL37-module-region-unique': 'GP50-module-region-unique',
+		'PL38-module-region-anchor': 'GP51-module-region-anchor',
+		'PL39-module-region-column': 'GP52-module-region-column',
+		'PL40-module-region-size': 'GP53-module-region-size',
+		'PL41-module-region-aspect': 'GP54-module-region-aspect',
+		'PL42-module-region-box': 'GP55-module-region-box',
+		'PL43-module-region-covers-modules': 'GP56-module-region-covers-modules',
+		'PL44-module-region-gap': 'GP57-module-region-gap',
+	};
+	for (const finding of validateModuleRegions(assembly, 'gsd-plan')) {
+		findings.push({ ...finding, rule: moduleRegionRules[finding.rule] || finding.rule.replace(/^PL/, 'GP') });
 	}
 	return findings;
 }

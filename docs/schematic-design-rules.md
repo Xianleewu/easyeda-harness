@@ -11,7 +11,7 @@ This file is the executable drawing rulebook for EasyEDA Harness. Agents must tr
 | DR3 | Wires must not pass through component bodies, symbols, visible text, net labels, GND flags, or NC markers. | component geometry plus cell routing | `contract:geometry` / `contract:geometry:live` rule `PG4-wire-through-visible-object` |
 | DR4 | Text, component attributes, net names, GND symbols, NC markers, and other visible objects must not overlap. | text/attribute/flag geometry | `contract:geometry` / `contract:geometry:live` rule `PG5-visible-object-overlap` |
 | DR5 | Text, net labels, flags, and attributes must not overlap component bodies. | component body bbox and visible object bbox | `contract:geometry` / `contract:geometry:live` rule `PG6-visible-object-over-component` |
-| DR6 | Each functional module must occupy its own compact module rectangle; module rectangles must keep the declared minimum gap and must not interlock. | `project_contract.json` modules plus `project_assembly.json` anchors | `contract:layout`, `pipeline`, page-composition checks |
+| DR6 | Each functional module must occupy its own compact module rectangle; module rectangles must keep the declared minimum gap and must not interlock. | `project_contract.json` modules plus `project_assembly.json` anchors and `layoutPolicy.moduleRegions` | `gsd:plan` rules `GP47-module-regions-declared`, `GP57-module-region-gap`; `contract:layout`, `pipeline`, page-composition checks |
 | DR7 | Cross-module interfaces must follow `layoutPolicy.flow`, ordered `layoutPolicy.columns`, and declared `layoutPolicy.interfaceRoutes`. | `project_assembly.json` | `contract:layout` |
 | DR8 | Every visible signal label must be budgeted in `layoutPolicy.labelColumns`; scattered labels are forbidden. | `project_assembly.json` | `contract:labels` / `contract:labels:live` rules `LL1-label-columns-declared`, `LL14-label-column-match`, `LL16-unbudgeted-visible-label` |
 | DR8A | Every grouped-net-label interface must declare source and target module-side label columns before generation. | `layoutPolicy.interfaceRoutes` and `layoutPolicy.labelColumns` | `gsd:plan` rules `GP44-label-column-covers-route-from`, `GP45-label-column-covers-route-to`; `contract:layout` rules `PL31-label-column-covers-route-from`, `PL32-label-column-covers-route-to` |
@@ -30,6 +30,7 @@ Every project must explain its reading flow before generation:
 
 - `layoutPolicy.flow` names the intended sheet reading order.
 - `layoutPolicy.columns` places modules into ordered page columns.
+- `layoutPolicy.moduleRegions` declares every module's minimum readable rectangle relative to its anchor, including module, anchor, column, dx/dy, width, height, and role.
 - `layoutPolicy.interfaceRoutes` explains cross-module net ownership, direction, and route strategy.
 - `layoutPolicy.labelColumns` explains every visible signal label column: role, module, routeEnd, side, x coordinate, tolerance, and allowed nets.
 - `minModuleGap`, `minColumnGap`, `maxModuleWireIntrusions`, and `requireNoLaneInterlocks` turn module spacing and no-interlock requirements into measurable checks.
