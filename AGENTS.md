@@ -4,6 +4,8 @@ This repository is a schematic design collaboration and checking harness for Cod
 
 Use `docs/agent-runner-guide.md` as the neutral runner contract. Prefer `node bin/easyeda-gsd.mjs ...` for agent workflows; npm scripts remain lower-level debugging and CI building blocks.
 
+For continuation work, read `docs/next-session-handoff.md` before changing code. It records the current objective, known weaknesses, non-negotiable drawing rules, and the next architecture work needed to make the harness useful beyond the bundled sample project.
+
 ## Scope Boundary
 
 This harness is an executable workflow, not a free-form schematic drawing assistant.
