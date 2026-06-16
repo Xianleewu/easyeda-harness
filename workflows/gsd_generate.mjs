@@ -2,6 +2,7 @@ import { spawnSync } from 'node:child_process';
 import { existsSync, readFileSync, writeFileSync, statSync } from 'node:fs';
 import { basename, dirname, resolve } from 'node:path';
 import { buildGsdPlan } from './gsd_plan.mjs';
+import { buildDesignBrief } from './design_brief.mjs';
 import { acquireRunLock } from './run_lock.mjs';
 
 function readJson(root, rel) {
@@ -91,6 +92,27 @@ export function runGsdGenerate({ root, specPath = 'project_spec.json', command =
 			writeFileSync(`${root}/gsd_generate_report.json`, JSON.stringify(report, null, 2), 'utf8');
 			return { report, status: 1 };
 		}
+		const designBrief = buildDesignBrief(root, specPath);
+		writeFileSync(`${root}/design_brief_report.json`, JSON.stringify(designBrief, null, 2), 'utf8');
+		if (!designBrief.pass) {
+			const report = {
+				generatedAt: new Date().toISOString(),
+				pass: false,
+				spec: specPath,
+				stage: 'design-brief',
+				plan: { pass: plan.pass, severity: plan.severity },
+				designBrief: {
+					pass: designBrief.pass,
+					severity: designBrief.severity,
+					findings: designBrief.findings,
+				},
+				severity: { hard: designBrief.severity.hard || 1, soft: 0, info: 0 },
+				findings: designBrief.findings,
+				durationMs: Date.now() - started,
+			};
+			writeFileSync(`${root}/gsd_generate_report.json`, JSON.stringify(report, null, 2), 'utf8');
+			return { report, status: 1 };
+		}
 
 		const child = spawnSync(process.execPath, command, {
 			cwd: root,
@@ -133,6 +155,7 @@ export function runGsdGenerate({ root, specPath = 'project_spec.json', command =
 				modelPath: context.modelPath,
 			},
 			plan: { pass: plan.pass, severity: plan.severity },
+			designBrief: { pass: designBrief.pass, severity: designBrief.severity, draft: designBrief.draft },
 			generated,
 			template: reportJson ? {
 				pass: reportJson.pass,

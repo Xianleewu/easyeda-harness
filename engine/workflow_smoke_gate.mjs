@@ -1449,6 +1449,43 @@ try {
 		afterFullModelMtime,
 	});
 
+	const briefBlockedDir = `${TMP_DIR}/brief_blocked_generate`;
+	mkdirSync(briefBlockedDir, { recursive: true });
+	writeFileSync(`${briefBlockedDir}/project_spec.json`, JSON.stringify(spec, null, 2) + '\n', 'utf8');
+	writeFileSync(`${briefBlockedDir}/project_contract.json`, JSON.stringify(contract, null, 2) + '\n', 'utf8');
+	const briefBlockedNetlist = {
+		...netlist,
+		nets: (netlist.nets || []).map(net => ({ name: net.name })),
+	};
+	writeFileSync(`${briefBlockedDir}/project_netlist.json`, JSON.stringify(briefBlockedNetlist, null, 2) + '\n', 'utf8');
+	writeFileSync(`${briefBlockedDir}/approved_library_manifest.json`, JSON.stringify(libraryManifest, null, 2) + '\n', 'utf8');
+	writeFileSync(`${briefBlockedDir}/project_library_snapshot.json`, JSON.stringify(readJson(`${ROOT}/snap2.json`), null, 2) + '\n', 'utf8');
+	writeFileSync(`${briefBlockedDir}/project_assembly.json`, JSON.stringify(assembly, null, 2) + '\n', 'utf8');
+	const beforeBriefBlockedMtime = fileMtimeMs(fullModelPath);
+	const briefBlockedGenerate = runGsdGenerate({
+		root: ROOT,
+		specPath: '_tmp_workflow_smoke/brief_blocked_generate/project_spec.json',
+		command: ['engine/pipeline_fast.mjs'],
+		draft: true,
+	});
+	const afterBriefBlockedMtime = fileMtimeMs(fullModelPath);
+	checks.generateRequiresStrictDesignBrief = {
+		status: briefBlockedGenerate.status,
+		stage: briefBlockedGenerate.report?.stage || null,
+		rules: (briefBlockedGenerate.report?.findings || []).map(f => f.rule),
+		fullModelMtimeUnchanged: beforeBriefBlockedMtime === afterBriefBlockedMtime,
+	};
+	assertFinding(
+		findings,
+		briefBlockedGenerate.status !== 0
+			&& briefBlockedGenerate.report?.stage === 'design-brief'
+			&& checks.generateRequiresStrictDesignBrief.rules.includes('DB6-pin-map-complete')
+			&& beforeBriefBlockedMtime === afterBriefBlockedMtime,
+		'WS88-generate-requires-strict-design-brief',
+		'GSD generate must stop before deterministic generation when strict design-brief readiness fails even if the plan can be built',
+		checks.generateRequiresStrictDesignBrief,
+	);
+
 	const missingPartManifest = clone(libraryManifest);
 	const firstRequiredPart = (contract.modules || []).flatMap(mod => mod.requiredParts || [])[0];
 	if (firstRequiredPart) delete missingPartManifest.parts[firstRequiredPart];
