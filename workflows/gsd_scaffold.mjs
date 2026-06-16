@@ -136,7 +136,9 @@ export function buildScaffold(spec, { pack = 'aihwdebugger', useGeneratedCells =
 		to: iface.to,
 		strategy: iface.strategy || 'grouped-net-label',
 		channel: `${iface.from || 'source'}-to-${iface.to || 'target'}`,
-		direction: 'left-to-right',
+		direction: iface.direction || 'left-to-right',
+		...(iface.fromSide ? { fromSide: iface.fromSide } : {}),
+		...(iface.toSide ? { toSide: iface.toSide } : {}),
 	}));
 	const groupedSignalRoutes = interfaceRoutes.filter(route => route.strategy === 'grouped-net-label' && route.net && !['GND', 'SYS_3V3', 'SYS_5V', 'VBUS'].includes(route.net));
 	const labelColumnMap = new Map();
@@ -159,8 +161,8 @@ export function buildScaffold(spec, { pack = 'aihwdebugger', useGeneratedCells =
 		if (!col.nets.includes(net)) col.nets.push(net);
 	}
 	for (const route of groupedSignalRoutes) {
-		addLabelColumn({ moduleId: route.from, side: 'right', routeEnd: 'from', net: route.net });
-		addLabelColumn({ moduleId: route.to, side: 'left', routeEnd: 'to', net: route.net });
+		addLabelColumn({ moduleId: route.from, side: route.fromSide || 'right', routeEnd: 'from', net: route.net });
+		addLabelColumn({ moduleId: route.to, side: route.toSide || 'left', routeEnd: 'to', net: route.net });
 	}
 	const labelColumns = [...labelColumnMap.values()];
 	const assembly = {

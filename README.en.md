@@ -2,11 +2,13 @@
 
 [中文](README.md)
 
-EasyEDA Harness is a schematic generation and checking tool intended for coding agents such as Codex and Claude Code. It is not the EasyEDA API skill. The official `easyeda-api-skill` owns the API docs, bridge, and EasyEDA extension; this repository owns deterministic placement, quality checks, offline previews, real EasyEDA snapshot evidence, and the write-back loop.
+EasyEDA Harness is a schematic design collaboration and checking workflow for coding agents such as Codex and Claude Code. It is not the EasyEDA API skill, and it is not a complete automatic schematic layout solver. The official `easyeda-api-skill` owns the API docs, bridge, and EasyEDA extension; this repository owns structured project contracts, deterministic placement, quality checks, offline previews, real EasyEDA snapshot evidence, and the write-back loop.
 
 The simplest user workflow is to hand this repository to an agent and ask it to follow `AGENTS.md` or `CLAUDE.md`. The agent should install dependencies, verify the official EasyEDA API Skill/Bridge, run the gates, generate visual evidence, and only write back to EasyEDA after every gate passes.
 
 The neutral runner entrypoint is `node bin/easyeda-gsd.mjs`; see `docs/agent-runner-guide.md`.
+
+The workflow is intentionally staged like a UI design loop: first produce a short, reviewable draft of the design intent, then generate and check deterministic artifacts. `node bin/easyeda-gsd.mjs design-brief` writes `design_brief_report.json` with a block diagram, module assumptions, pin/net plan, layout/interface plan, ERC/layout checklist, and next tasks. Agents should use that brief to catch missing module rectangles, missing label columns, missing pin maps, floating labels, and unclear interface ownership before spending time on full generation.
 
 ## Scope
 
@@ -14,7 +16,7 @@ This repository is an executable workflow, not a prompt pack for free-form drawi
 
 A PASS on the current model only proves the current model. It does not validate another project, another schematic, or manual EasyEDA edits.
 
-`project_spec.json` is the machine-readable user-intent input. `node bin/easyeda-gsd.mjs plan` writes `gsd_plan_report.json`, proving that the spec is realized by the current contract, netlist, assembly, and circuit pack. `node bin/easyeda-gsd.mjs generate` writes `gsd_generate_report.json`, refuses to generate if the plan fails, and runs full layout search by default; `generate --fast` is only a draft iteration mode. `project_contract.json` is the design contract derived from that spec. `npm run spec` checks that the contract covers the spec, and `npm run contract` / `npm run accept` continue checking the contract and generated model.
+`project_spec.json` is the machine-readable user-intent input. `node bin/easyeda-gsd.mjs plan` writes `gsd_plan_report.json`, proving that the spec is realized by the current contract, netlist, assembly, and circuit pack. `node bin/easyeda-gsd.mjs design-brief` writes the fast review artifact that explains the current block diagram, pin/net plan, layout/interface plan, label-column plan, and open tasks. `node bin/easyeda-gsd.mjs generate` writes `gsd_generate_report.json`, refuses to generate if the plan fails, and runs full layout search by default; `generate --fast` is only a draft iteration mode. `project_contract.json` is the design contract derived from that spec. `npm run spec` checks that the contract covers the spec, and `npm run contract` / `npm run accept` continue checking the contract and generated model.
 `npm run spec:schema` validates the spec shape before contract coverage is checked.
 
 `project_contract.json` is the first machine-readable file an agent must update for a new project. Each module must declare `drawingRules` for the reusable schematic-quality rules it expects. `project_netlist.json` records the required electrical endpoints. `circuit_packs/*/cell_manifest.json` declares deterministic cell capabilities for the selected circuit pack, and `project_assembly.json` maps each contract module to those cells, refs, anchors, nets, and layout policy. `npm run contract`, `npm run contract:netlist`, `npm run contract:cells`, `npm run contract:assembly`, `npm run contract:layout`, `npm run contract:geometry`, and `npm run accept` check them; if they fail, the agent should not edit write-back scripts, apply to EasyEDA, or claim completion.
@@ -25,6 +27,7 @@ A PASS on the current model only proves the current model. It does not validate 
 - Deterministic schematic assembly: the selected `circuit_packs/<pack>/pack.mjs` exposes functional cell builders, `circuit_packs/<pack>/cell_manifest.json` declares their contracts, and `engine/assemble.mjs` composes the active `project_assembly.json`.
 - Project spec gate: `project_spec.json` defines user-level modules, nets, interfaces, and quality policy.
 - Spec schema gate: `spec:schema` validates `project_spec.json` as the first-layer user-intent contract.
+- Design brief stage: `design-brief` produces a fast review report with block diagram, module assumptions, pin/net plan, layout/interface plan, label-column plan, ERC/layout checklist, and next tasks before deterministic generation.
 - Project contract gate: `project_contract.json` defines modules, key nets, interfaces, visual evidence regions, and the no-free-draw policy.
 - Project netlist gate: `project_netlist.json` defines required pins for key nets and proves the generated model connects them.
 - Circuit pack gate: `contract:pack` verifies the selected `pack.mjs` is registered and exposes required generation hooks.
@@ -80,6 +83,7 @@ The agent runs the local checks, workflow smoke checks, generates preview eviden
 Preferred agent commands:
 
 ```bash
+node bin/easyeda-gsd.mjs design-brief
 node bin/easyeda-gsd.mjs accept
 node bin/easyeda-gsd.mjs repair
 node bin/easyeda-gsd.mjs live-check
@@ -121,6 +125,7 @@ For handoff, review the global sheet and local crops for USB, LDO, RESET, BOOT, 
 - Project spec coverage check: `project_spec_report.json` has `HARD=0 SOFT=0 INFO=0`
 - Spec schema check: `spec_schema_report.json` has `HARD=0 SOFT=0 INFO=0`
 - Project rule coverage check: `project_rule_report.json` has `HARD=0 SOFT=0 INFO=0`
+- Design brief check: `design_brief_report.json` has `HARD=0 SOFT=0 INFO=0` and explains block diagram, pin/net plan, layout/interface plan, label-column plan, ERC/layout checklist, and next tasks
 - Project netlist check: `project_netlist_report.json` has `HARD=0 SOFT=0 INFO=0`
 - Circuit pack check: `project_pack_report.json` has `HARD=0 SOFT=0 INFO=0`
 - Cell manifest check: `cell_manifest_report.json` has `HARD=0 SOFT=0 INFO=0`
@@ -174,6 +179,7 @@ For handoff, review the global sheet and local crops for USB, LDO, RESET, BOOT, 
 - `docs/schematic-design-rules.md`: executable schematic layout rules for wire crossings, object overlap, label origins, label columns, module rectangles, and live evidence.
 - `workflows/repair_loop.mjs`: read-only repair loop planner that groups `next_actions.json` and `repair_actions.json` into fix kinds, files, evidence, and rerun commands, then emits `repair_loop_report.json`.
 - `workflows/gsd_plan.mjs`: spec-to-contract realization planner that emits `gsd_plan_report.json`.
+- `workflows/design_brief.mjs`: short-cycle design review builder that emits `design_brief_report.json`.
 - `workflows/gsd_generate.mjs`: plan-gated deterministic generation wrapper that emits `gsd_generate_report.json`.
 - `workflows/gsd_scaffold.mjs`: new-project scaffold writer for spec, contract, netlist, assembly, and `gsd_scaffold_report.json`.
 - `contracts/library_contract.mjs`: approved library binding validator for required parts.

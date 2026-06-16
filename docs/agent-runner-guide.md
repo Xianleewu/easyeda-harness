@@ -7,17 +7,18 @@ Use this repository as an executable schematic workflow, not as permission to dr
 1. Capture user intent in `project_spec.json`.
 2. For a new project directory, run `node bin/easyeda-gsd.mjs init --pack <pack> --out <project-dir>` to create editable scaffold files and, for a new pack id, `circuit_packs/<pack>/` skeleton files.
 3. Run `node bin/easyeda-gsd.mjs plan <project-dir>/project_spec.json` and keep `gsd_plan_report.json` passing as the spec-to-contract realization proof.
-4. Derive `project_contract.json`, including module-level `drawingRules` for orthogonal wiring, real net labels, text clearance, module isolation, no fake net text, and no unnecessary net ports.
-5. Define required electrical endpoints in `project_netlist.json`.
-6. Fill `approved_library_manifest.json` so every required part has approved Symbol, Device, and Footprint bindings.
-7. Select or declare the circuit-pack `pack.mjs` and `cell_manifest.json`.
-8. Map modules, refs, anchors, nets, and layout policy in `project_assembly.json`.
-9. Run `npm.cmd run workflow:smoke` and keep `workflow_smoke_report.json` passing so reusable workflow regressions stay blocked.
-10. Implement deterministic cells and rules only after those contracts exist.
-11. Run `node bin/easyeda-gsd.mjs generate <project-dir>/project_spec.json` and keep `gsd_generate_report.json` passing with full layout-search evidence; use `generate --fast` only for draft iteration.
-12. Run `node bin/easyeda-gsd.mjs accept <project-dir>/project_spec.json`; this includes `contract:geometry` and `contract:labels`.
-13. Run `node bin/easyeda-gsd.mjs live-check <project-dir>/project_spec.json` before final delivery.
-14. Write back only with `node bin/easyeda-gsd.mjs apply --gated <project-dir>/project_spec.json`.
+4. Run `node bin/easyeda-gsd.mjs design-brief <project-dir>/project_spec.json` and inspect `design_brief_report.json` as the short review loop.
+5. Derive `project_contract.json`, including module-level `drawingRules` for orthogonal wiring, real net labels, text clearance, module isolation, no fake net text, and no unnecessary net ports.
+6. Define required electrical endpoints in `project_netlist.json`.
+7. Fill `approved_library_manifest.json` so every required part has approved Symbol, Device, and Footprint bindings.
+8. Select or declare the circuit-pack `pack.mjs` and `cell_manifest.json`.
+9. Map modules, refs, anchors, nets, and layout policy in `project_assembly.json`.
+10. Run `npm.cmd run workflow:smoke` and keep `workflow_smoke_report.json` passing so reusable workflow regressions stay blocked.
+11. Implement deterministic cells and rules only after those contracts exist and the design brief explains module rectangles, pin/net ownership, interface sides, and label columns.
+12. Run `node bin/easyeda-gsd.mjs generate <project-dir>/project_spec.json` and keep `gsd_generate_report.json` passing with full layout-search evidence; use `generate --fast` only for draft iteration.
+13. Run `node bin/easyeda-gsd.mjs accept <project-dir>/project_spec.json`; this includes `design:brief`, `contract:geometry`, and `contract:labels`.
+14. Run `node bin/easyeda-gsd.mjs live-check <project-dir>/project_spec.json` before final delivery.
+15. Write back only with `node bin/easyeda-gsd.mjs apply --gated <project-dir>/project_spec.json`.
 
 ## Constraints
 
@@ -26,6 +27,7 @@ Use this repository as an executable schematic workflow, not as permission to dr
 - Do not use low-level writer scripts for final delivery.
 - Do not reuse `aihwdebugger` for unrelated schematics; create or fill the target circuit pack first.
 - Do not trust a module contract until it declares `drawingRules`; missing drawing rules mean the project has not stated the schematic-quality constraints that deterministic cells must satisfy.
+- Do not implement or tune cells from a vague prompt. First make `design_brief_report.json` explain the block diagram, pin/net plan, layout/interface plan, label columns, ERC/layout checklist, and next tasks.
 - Do not implement a deterministic cell until its `cell_manifest.json` entry declares `qualityRules` for orthogonal wiring, real net labels, text clearance, module isolation, no fake net text, and no unnecessary net ports.
 - Do not trust layout work until `project_assembly.json` declares `layoutPolicy.flow` and ordered `layoutPolicy.columns` for every module.
 - Do not trust geometry work until `contract:geometry` passes for the generated model and `contract:geometry:live` passes for the real EasyEDA snapshot.
@@ -33,7 +35,7 @@ Use this repository as an executable schematic workflow, not as permission to dr
 - Inspect `next_actions.json` first when a gate fails.
 - Use `repair_actions.json` to find the owning files and rerun command for each finding.
 - Use `node bin/easyeda-gsd.mjs repair` for the read-only grouped repair plan.
-- Run stateful workflow commands serially. `plan`, `generate`, `accept`, `workflow:smoke`, `repair`, `live-check`, and `apply --gated` write shared report artifacts and are protected by a workspace lock.
+- Run stateful workflow commands serially. `plan`, `design-brief`, `generate`, `accept`, `workflow:smoke`, `repair`, `live-check`, and `apply --gated` write shared report artifacts and are protected by a workspace lock.
 - Final delivery requires real EasyEDA live evidence and DRC `0 error / 0 warning / 0 info`.
 
 ## Commands
@@ -41,6 +43,7 @@ Use this repository as an executable schematic workflow, not as permission to dr
 ```bash
 node bin/easyeda-gsd.mjs help
 node bin/easyeda-gsd.mjs plan project_spec.json
+node bin/easyeda-gsd.mjs design-brief project_spec.json
 node bin/easyeda-gsd.mjs generate project_spec.json
 npm.cmd run workflow:smoke
 node bin/easyeda-gsd.mjs accept

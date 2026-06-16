@@ -17,6 +17,7 @@ harness_*_report.json
 apply_report.json
 acceptance_report.json
 gsd_plan_report.json
+design_brief_report.json
 gsd_generate_report.json
 gsd_scaffold_report.json
 workflow_smoke_report.json

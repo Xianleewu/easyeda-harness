@@ -15,13 +15,13 @@
   "interfaces": [
     { "net": "SYS_5V", "from": "usb", "to": "ldo" },
     { "net": "SYS_3V3", "from": "ldo", "to": "mcu" },
-    { "net": "USB_DP", "from": "usb", "to": "mcu" },
-    { "net": "USB_DN", "from": "usb", "to": "mcu" },
+    { "net": "USB_DP", "from": "usb", "to": "mcu", "strategy": "grouped-net-label", "direction": "left-to-right", "fromSide": "left", "toSide": "left" },
+    { "net": "USB_DN", "from": "usb", "to": "mcu", "strategy": "grouped-net-label", "direction": "left-to-right", "fromSide": "left", "toSide": "left" },
     { "net": "RESET_EN", "from": "reset", "to": "mcu" },
     { "net": "BOOT_IO9", "from": "boot", "to": "mcu" },
-    { "net": "EXT_PWR_EN", "from": "mcu", "to": "pmos" },
-    { "net": "RELAY1_EN", "from": "mcu", "to": "relay1" },
-    { "net": "RELAY2_EN", "from": "mcu", "to": "relay2" }
+    { "net": "EXT_PWR_EN", "from": "mcu", "to": "pmos", "strategy": "grouped-net-label", "direction": "left-to-right", "fromSide": "left", "toSide": "left" },
+    { "net": "RELAY1_EN", "from": "mcu", "to": "relay1", "strategy": "grouped-net-label", "direction": "left-to-right", "fromSide": "left", "toSide": "left" },
+    { "net": "RELAY2_EN", "from": "mcu", "to": "relay2", "strategy": "grouped-net-label", "direction": "left-to-right", "fromSide": "left", "toSide": "left" }
   ],
   "qualityPolicy": {
     "severityMustBeZero": true,

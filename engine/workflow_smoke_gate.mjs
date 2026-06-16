@@ -4,8 +4,10 @@ import { resolve } from 'node:path';
 import { buildGsdPlan } from '../workflows/gsd_plan.mjs';
 import { runGsdGenerate } from '../workflows/gsd_generate.mjs';
 import { writeScaffold } from '../workflows/gsd_scaffold.mjs';
+import { writeDesignBrief } from '../workflows/design_brief.mjs';
 import { buildMinimalSpec, syncPackRegistry, writePackScaffold } from '../workflows/pack_scaffold.mjs';
 import { validateLibraryContract } from '../contracts/library_contract.mjs';
+import { validateSpecSchema, asArray } from '../contracts/spec_schema.mjs';
 import { validateLayoutContract } from '../contracts/layout_contract.mjs';
 import { buildAnchorFamily } from './layout_planner.mjs';
 import { measureProjectColumnRhythm } from './sheet_output_gate.mjs';
@@ -192,6 +194,29 @@ try {
 		firstFinding: rootPlan.findings?.[0] || null,
 	});
 
+	const designBrief = writeDesignBrief(ROOT, 'project_spec.json', `${TMP_DIR}/design_brief_report.json`);
+	checks.designBriefFastReview = {
+		pass: designBrief.pass,
+		severity: designBrief.severity,
+		modules: designBrief.blockDiagram?.modules?.length || 0,
+		interfaces: designBrief.blockDiagram?.interfaces?.length || 0,
+		pinNetPlan: designBrief.pinNetPlan?.length || 0,
+		layoutLabelColumns: designBrief.layoutPlan?.labelColumns?.length || 0,
+		nextTasks: designBrief.nextTasks?.length || 0,
+		hasLabelOriginChecklist: (designBrief.ercChecklist || []).some(item => item.id === 'label-columns'),
+	};
+	assertFinding(
+		findings,
+		checks.designBriefFastReview.pass
+			&& checks.designBriefFastReview.modules >= asArray(spec.modules).length
+			&& checks.designBriefFastReview.pinNetPlan > 0
+			&& checks.designBriefFastReview.layoutLabelColumns > 0
+			&& checks.designBriefFastReview.hasLabelOriginChecklist,
+		'WS86-design-brief-short-feedback',
+		'workflow must produce a fast review brief with block diagram, pin/net plan, layout label columns, and ERC/layout checklist before generation',
+		checks.designBriefFastReview,
+	);
+
 	const badSpec = clone(spec);
 	badSpec.projectId = `${spec.projectId || 'project'}-workflow-smoke-mismatch`;
 	const mismatchPlan = buildPlanForFiles({
@@ -212,6 +237,34 @@ try {
 			observedRules: checks.projectMismatchRejected.rules,
 		});
 	}
+
+	const badInterfaceSideSpec = clone(spec);
+	if (badInterfaceSideSpec.interfaces?.[0]) badInterfaceSideSpec.interfaces[0].fromSide = 'middle';
+	const badInterfaceSideFindings = validateSpecSchema(badInterfaceSideSpec);
+	checks.specRejectsInvalidInterfaceSide = {
+		pass: badInterfaceSideFindings.some(f => f.rule === 'SS24-interface-label-side'),
+		rules: badInterfaceSideFindings.map(f => f.rule),
+		firstFinding: badInterfaceSideFindings[0] || null,
+	};
+	assertFinding(findings, checks.specRejectsInvalidInterfaceSide.pass, 'WS83-spec-interface-label-side', 'project spec schema must reject invalid interface fromSide/toSide values before scaffold or layout generation', checks.specRejectsInvalidInterfaceSide);
+
+	const routeSideMismatchAssembly = clone(assembly);
+	const sideRoute = (routeSideMismatchAssembly.layoutPolicy?.interfaceRoutes || []).find(route => route.fromSide || route.toSide);
+	if (sideRoute) sideRoute.fromSide = sideRoute.fromSide === 'left' ? 'right' : 'left';
+	const routeSideMismatchPlan = buildPlanForFiles({
+		spec,
+		contract,
+		netlist,
+		assembly: routeSideMismatchAssembly,
+		libraryManifest,
+		specPath: '_tmp_workflow_smoke/route_side_mismatch_project_spec.json',
+	});
+	checks.interfaceRouteSidePreservesSpec = {
+		pass: !routeSideMismatchPlan.pass && hasRule(routeSideMismatchPlan, 'GP67-interface-route-preserves-spec'),
+		rules: (routeSideMismatchPlan.findings || []).map(f => f.rule),
+		firstFinding: routeSideMismatchPlan.findings?.find(f => f.rule === 'GP67-interface-route-preserves-spec') || null,
+	};
+	assertFinding(findings, checks.interfaceRouteSidePreservesSpec.pass, 'WS84-interface-route-side-preserves-spec', 'GSD plan must reject assembly interface routes that silently drop or alter fromSide/toSide declared in project_spec.json', checks.interfaceRouteSidePreservesSpec);
 
 	const duplicatePartContract = clone(contract);
 	if (duplicatePartContract.modules?.[0] && duplicatePartContract.modules?.[1]) {
@@ -1451,7 +1504,15 @@ try {
 		checks.cellPortLayoutRequired,
 	);
 
-	const scaffoldReport = writeScaffold({ outDir: SCAFFOLD_DIR, spec, pack: spec.circuitPack || 'aihwdebugger' });
+	const scaffoldInputSpec = clone(spec);
+	const scaffoldSideIface = scaffoldInputSpec.interfaces?.find(iface => iface.net && iface.from && iface.to && !['GND', 'SYS_3V3', 'SYS_5V', 'VBUS'].includes(iface.net));
+	if (scaffoldSideIface) {
+		scaffoldSideIface.strategy = 'grouped-net-label';
+		scaffoldSideIface.direction = 'left-to-right';
+		scaffoldSideIface.fromSide = 'left';
+		scaffoldSideIface.toSide = 'right';
+	}
+	const scaffoldReport = writeScaffold({ outDir: SCAFFOLD_DIR, spec: scaffoldInputSpec, pack: scaffoldInputSpec.circuitPack || 'aihwdebugger' });
 	const scaffoldFiles = [
 		'project_spec.json',
 		'project_contract.json',
@@ -1487,6 +1548,8 @@ try {
 		planPass: scaffoldPlan.pass,
 		labelColumns: (scaffoldAssembly.layoutPolicy?.labelColumns || []).map(col => ({ id: col.id, side: col.side, x: col.x, nets: col.nets })),
 		moduleRegions: (scaffoldAssembly.layoutPolicy?.moduleRegions || []).map(region => ({ module: region.module, anchor: region.anchor, column: region.column, width: region.width, height: region.height })),
+		sideInterface: scaffoldSideIface || null,
+		sideRoute: scaffoldSideIface ? (scaffoldAssembly.layoutPolicy?.interfaceRoutes || []).find(route => route.net === scaffoldSideIface.net && route.from === scaffoldSideIface.from && route.to === scaffoldSideIface.to) || null : null,
 		rules: (scaffoldPlan.findings || []).map(f => f.rule),
 	};
 	assertFinding(findings, missingScaffoldFiles.length === 0, 'WS6-scaffold-files-present', 'GSD scaffold must emit all editable project contract files', {
@@ -1551,6 +1614,18 @@ try {
 				}),
 		'WS71-scaffold-label-columns',
 		'new project scaffolds with grouped interfaces must include module-side layoutPolicy.labelColumns so agents do not invent floating labels',
+		checks.scaffold,
+	);
+	assertFinding(
+		findings,
+		!scaffoldSideIface || (
+			checks.scaffold.sideRoute?.fromSide === scaffoldSideIface.fromSide
+			&& checks.scaffold.sideRoute?.toSide === scaffoldSideIface.toSide
+			&& (scaffoldAssembly.layoutPolicy?.labelColumns || []).some(col => col.module === scaffoldSideIface.from && col.routeEnd === 'from' && col.side === scaffoldSideIface.fromSide && col.nets.includes(scaffoldSideIface.net))
+			&& (scaffoldAssembly.layoutPolicy?.labelColumns || []).some(col => col.module === scaffoldSideIface.to && col.routeEnd === 'to' && col.side === scaffoldSideIface.toSide && col.nets.includes(scaffoldSideIface.net))
+		),
+		'WS85-scaffold-preserves-interface-label-sides',
+		'GSD scaffold must preserve project_spec interface fromSide/toSide into layoutPolicy.interfaceRoutes and generated label columns',
 		checks.scaffold,
 	);
 

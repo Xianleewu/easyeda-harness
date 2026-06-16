@@ -42,6 +42,8 @@ export function validateSpecSchema(spec) {
 
 	const allNets = stringSet(modules.flatMap(mod => asArray(mod?.requiredNets)));
 	const ifaceKeys = new Set();
+	const validStrategies = new Set(['visible-continuity', 'grouped-net-label']);
+	const validDirections = new Set(['left-to-right', 'right-to-left', 'vertical', 'local']);
 	for (const [index, iface] of asArray(spec.interfaces).entries()) {
 		if (!iface || typeof iface !== 'object') {
 			hard(findings, 'SS12-interface-object', 'each spec interface must be an object', { index });
@@ -56,6 +58,17 @@ export function validateSpecSchema(spec) {
 		const key = `${iface.net || ''}:${iface.from || ''}:${iface.to || ''}`;
 		if (ifaceKeys.has(key)) hard(findings, 'SS19-interface-unique', `duplicate spec interface ${key}`, { interface: iface });
 		else ifaceKeys.add(key);
+		if (iface.strategy !== undefined && !validStrategies.has(iface.strategy)) {
+			hard(findings, 'SS22-interface-strategy', 'interface.strategy must be visible-continuity or grouped-net-label when declared', { index, interface: iface, validStrategies: [...validStrategies] });
+		}
+		if (iface.direction !== undefined && !validDirections.has(iface.direction)) {
+			hard(findings, 'SS23-interface-direction', 'interface.direction must be left-to-right, right-to-left, vertical, or local when declared', { index, interface: iface, validDirections: [...validDirections] });
+		}
+		for (const sideKey of ['fromSide', 'toSide']) {
+			if (iface[sideKey] !== undefined && !['left', 'right'].includes(iface[sideKey])) {
+				hard(findings, 'SS24-interface-label-side', 'interface.fromSide and interface.toSide must be left or right when declared', { index, interface: iface, sideKey });
+			}
+		}
 	}
 
 	const quality = spec.qualityPolicy || {};

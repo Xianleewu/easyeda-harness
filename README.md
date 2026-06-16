@@ -2,7 +2,7 @@
 
 [English](README.en.md)
 
-EasyEDA Harness 是给 Codex、Claude Code 等编码 Agent 使用的 EasyEDA 原理图生成与验收工作流。它不是 `easyeda-api-skill`，也不是让 Agent 自由画图的 prompt 包：官方 `easyeda-api-skill` 负责 EasyEDA API 文档、Bridge 和扩展；本仓库负责把用户需求变成结构化合同、确定性模板、布局门禁、几何/标签门禁、预览证据、live 证据和受控写回。
+EasyEDA Harness 是给 Codex、Claude Code 等编码 Agent 使用的 EasyEDA 原理图设计协作与验收工作流。它不是 `easyeda-api-skill`，也不是完整的自动原理图布局器，更不是让 Agent 自由画图的 prompt 包：官方 `easyeda-api-skill` 负责 EasyEDA API 文档、Bridge 和扩展；本仓库负责把用户需求变成结构化合同、确定性模板、布局门禁、几何/标签门禁、预览证据、live 证据和受控写回。
 
 推荐用法很简单：把仓库交给 Agent，让它按 `AGENTS.md` 或 `CLAUDE.md` 执行。Agent 必须先确认官方 skill 和 Bridge 可用，再建立项目合同与模块模板，运行本地和 live 门禁，只有所有检查通过后才允许 `apply:gated` 写回 EasyEDA。
 
@@ -24,6 +24,8 @@ Follow AGENTS.md for this repository. Install/verify easyeda-api-skill first. Fo
 
 用户通常不需要逐条执行命令；命令是给 Agent 和 CI 使用的稳定入口。中立入口是 `node bin/easyeda-gsd.mjs`，详细 Runner 约定见 `docs/agent-runner-guide.md`。
 
+工作流应像 UI 设计一样先形成短周期草案，再进入完整生成和验收。`node bin/easyeda-gsd.mjs design-brief` 会写出 `design_brief_report.json`，包含功能 block diagram、模块假设、pin/net plan、布局/接口计划、label column 计划、ERC/版式 checklist 和下一步任务。Agent 应先用这个 brief 发现模块矩形缺失、label column 缺失、pin map 缺失、接口方向不清、浮空 label 等问题，再继续写 deterministic cell。
+
 ## 工作流边界
 
 新项目不能直接让 Agent 在 EasyEDA 里边看边画。必须先把设计意图落到机器可检查的文件：
@@ -44,6 +46,7 @@ Follow AGENTS.md for this repository. Install/verify easyeda-api-skill first. Fo
 - `workflow:smoke`：证明坏 spec、缺库绑定、失败 generate、未完成 scaffold 都会被拦住，并写出 `workflow_smoke_report.json`。
 - 新 pack 的 `init --pack <pack> --out <project-dir>` 会生成按模块拆分的 `cell_manifest.json` cell 模板和 `portLayout`，并让 `project_assembly.json` 引用这些 cell；agent 必须实现这些 deterministic builders，不能绕回自由绘图。
 - `easyeda-gsd plan`：检查 spec 是否被合同、netlist、assembly 和 circuit pack 实现，并写出 `gsd_plan_report.json`。
+- `easyeda-gsd design-brief`：生成快速审阅报告，说明 block diagram、pin/net plan、布局/接口计划、label column、ERC/版式 checklist 和下一步。
 - `easyeda-gsd generate`：只有 plan 通过才生成模型，并写出 `gsd_generate_report.json`。
 - `contract:pack`：检查选中的 circuit pack 和生成 hook。
 - `contract:library`：检查器件 Symbol、Device、Footprint、名称、值和 BOM/PCB 状态。
@@ -83,6 +86,7 @@ Follow AGENTS.md for this repository. Install/verify easyeda-api-skill first. Fo
 最终交付必须来自真实 EasyEDA live 检查：
 
 - `acceptance_report.json`：完整验收报告。
+- `design_brief_report.json`：证明生成前已经明确 block diagram、pin/net plan、布局/接口计划、label column、ERC/版式 checklist 和下一步。
 - `final_evidence_report.json`：本地和 live 证据的新鲜度、完整性和通过状态。
 - `delivery_report.json`：最终 handoff 报告。
 - `live.json`、`live_canvas.png` 和模块级 live 截图：证明真实 EasyEDA 画布与合同一致。
@@ -98,6 +102,7 @@ Follow AGENTS.md for this repository. Install/verify easyeda-api-skill first. Fo
 - `circuit_packs/`：可复用 circuit pack、cell builders 和 `cell_manifest.json`。
 - `engine/`：生成、布局搜索、门禁、写回、live snapshot、DRC 和证据收集。
 - `workflows/`：GSD plan/generate/scaffold/repair 流程。
+- `workflows/design_brief.mjs`：短周期设计审阅报告生成器。
 - `reports/README.md`：生成报告和 action contract 说明。
 
 Agent rule index: wire crossings, object overlap, left-bottom/right-bottom origins.

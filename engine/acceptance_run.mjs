@@ -60,6 +60,7 @@ steps.push(runStep('entrypoints', 'node', ['engine/entrypoint_audit.mjs']));
 steps.push(runStep('agent:instructions', 'node', ['engine/agent_instruction_gate.mjs']));
 steps.push(runStep('workflow:smoke', 'node', ['engine/workflow_smoke_gate.mjs']));
 steps.push(runStep('gsd:plan', 'node', ['bin/easyeda-gsd.mjs', 'plan', SPEC_PATH]));
+steps.push(runStep('design:brief', 'node', ['bin/easyeda-gsd.mjs', 'design-brief', SPEC_PATH]));
 steps.push(runStep('gsd:generate', 'node', ['bin/easyeda-gsd.mjs', 'generate', '--fast', SPEC_PATH]));
 steps.push(runStep('spec:schema', 'node', ['engine/spec_schema_gate.mjs']));
 steps.push(runStep('spec', 'node', ['engine/project_spec_gate.mjs']));
@@ -97,6 +98,7 @@ for (const [key, path] of Object.entries({
 	agentInstructions: DIR + 'agent_instruction_report.json',
 	workflowSmoke: DIR + 'workflow_smoke_report.json',
 	gsdPlan: DIR + 'gsd_plan_report.json',
+	designBrief: DIR + 'design_brief_report.json',
 	gsdGenerate: DIR + 'gsd_generate_report.json',
 	specSchema: DIR + 'spec_schema_report.json',
 	projectSpec: DIR + 'project_spec_report.json',
@@ -146,6 +148,7 @@ const acceptance = {
 			agentInstructions: steps.find(s => s.name === 'agent:instructions')?.pass === true,
 			workflowSmoke: steps.find(s => s.name === 'workflow:smoke')?.pass === true,
 			gsdPlan: steps.find(s => s.name === 'gsd:plan')?.pass === true,
+			designBrief: steps.find(s => s.name === 'design:brief')?.pass === true,
 			gsdGenerate: steps.find(s => s.name === 'gsd:generate')?.pass === true,
 			specSchema: steps.find(s => s.name === 'spec:schema')?.pass === true,
 			spec: steps.find(s => s.name === 'spec')?.pass === true,
@@ -181,6 +184,7 @@ const acceptance = {
 		agentInstructions: artifacts.agentInstructions ? { pass: artifacts.agentInstructions.pass, severity: artifacts.agentInstructions.severity, filesChecked: artifacts.agentInstructions.filesChecked } : null,
 		workflowSmoke: artifacts.workflowSmoke ? { pass: artifacts.workflowSmoke.pass, severity: artifacts.workflowSmoke.severity, checks: artifacts.workflowSmoke.checks } : null,
 		gsdPlan: artifacts.gsdPlan ? { pass: artifacts.gsdPlan.pass, severity: artifacts.gsdPlan.severity, projectId: artifacts.gsdPlan.projectId, circuitPack: artifacts.gsdPlan.circuitPack, modules: artifacts.gsdPlan.modules, partLib: artifacts.gsdPlan.partLib || null } : null,
+		designBrief: artifacts.designBrief ? { pass: artifacts.designBrief.pass, severity: artifacts.designBrief.severity, projectId: artifacts.designBrief.projectId, circuitPack: artifacts.designBrief.circuitPack, modules: artifacts.designBrief.blockDiagram?.modules?.length || 0, interfaces: artifacts.designBrief.blockDiagram?.interfaces?.length || 0, nextTasks: artifacts.designBrief.nextTasks?.length || 0 } : null,
 		gsdGenerate: artifacts.gsdGenerate ? { pass: artifacts.gsdGenerate.pass, severity: artifacts.gsdGenerate.severity, projectId: artifacts.gsdGenerate.projectId, circuitPack: artifacts.gsdGenerate.circuitPack, generationContext: artifacts.gsdGenerate.generationContext || null, generated: artifacts.gsdGenerate.generated } : null,
 		specSchema: artifacts.specSchema ? { pass: artifacts.specSchema.pass, severity: artifacts.specSchema.severity, projectId: artifacts.specSchema.projectId, modules: artifacts.specSchema.modules, interfaces: artifacts.specSchema.interfaces } : null,
 		projectSpec: artifacts.projectSpec ? { pass: artifacts.projectSpec.pass, severity: artifacts.projectSpec.severity, projectId: artifacts.projectSpec.projectId, modules: artifacts.projectSpec.modules, interfaces: artifacts.projectSpec.interfaces } : null,

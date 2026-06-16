@@ -33,6 +33,10 @@ function netsByName(netlist) {
 	return new Map(asArray(netlist?.nets).map(net => [net.name, net]));
 }
 
+function routesByKey(assembly) {
+	return new Map(asArray(assembly?.layoutPolicy?.interfaceRoutes).map(route => [interfaceKey(route), route]));
+}
+
 function finitePoint(point) {
 	return point && Number.isFinite(point.x) && Number.isFinite(point.y);
 }
@@ -208,6 +212,7 @@ function validateSpecRealization(spec, contract, netlist, assembly, model = null
 	const contractModules = moduleById(contract);
 	const assemblyModules = moduleById(assembly);
 	const netEntries = netsByName(netlist);
+	const assemblyRoutes = routesByKey(assembly);
 
 	if (contract?.projectId !== spec?.projectId) {
 		hard(findings, 'GP1-project-id-contract', 'project_contract.json projectId must match the planned spec', {
@@ -258,6 +263,20 @@ function validateSpecRealization(spec, contract, netlist, assembly, model = null
 	for (const iface of asArray(spec.interfaces)) {
 		const matched = asArray(contract.interfaces).some(candidate => candidate.net === iface.net && candidate.from === iface.from && candidate.to === iface.to);
 		if (!matched) hard(findings, 'GP10-interface-covered', 'project_contract.json must cover every spec interface', { interface: iface });
+		const route = assemblyRoutes.get(interfaceKey(iface));
+		if (route) {
+			for (const key of ['strategy', 'direction', 'fromSide', 'toSide']) {
+				if (iface[key] !== undefined && route[key] !== iface[key]) {
+					hard(findings, 'GP67-interface-route-preserves-spec', 'project_assembly.json layoutPolicy.interfaceRoutes must preserve interface route intent declared in project_spec.json', {
+						interface: iface,
+						key,
+						expected: iface[key],
+						actual: route[key] ?? null,
+						route,
+					});
+				}
+			}
+		}
 	}
 
 	const specNets = setOf(asArray(spec.modules).flatMap(mod => asArray(mod.requiredNets)));

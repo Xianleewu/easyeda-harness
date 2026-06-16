@@ -6,6 +6,7 @@ import { validateSpecSchema } from '../contracts/spec_schema.mjs';
 import { loadRepairLoopPlan } from '../workflows/repair_loop.mjs';
 import { buildGeneratePlan, runGsdGenerate } from '../workflows/gsd_generate.mjs';
 import { writeScaffold } from '../workflows/gsd_scaffold.mjs';
+import { writeDesignBrief } from '../workflows/design_brief.mjs';
 import { buildMinimalSpec, validatePackId, writePackScaffold } from '../workflows/pack_scaffold.mjs';
 import { circuitPackIds } from '../circuit_packs/registry.mjs';
 import { acquireRunLock } from '../workflows/run_lock.mjs';
@@ -23,17 +24,19 @@ Agent-neutral workflow wrapper for EasyEDA Harness.
 
 Safe order:
   1. init/plan a structured project input
-  2. generate deterministic model artifacts
-  3. accept local gates
-  4. live-check with EasyEDA bridge evidence
-  5. deliver final live evidence
-  6. apply --gated
+  2. write a design brief for fast human/agent review
+  3. generate deterministic model artifacts
+  4. accept local gates
+  5. live-check with EasyEDA bridge evidence
+  6. deliver final live evidence
+  7. apply --gated
 
 Commands:
   help                         Show this help.
   init --pack <pack> --out <file-or-dir>
                                Write a spec file, or a full project + circuit-pack scaffold when <out> is a directory.
   plan [spec]                  Validate current project contracts and print selected pack data.
+  design-brief [spec]          Write a fast review brief: block diagram, assumptions, pin/net plan, layout plan, ERC checklist, next tasks.
   generate [--fast] [spec]     Plan-gated deterministic generation without write-back; full layout search by default.
   accept [spec]                Run local acceptance gates for the selected spec context.
   live-check [spec]            Run live EasyEDA snapshot, image, DRC, and live shot checks.
@@ -127,8 +130,22 @@ function plan(args) {
 	}
 }
 
+function designBrief(args) {
+	const lock = acquireCliLock();
+	try {
+		const spec = args.find(a => !a.startsWith('-')) || 'project_spec.json';
+		const report = writeDesignBrief(ROOT, spec);
+		log(JSON.stringify(report, null, 2));
+		log('report -> design_brief_report.json');
+		return report.pass ? 0 : 1;
+	} finally {
+		lock.release();
+	}
+}
+
 function report() {
 	const files = [
+		'design_brief_report.json',
 		'acceptance_report.json',
 		'cell_manifest_report.json',
 		'project_contract_report.json',
@@ -204,6 +221,9 @@ switch (cmd) {
 		break;
 	case 'plan':
 		process.exit(plan(args));
+		break;
+	case 'design-brief':
+		process.exit(designBrief(args));
 		break;
 	case 'generate':
 		generate(args);
