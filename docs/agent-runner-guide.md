@@ -7,7 +7,7 @@ Use this repository as an executable schematic workflow, not as permission to dr
 1. Capture user intent in `project_spec.json`.
 2. For a new project directory, run `node bin/easyeda-gsd.mjs init --pack <pack> --out <project-dir>` to create editable scaffold files and, for a new pack id, `circuit_packs/<pack>/` skeleton files.
 3. Run `node bin/easyeda-gsd.mjs plan <project-dir>/project_spec.json` and keep `gsd_plan_report.json` passing as the spec-to-contract realization proof.
-4. Run `node bin/easyeda-gsd.mjs design-brief <project-dir>/project_spec.json` and inspect `design_brief_report.json` as the short review loop.
+4. Run `node bin/easyeda-gsd.mjs design-brief <project-dir>/project_spec.json` and inspect strict `design_brief_report.json` as the short review loop. Use `--draft` only for early incomplete scaffolds.
 5. Derive `project_contract.json`, including module-level `drawingRules` for orthogonal wiring, real net labels, text clearance, module isolation, no fake net text, and no unnecessary net ports.
 6. Define required electrical endpoints in `project_netlist.json`.
 7. Fill `approved_library_manifest.json` so every required part has approved Symbol, Device, and Footprint bindings.
@@ -27,7 +27,7 @@ Use this repository as an executable schematic workflow, not as permission to dr
 - Do not use low-level writer scripts for final delivery.
 - Do not reuse `aihwdebugger` for unrelated schematics; create or fill the target circuit pack first.
 - Do not trust a module contract until it declares `drawingRules`; missing drawing rules mean the project has not stated the schematic-quality constraints that deterministic cells must satisfy.
-- Do not implement or tune cells from a vague prompt. First make `design_brief_report.json` explain the block diagram, pin/net plan, layout/interface plan, label columns, ERC/layout checklist, and next tasks.
+- Do not implement or tune cells from a vague prompt. First make strict `design_brief_report.json` pass and explain the block diagram, pin/net plan, layout/interface plan, label columns, ERC/layout checklist, and next tasks.
 - Do not implement a deterministic cell until its `cell_manifest.json` entry declares `qualityRules` for orthogonal wiring, real net labels, text clearance, module isolation, no fake net text, and no unnecessary net ports.
 - Do not trust layout work until `project_assembly.json` declares `layoutPolicy.flow` and ordered `layoutPolicy.columns` for every module.
 - Do not trust geometry work until `contract:geometry` passes for the generated model and `contract:geometry:live` passes for the real EasyEDA snapshot.

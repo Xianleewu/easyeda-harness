@@ -14,6 +14,11 @@ function soft(findings, rule, msg, where = {}) {
 	findings.push({ rule, severity: 'soft', category: 'design-brief', msg, where });
 }
 
+function addFinding(findings, severity, rule, msg, where = {}) {
+	if (severity === 'soft') soft(findings, rule, msg, where);
+	else hard(findings, rule, msg, where);
+}
+
 function moduleMap(doc) {
 	return new Map(asArray(doc?.modules).map(mod => [mod.id, mod]));
 }
@@ -154,8 +159,58 @@ function nextTasks({ spec, contract, netlist, assembly }) {
 	return tasks.slice(0, 20);
 }
 
-export function buildDesignBrief(root, specPath = 'project_spec.json') {
+function isSignalNet(net) {
+	return !!net && !['GND', 'SYS_3V3', 'SYS_5V', 'VBUS'].includes(net);
+}
+
+function auditCompleteness(findings, { draft, spec, contract, netlist, assembly, moduleAssumptions, pinNetPlan, layoutPlan }) {
+	const severity = draft ? 'soft' : 'hard';
+	if (!contract) addFinding(findings, severity, 'DB2-contract-required', 'project_contract.json is required for a generation-ready design brief', {});
+	if (!netlist) addFinding(findings, severity, 'DB3-netlist-required', 'project_netlist.json is required for a generation-ready design brief', {});
+	if (!assembly) addFinding(findings, severity, 'DB4-assembly-required', 'project_assembly.json is required for a generation-ready design brief', {});
+	for (const item of moduleAssumptions) {
+		if (item.openAssumptions.length) {
+			addFinding(findings, severity, 'DB5-module-assumption-open', 'module assumptions must be closed before deterministic generation', {
+				module: item.module,
+				openAssumptions: item.openAssumptions,
+			});
+		}
+	}
+	for (const item of pinNetPlan) {
+		if (item.status !== 'mapped') addFinding(findings, severity, 'DB6-pin-map-complete', 'every required net needs concrete requiredPins or modulePins before generation', { net: item.net });
+	}
+	if (!layoutPlan.flow) addFinding(findings, severity, 'DB7-layout-flow-required', 'layoutPolicy.flow must explain the schematic reading order before generation', {});
+	if (!layoutPlan.columns.length) addFinding(findings, severity, 'DB8-layout-columns-required', 'layoutPolicy.columns must declare readable module columns before generation', {});
+	if (!layoutPlan.moduleRegions.length) addFinding(findings, severity, 'DB9-module-regions-required', 'layoutPolicy.moduleRegions must declare module rectangles before generation', {});
+	if (!layoutPlan.interfaceRoutes.length && asArray(spec?.interfaces).length) {
+		addFinding(findings, severity, 'DB10-interface-routes-required', 'layoutPolicy.interfaceRoutes must explain cross-module signal ownership before generation', {});
+	}
+	if (!layoutPlan.labelColumns.length && asArray(spec?.interfaces).some(iface => isSignalNet(iface.net))) {
+		addFinding(findings, severity, 'DB11-label-columns-required', 'layoutPolicy.labelColumns must budget visible signal labels before generation', {});
+	}
+	const labelColumns = layoutPlan.labelColumns;
+	for (const iface of asArray(spec?.interfaces)) {
+		const route = layoutPlan.interfaceRoutes.find(r => keyOfInterface(r) === keyOfInterface(iface)) || {};
+		const strategy = route.strategy || iface.strategy;
+		if (strategy !== 'grouped-net-label' || !isSignalNet(iface.net)) continue;
+		const fromSide = route.fromSide || iface.fromSide || 'right';
+		const toSide = route.toSide || iface.toSide || 'left';
+		const fromOk = labelColumns.some(col => col.module === iface.from && col.routeEnd === 'from' && col.side === fromSide && col.nets.includes(iface.net));
+		const toOk = labelColumns.some(col => col.module === iface.to && col.routeEnd === 'to' && col.side === toSide && col.nets.includes(iface.net));
+		if (!fromOk || !toOk) {
+			addFinding(findings, severity, 'DB12-grouped-interface-label-columns', 'grouped-net-label interfaces need source and target label columns with matching side and routeEnd', {
+				interface: iface,
+				expected: { fromSide, toSide },
+				fromOk,
+				toOk,
+			});
+		}
+	}
+}
+
+export function buildDesignBrief(root, specPath = 'project_spec.json', options = {}) {
 	const context = generateContext(root, specPath);
+	const draft = options.draft === true;
 	const findings = [];
 	let spec = null;
 	let contract = null;
@@ -169,7 +224,7 @@ export function buildDesignBrief(root, specPath = 'project_spec.json') {
 	if (spec) findings.push(...validateSpecSchema(spec).map(f => ({ ...f, category: 'design-brief' })));
 	for (const [key, path] of Object.entries({ contract: context.contractPath, netlist: context.netlistPath, assembly: context.assemblyPath })) {
 		if (!existsSync(path)) {
-			soft(findings, `DB1-${key}-missing`, `${key} file is missing; brief will include open tasks`, { path });
+			addFinding(findings, draft ? 'soft' : 'hard', `DB1-${key}-missing`, `${key} file is missing; brief will include open tasks`, { path });
 			continue;
 		}
 		try {
@@ -180,20 +235,26 @@ export function buildDesignBrief(root, specPath = 'project_spec.json') {
 			hard(findings, `DB1-${key}-parse`, `${key} file must parse as JSON`, { path, error: e.message });
 		}
 	}
+	const blockDiagram = buildBlockDiagram(spec, assembly);
+	const moduleAssumptions = buildModuleAssumptions(spec, contract, assembly);
+	const pinNetPlan = buildPinNetPlan(spec, netlist);
+	const layoutPlan = buildLayoutPlan(assembly);
+	auditCompleteness(findings, { draft, spec, contract, netlist, assembly, moduleAssumptions, pinNetPlan, layoutPlan });
 	const hardCount = findings.filter(f => f.severity === 'hard').length;
 	const softCount = findings.filter(f => f.severity === 'soft').length;
 	const report = {
 		generatedAt: new Date().toISOString(),
 		pass: hardCount === 0,
-		mode: 'design-brief',
+		mode: draft ? 'design-brief-draft' : 'design-brief',
+		draft,
 		spec: specPath,
 		projectId: spec?.projectId || contract?.projectId || null,
 		circuitPack: spec?.circuitPack || assembly?.circuitPack || null,
 		severity: { hard: hardCount, soft: softCount, info: 0 },
-		blockDiagram: buildBlockDiagram(spec, assembly),
-		moduleAssumptions: buildModuleAssumptions(spec, contract, assembly),
-		pinNetPlan: buildPinNetPlan(spec, netlist),
-		layoutPlan: buildLayoutPlan(assembly),
+		blockDiagram,
+		moduleAssumptions,
+		pinNetPlan,
+		layoutPlan,
 		ercChecklist: qualityChecklist(spec, contract),
 		nextTasks: nextTasks({ spec, contract, netlist, assembly }),
 		findings,
@@ -201,8 +262,8 @@ export function buildDesignBrief(root, specPath = 'project_spec.json') {
 	return report;
 }
 
-export function writeDesignBrief(root, specPath = 'project_spec.json', reportPath = `${root.replace(/\\/g, '/')}/design_brief_report.json`) {
-	const report = buildDesignBrief(root.replace(/\\/g, '/'), specPath);
+export function writeDesignBrief(root, specPath = 'project_spec.json', reportPath = `${root.replace(/\\/g, '/')}/design_brief_report.json`, options = {}) {
+	const report = buildDesignBrief(root.replace(/\\/g, '/'), specPath, options);
 	writeFileSync(reportPath, JSON.stringify(report, null, 2), 'utf8');
 	return report;
 }

@@ -4,7 +4,7 @@ import { resolve } from 'node:path';
 import { buildGsdPlan } from '../workflows/gsd_plan.mjs';
 import { runGsdGenerate } from '../workflows/gsd_generate.mjs';
 import { writeScaffold } from '../workflows/gsd_scaffold.mjs';
-import { writeDesignBrief } from '../workflows/design_brief.mjs';
+import { buildDesignBrief, writeDesignBrief } from '../workflows/design_brief.mjs';
 import { buildMinimalSpec, syncPackRegistry, writePackScaffold } from '../workflows/pack_scaffold.mjs';
 import { validateLibraryContract } from '../contracts/library_contract.mjs';
 import { validateSpecSchema, asArray } from '../contracts/spec_schema.mjs';
@@ -215,6 +215,28 @@ try {
 		'WS86-design-brief-short-feedback',
 		'workflow must produce a fast review brief with block diagram, pin/net plan, layout label columns, and ERC/layout checklist before generation',
 		checks.designBriefFastReview,
+	);
+
+	const briefDraftDir = `${TMP_DIR}/brief_draft`;
+	mkdirSync(briefDraftDir, { recursive: true });
+	writeFileSync(`${briefDraftDir}/project_spec.json`, JSON.stringify(spec, null, 2), 'utf8');
+	const missingAssemblyBrief = buildDesignBrief(ROOT, '_tmp_workflow_smoke/brief_draft/project_spec.json');
+	const missingAssemblyBriefDraft = buildDesignBrief(ROOT, '_tmp_workflow_smoke/brief_draft/project_spec.json', { draft: true });
+	checks.designBriefStrictByDefault = {
+		strictPass: missingAssemblyBrief.pass,
+		strictRules: (missingAssemblyBrief.findings || []).map(f => f.rule),
+		draftPass: missingAssemblyBriefDraft.pass,
+		draftSeverity: missingAssemblyBriefDraft.severity,
+	};
+	assertFinding(
+		findings,
+		!checks.designBriefStrictByDefault.strictPass
+			&& checks.designBriefStrictByDefault.strictRules.includes('DB1-contract-missing')
+			&& checks.designBriefStrictByDefault.draftPass === true
+			&& checks.designBriefStrictByDefault.draftSeverity.soft > 0,
+		'WS87-design-brief-strict-default',
+		'design-brief must be fail-closed by default; draft mode may downgrade missing companion files to soft early-review tasks',
+		checks.designBriefStrictByDefault,
 	);
 
 	const badSpec = clone(spec);

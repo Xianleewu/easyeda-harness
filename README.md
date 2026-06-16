@@ -24,7 +24,7 @@ Follow AGENTS.md for this repository. Install/verify easyeda-api-skill first. Fo
 
 用户通常不需要逐条执行命令；命令是给 Agent 和 CI 使用的稳定入口。中立入口是 `node bin/easyeda-gsd.mjs`，详细 Runner 约定见 `docs/agent-runner-guide.md`。
 
-工作流应像 UI 设计一样先形成短周期草案，再进入完整生成和验收。`node bin/easyeda-gsd.mjs design-brief` 会写出 `design_brief_report.json`，包含功能 block diagram、模块假设、pin/net plan、布局/接口计划、label column 计划、ERC/版式 checklist 和下一步任务。Agent 应先用这个 brief 发现模块矩形缺失、label column 缺失、pin map 缺失、接口方向不清、浮空 label 等问题，再继续写 deterministic cell。
+工作流应像 UI 设计一样先形成短周期草案，再进入完整生成和验收。`node bin/easyeda-gsd.mjs design-brief` 默认是严格检查，会写出 `design_brief_report.json`，包含功能 block diagram、模块假设、pin/net plan、布局/接口计划、label column 计划、ERC/版式 checklist 和下一步任务。Agent 应先用这个 brief 发现模块矩形缺失、label column 缺失、pin map 缺失、接口方向不清、浮空 label 等问题；只有 `HARD=0 SOFT=0 INFO=0` 才能继续写 deterministic cell。`design-brief --draft` 只用于早期不完整 scaffold 的探索，不是生成或交付证据。
 
 ## 工作流边界
 
@@ -46,7 +46,7 @@ Follow AGENTS.md for this repository. Install/verify easyeda-api-skill first. Fo
 - `workflow:smoke`：证明坏 spec、缺库绑定、失败 generate、未完成 scaffold 都会被拦住，并写出 `workflow_smoke_report.json`。
 - 新 pack 的 `init --pack <pack> --out <project-dir>` 会生成按模块拆分的 `cell_manifest.json` cell 模板和 `portLayout`，并让 `project_assembly.json` 引用这些 cell；agent 必须实现这些 deterministic builders，不能绕回自由绘图。
 - `easyeda-gsd plan`：检查 spec 是否被合同、netlist、assembly 和 circuit pack 实现，并写出 `gsd_plan_report.json`。
-- `easyeda-gsd design-brief`：生成快速审阅报告，说明 block diagram、pin/net plan、布局/接口计划、label column、ERC/版式 checklist 和下一步。
+- `easyeda-gsd design-brief`：生成严格快速审阅报告，说明 block diagram、pin/net plan、布局/接口计划、label column、ERC/版式 checklist 和下一步；`--draft` 只用于早期草稿。
 - `easyeda-gsd generate`：只有 plan 通过才生成模型，并写出 `gsd_generate_report.json`。
 - `contract:pack`：检查选中的 circuit pack 和生成 hook。
 - `contract:library`：检查器件 Symbol、Device、Footprint、名称、值和 BOM/PCB 状态。

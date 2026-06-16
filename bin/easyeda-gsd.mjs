@@ -36,7 +36,8 @@ Commands:
   init --pack <pack> --out <file-or-dir>
                                Write a spec file, or a full project + circuit-pack scaffold when <out> is a directory.
   plan [spec]                  Validate current project contracts and print selected pack data.
-  design-brief [spec]          Write a fast review brief: block diagram, assumptions, pin/net plan, layout plan, ERC checklist, next tasks.
+  design-brief [--draft] [spec]
+                               Write a strict fast review brief: block diagram, assumptions, pin/net plan, layout plan, ERC checklist, next tasks.
   generate [--fast] [spec]     Plan-gated deterministic generation without write-back; full layout search by default.
   accept [spec]                Run local acceptance gates for the selected spec context.
   live-check [spec]            Run live EasyEDA snapshot, image, DRC, and live shot checks.
@@ -134,7 +135,7 @@ function designBrief(args) {
 	const lock = acquireCliLock();
 	try {
 		const spec = args.find(a => !a.startsWith('-')) || 'project_spec.json';
-		const report = writeDesignBrief(ROOT, spec);
+		const report = writeDesignBrief(ROOT, spec, `${ROOT}/design_brief_report.json`, { draft: args.includes('--draft') });
 		log(JSON.stringify(report, null, 2));
 		log('report -> design_brief_report.json');
 		return report.pass ? 0 : 1;
