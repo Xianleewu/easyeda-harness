@@ -27,6 +27,7 @@
     "contract:helpers": "node engine/cell_helpers_gate.mjs",
     "status:local": "node engine/local_gate_status.mjs",
     "bridge:check": "node engine/bridge_check.mjs",
+    "live:audit": "node engine/live_audit.mjs",
     "examples:divider": "node engine/divider_pack_smoke.mjs",
     "examples:divider:accept": "node bin/easyeda-gsd.mjs accept samples/divider/project_spec.json",
     "contract:assembly": "node engine/project_assembly_gate.mjs",
