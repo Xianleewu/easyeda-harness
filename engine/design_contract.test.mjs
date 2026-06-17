@@ -64,3 +64,33 @@ test('布线通道:相邻列之间各一条', () => {
 	assert.equal(contract.routingChannels.length, contract.columns.length - 1);
 	assert.deepEqual(contract.routingChannels[0].betweenColumns, ['input', 'control']);
 });
+
+test('contractQC:合法 contract 无 hard finding', () => {
+	const hard = contractQC(contract).filter(f => f.severity === 'hard');
+	assert.deepEqual(hard, []);
+});
+
+test('确定性:同输入两次合成深相等', () => {
+	assert.deepEqual(synthesizeContract(roles, logical), synthesizeContract(roles, logical));
+});
+
+test('空模块:contractQC 报 DC0-empty(info)', () => {
+	const empty = synthesizeContract({ controller: null, parts: [], modules: [] }, { parts: [], nets: [] });
+	const info = contractQC(empty).filter(f => f.rule === 'DC0-empty');
+	assert.equal(info.length, 1);
+	assert.equal(info[0].severity, 'info');
+});
+
+test('contractQC 负例:重叠区→DC3、孤儿标签→DC4、power 标签→DC5', () => {
+	const bad = JSON.parse(JSON.stringify(contract));
+	const byCol = {};
+	for (const m of bad.modules) (byCol[m.region.col] ||= []).push(m);
+	const dup = Object.values(byCol).find(a => a.length >= 2);
+	dup[1].region.row = dup[0].region.row;          // 强制同列重叠
+	bad.labelColumns.push({ id: 'X@ghost', net: 'X', module: 'ghost', side: 'left', routeEnd: 'from', class: 'signal' });
+	bad.labelColumns.push({ id: 'P@' + bad.modules[0].id, net: 'P', module: bad.modules[0].id, side: 'left', routeEnd: 'from', class: 'power' });
+	const rules = new Set(contractQC(bad).map(f => f.rule));
+	assert.ok(rules.has('DC3-region-overlap'));
+	assert.ok(rules.has('DC4-label-orphan'));
+	assert.ok(rules.has('DC5-label-class'));
+});

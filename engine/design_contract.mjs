@@ -113,5 +113,70 @@ export function synthesizeContract(roles, logical, opts = {}) {
 }
 
 export function contractQC(contract) {
-	return [];
+	const findings = [];
+	const mods = contract.modules || [];
+	const cols = contract.columns || [];
+
+	if (!mods.length) {
+		findings.push({ rule: 'DC0-empty', severity: 'info', message: '空 contract：无模块' });
+	}
+
+	// DC1:每模块恰好属于一列
+	const membership = new Map();
+	for (const c of cols) for (const id of c.modules) membership.set(id, (membership.get(id) || 0) + 1);
+	for (const m of mods) {
+		const k = membership.get(m.id) || 0;
+		if (k !== 1) {
+			findings.push({ rule: 'DC1-module-column-membership', severity: 'hard',
+				message: `模块 ${m.id} 属于 ${k} 个列(应恰好 1)`, where: { module: m.id } });
+		}
+	}
+
+	// DC2:列 order 密集唯一 + 控制器列位于输入/输出之间
+	const orders = cols.map(c => c.order).slice().sort((a, b) => a - b);
+	if (!orders.every((o, i) => o === i)) {
+		findings.push({ rule: 'DC2-column-order', severity: 'hard', message: `列 order 非密集唯一:${orders.join(',')}` });
+	}
+	const idx = Object.fromEntries(cols.map(c => [c.id, c]));
+	if (idx.control && idx.input && idx.output &&
+		!(idx.input.order < idx.control.order && idx.control.order < idx.output.order)) {
+		findings.push({ rule: 'DC2-column-order', severity: 'hard', message: '控制器列未位于输入/输出列之间' });
+	}
+
+	// DC3:同列模块区不重叠
+	const perCol = new Map();
+	for (const m of mods) {
+		if (!perCol.has(m.region.col)) perCol.set(m.region.col, []);
+		perCol.get(m.region.col).push(m);
+	}
+	for (const list of perCol.values()) {
+		const sorted = list.slice().sort((a, b) => a.region.row - b.region.row);
+		for (let i = 1; i < sorted.length; i++) {
+			const prev = sorted[i - 1], cur = sorted[i];
+			if (cur.region.row < prev.region.row + prev.region.hCells) {
+				findings.push({ rule: 'DC3-region-overlap', severity: 'hard',
+					message: `模块 ${prev.id} 与 ${cur.id} 区重叠`, where: { modules: [prev.id, cur.id] } });
+			}
+		}
+	}
+
+	// DC4/DC5:标签列引用存在、不重复、必为 signal 类
+	const modIds = new Set(mods.map(m => m.id));
+	const seen = new Set();
+	for (const l of contract.labelColumns || []) {
+		if (!modIds.has(l.module)) {
+			findings.push({ rule: 'DC4-label-orphan', severity: 'hard',
+				message: `标签列引用不存在模块 ${l.module}`, where: { label: l.id } });
+		}
+		if (seen.has(l.id)) {
+			findings.push({ rule: 'DC4-label-duplicate', severity: 'hard', message: `重复标签列 ${l.id}` });
+		}
+		seen.add(l.id);
+		if (l.class !== 'signal') {
+			findings.push({ rule: 'DC5-label-class', severity: 'hard',
+				message: `标签列 ${l.id} 非 signal 类(${l.class})`, where: { label: l.id } });
+		}
+	}
+
+	return findings;
 }
