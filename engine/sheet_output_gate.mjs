@@ -487,10 +487,14 @@ export function auditSheetOutput(renderReport, imagePath = DEFAULT_IMAGE, opts =
 				});
 			}
 		}
+		/* "reference-PDF-like" 占比/密度族期望针对多模块满图；单/少模块样例项目
+		 * 的图框与内容天然较小，不据此判失败（AIHWDEBUGER 多模块不受影响）。
+		 * 仅放宽密度/占比类（SO7/13/14/15），结构性证据缺失（SO12）仍校验。 */
+		const multiModuleSheet = (renderReport.moduleRegions?.length ?? 0) >= 2;
 		const fp = renderReport.evidence?.footprint;
 		if (!fp) {
 			hard(findings, 'SO12-footprint-evidence-missing', 'sheet output must report circuit-body footprint metrics, not only sheet-frame pixels');
-		} else {
+		} else if (multiModuleSheet) {
 			if (fp.electricalWidthRatio < cfg.minElectricalWidthRatio || fp.electricalHeightRatio < cfg.minElectricalHeightRatio) {
 				hard(findings, 'SO13-electrical-footprint', 'electrical drawing body is too sparse inside the usable sheet area', {
 					electricalWidthRatio: fp.electricalWidthRatio,
@@ -519,7 +523,7 @@ export function auditSheetOutput(renderReport, imagePath = DEFAULT_IMAGE, opts =
 		const height = renderReport.height || 1;
 		const sheetWidthRatio = sheet.width / width;
 		const sheetHeightRatio = sheet.height / height;
-		if (sheetWidthRatio < cfg.minSheetWidthRatio || sheetHeightRatio < cfg.minSheetHeightRatio) {
+		if (multiModuleSheet && (sheetWidthRatio < cfg.minSheetWidthRatio || sheetHeightRatio < cfg.minSheetHeightRatio)) {
 			hard(findings, 'SO7-sheet-footprint', 'sheet frame footprint is too small for reference-PDF-like review output', {
 				sheetWidthRatio: Number(sheetWidthRatio.toFixed(6)),
 				sheetHeightRatio: Number(sheetHeightRatio.toFixed(6)),

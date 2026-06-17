@@ -84,7 +84,10 @@ export function c1Layout(m) {
 	}
 
 	const sb = m.sheetBBox;
-	if (sb) {
+	/* 密度规则对"满图"才有意义；元件极少的小项目在标准图框上天然稀疏，
+	 * 不应据此判失败（AIHWDEBUGER 34 件 >= 阈值，行为不变）。 */
+	const MIN_PARTS_FOR_DENSITY = 8;
+	if (sb && m.parts.length >= MIN_PARTS_FOR_DENSITY) {
 		const sheetArea = (sb.maxX - sb.minX) * (sb.maxY - sb.minY);
 		const partArea = m.parts.reduce((a, p) => a + (p.bbox.maxX - p.bbox.minX) * (p.bbox.maxY - p.bbox.minY), 0);
 		const density = sheetArea > 0 ? round2(partArea / sheetArea * 100) : 0;

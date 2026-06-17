@@ -40,7 +40,9 @@ Commands:
                                Write a strict fast review brief: block diagram, assumptions, pin/net plan, layout plan, ERC checklist, next tasks.
   generate [--fast] [spec]     Plan-gated deterministic generation without write-back; full layout search by default.
   accept [spec]                Run local acceptance gates for the selected spec context.
-  live-check [spec]            Run live EasyEDA snapshot, image, DRC, and live shot checks.
+  status                       Read-only local gate signal: exit 0 when all local gates pass (delivery still needs live evidence).
+  bridge-check                 Probe the EasyEDA live bridge (49620-49629); print actionable startup guidance if it is down.
+  live-check [spec]            Run live EasyEDA snapshot, image, DRC, and live shot checks (pre-flights the bridge first).
   deliver [spec]               Verify final handoff evidence from live-check; rejects local-only PASS.
   apply --gated [spec]         Write back through the fail-closed gated entrypoint for the selected spec context.
   repair [--max-iterations N]  Write repair_loop_report.json from next_actions/repair_actions.
@@ -232,9 +234,21 @@ switch (cmd) {
 	case 'accept':
 		runNode(['engine/acceptance_run.mjs', ...args]);
 		break;
-	case 'live-check':
+	case 'status':
+		runNode(['engine/local_gate_status.mjs', ...args]);
+		break;
+	case 'bridge-check':
+		runNode(['engine/bridge_check.mjs', ...args]);
+		break;
+	case 'live-check': {
+		const probe = spawnSync(process.execPath, ['engine/bridge_check.mjs'], { cwd: ROOT, stdio: 'inherit', shell: false, env: process.env });
+		if (probe.status !== 0) {
+			console.error('live-check aborted: EasyEDA bridge is not ready (see guidance above). Local evidence is not final delivery proof.');
+			process.exit(probe.status ?? 3);
+		}
 		runNode(['engine/acceptance_run.mjs', '--live', ...args]);
 		break;
+	}
 	case 'deliver':
 		runNode(['engine/delivery_gate.mjs', ...args]);
 		break;

@@ -1,0 +1,59 @@
+{
+  "schemaVersion": 1,
+  "projectId": "divider-project",
+  "circuitPack": "divider",
+  "cellManifest": "circuit_packs/divider/cell_manifest.json",
+  "layoutProfile": "single-column",
+  "agentPolicy": {
+    "freeDrawAllowed": false,
+    "authoritativeEditPath": "project_spec.json -> project contract -> project_netlist.json -> project_assembly.json -> deterministic cells -> gates -> gated write-back"
+  },
+  "anchors": { "divider": { "x": 400, "y": 600 } },
+  "layoutPolicy": {
+    "candidateSource": "project_assembly.layoutPolicy",
+    "flow": "left-to-right: single divider column",
+    "columns": [
+      { "id": "divider_col", "role": "Voltage divider", "modules": ["divider"] }
+    ],
+    "moduleRegions": [
+      { "module": "divider", "anchor": "divider", "column": "divider_col", "dx": 30, "dy": 0, "width": 320, "height": 380, "role": "Voltage divider readable rectangle" }
+    ],
+    "minModuleGap": 90,
+    "minColumnGap": 120,
+    "maxModuleWireIntrusions": 0,
+    "requireNoLaneInterlocks": true,
+    "interfaceRoutes": [],
+    "labelColumns": [
+      { "id": "vmid-label", "role": "VMID divider tap output label at the right endpoint of the named stub", "module": "divider", "routeEnd": "to", "side": "right", "x": 470, "tolerance": 4, "nets": ["VMID"] }
+    ],
+    "baseAnchors": { "divider": { "x": 400, "y": 600 } },
+    "anchorVariants": [
+      { "id": "base", "anchors": { "divider": { "dx": 0, "dy": 0 } } },
+      { "id": "raise-row", "anchors": { "divider": { "dx": 0, "dy": -80 } } },
+      { "id": "lower-row", "anchors": { "divider": { "dx": 0, "dy": 80 } } },
+      { "id": "raise-more", "anchors": { "divider": { "dx": 0, "dy": -160 } } },
+      { "id": "lower-more", "anchors": { "divider": { "dx": 0, "dy": 160 } } },
+      { "id": "shift-left", "anchors": { "divider": { "dx": -80, "dy": 0 } } },
+      { "id": "shift-right", "anchors": { "divider": { "dx": 80, "dy": 0 } } },
+      { "id": "shift-left-raise", "anchors": { "divider": { "dx": -80, "dy": -80 } } },
+      { "id": "shift-right-lower", "anchors": { "divider": { "dx": 80, "dy": 80 } } },
+      { "id": "shift-right-raise", "anchors": { "divider": { "dx": 80, "dy": -80 } } },
+      { "id": "shift-left-lower", "anchors": { "divider": { "dx": -80, "dy": 80 } } }
+    ],
+    "inputRows": [{ "y": 600 }],
+    "outputRows": [{ "y": 600 }],
+    "xProfiles": [{ "divider": 400 }]
+  },
+  "modules": [
+    {
+      "id": "divider",
+      "order": 10,
+      "registryModule": "divider",
+      "cell": "dividerCell",
+      "anchor": "divider",
+      "refs": { "R_top": "R1", "R_bot": "R2" },
+      "netArgs": { "VIN": "VIN", "VMID": "VMID" },
+      "nets": ["VIN", "VMID", "GND"]
+    }
+  ]
+}

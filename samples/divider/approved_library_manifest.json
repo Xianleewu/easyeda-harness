@@ -1,0 +1,9 @@
+{
+  "generatedFrom": "reuse of aihwdebugger approved resistor bindings",
+  "purpose": "Approved EasyEDA library bindings for the divider sample. R1/R2 reuse an approved resistor symbol/device/footprint.",
+  "bindingKeys": ["Symbol", "Device", "Footprint"],
+  "parts": {
+    "R1": { "name": "0603WAF5101T5E", "value": "10k", "addIntoBom": true, "addIntoPcb": true, "Symbol": "1d36a63e24f15eb8", "Device": "8c6911d22cbb63ef", "Footprint": "8a685b94dcad62a7" },
+    "R2": { "name": "0603WAF5101T5E", "value": "10k", "addIntoBom": true, "addIntoPcb": true, "Symbol": "1d36a63e24f15eb8", "Device": "8c6911d22cbb63ef", "Footprint": "8a685b94dcad62a7" }
+  }
+}

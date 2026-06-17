@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "projectId": "divider-project",
+  "circuitPack": "divider",
+  "intent": "Resistor voltage divider sample: VIN through R_top to the VMID tap, R_bot to GND. Fixture for scope-aware generation/layout rules (see docs/next-session-handoff.md item 4).",
+  "modules": [
+    {
+      "id": "divider",
+      "title": "Voltage divider",
+      "requiredNets": ["VIN", "VMID", "GND"]
+    }
+  ],
+  "interfaces": [],
+  "qualityPolicy": {
+    "severityMustBeZero": true,
+    "drcErrors": 0,
+    "drcWarnings": 0,
+    "drcInfo": 0,
+    "singleSheetNoNetPortsByDefault": true,
+    "fakeTextNetLabelsAllowed": false
+  }
+}

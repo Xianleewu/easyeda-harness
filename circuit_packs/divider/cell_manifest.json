@@ -1,0 +1,37 @@
+{
+  "schemaVersion": 1,
+  "packId": "divider",
+  "purpose": "Example non-AIHWDEBUGER pack: a resistor voltage divider whose cell builder is assembled entirely from engine/cell_helpers.mjs primitives. Validated by engine/divider_pack_smoke.mjs.",
+  "requiredQualityRules": [
+    "orthogonal-wiring",
+    "real-net-labels",
+    "text-clearance",
+    "module-box-isolation",
+    "no-fake-net-text",
+    "no-unnecessary-net-ports"
+  ],
+  "cells": [
+    {
+      "id": "dividerCell",
+      "moduleType": "divider",
+      "refs": ["R_top", "R_bot"],
+      "optionalRefs": [],
+      "netArgs": ["VIN", "VMID"],
+      "ports": ["VIN", "VMID", "GND"],
+      "portLayout": {
+        "VIN": { "side": "top", "kind": "power", "label": "required" },
+        "VMID": { "side": "right", "kind": "sig", "label": "required" },
+        "GND": { "side": "local", "kind": "gnd", "label": "optional" }
+      },
+      "layoutIntent": "Vertical divider: VIN top power, VMID right-side signal label (alignMode 8), GND bottom.",
+      "qualityRules": [
+        "orthogonal-wiring",
+        "real-net-labels",
+        "text-clearance",
+        "module-box-isolation",
+        "no-fake-net-text",
+        "no-unnecessary-net-ports"
+      ]
+    }
+  ]
+}

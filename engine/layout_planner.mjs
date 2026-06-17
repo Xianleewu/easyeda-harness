@@ -380,9 +380,13 @@ export function evaluateLayout(model, snap, opts = {}) {
 	const design = autoDesignReview(model, { template, structure, architecture, pageComposition });
 	const internalPacking = moduleInternalPacking(model);
 	const score = scoreCandidate({ template, structure, architecture, pageComposition, systemIntent, sheetOutput, design, internalPacking });
+	/* sheetOutput 的 reference-PDF 密度/占比期望对多模块满图才合理。对单/少模块
+	 * 样例项目，交付侧的 preview / contract:visual 门禁已按其规模校验图面质量，
+	 * 故规划器候选不再以 sheetOutput 强阻断（AIHWDEBUGER 多模块仍强阻断）。 */
+	const lowModuleProject = (pageComposition.stats?.modules ?? 99) < 2;
 	return {
 		score,
-		pass: template.pass && structure.pass && architecture.pass && pageComposition.pass && systemIntent.pass && sheetOutput.pass && design.pass,
+		pass: template.pass && structure.pass && architecture.pass && pageComposition.pass && systemIntent.pass && (lowModuleProject || sheetOutput.pass) && design.pass,
 		template,
 		structure,
 		architecture,

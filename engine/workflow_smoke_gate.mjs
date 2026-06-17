@@ -23,6 +23,8 @@ import { runRules } from '../harness/rule_registry.mjs';
 import { acquireRunLock } from '../workflows/run_lock.mjs';
 import { validateProjectGeometry } from './project_geometry_gate.mjs';
 import { validateLabelLayout } from './project_label_layout_gate.mjs';
+import { runCellHelpersGate } from './cell_helpers_gate.mjs';
+import { runDividerPackSmoke } from './divider_pack_smoke.mjs';
 
 const ROOT = (process.env.EASYEDA_WORKDIR || process.cwd()).replace(/\\/g, '/');
 let LOCK;
@@ -869,6 +871,11 @@ try {
 			...process.env,
 			EASYEDA_PROJECT_ASSEMBLY: `${TMP_DIR}/duplicate_ref_assembly.json`,
 			EASYEDA_PROJECT_ASSEMBLY_REPORT: `${TMP_DIR}/duplicate_ref_assembly_report.json`,
+			/* duplicate-ref fixture is cloned from the bundled root assembly, so pin its
+			 * contract to the root contract too — otherwise an active non-root spec's
+			 * single-module contract leaks in, the contract-module loop never reaches the
+			 * fixture modules, and PA21 cannot fire (WS36 then fails on non-root accept). */
+			EASYEDA_PROJECT_CONTRACT: `${ROOT}/project_contract.json`,
 		},
 		encoding: 'utf8',
 	});
@@ -2868,6 +2875,90 @@ export const pack = { id: '${NO_WRITER_PACK}', fallbackAnchors, cellBuilders, no
 		'WS15-stateful-run-lock',
 		'stateful GSD commands must not run concurrently because they share report artifacts and temporary workflow directories',
 		checks.concurrentStatefulCommandBlocked,
+	);
+
+	const helpers = runCellHelpersGate();
+	checks.cellHelpers = {
+		pass: helpers.pass,
+		positiveLabelHard: helpers.checks?.positive?.labelHard ?? null,
+		positiveGeom: helpers.checks?.positive?.geom ?? null,
+		negative: helpers.checks?.negative ?? null,
+		firstFinding: helpers.findings?.[0] || null,
+	};
+	assertFinding(
+		findings,
+		helpers.pass === true
+			&& (helpers.checks?.negative?.enforced ?? 0) === (helpers.checks?.negative?.expected ?? -1)
+			&& (helpers.checks?.negative?.expected ?? 0) > 0,
+		'WS24-cell-helpers-enforced',
+		'reusable cell helpers must build gate-clean geometry and fail-fast on diagonals, floating labels, oversized stubs, empty nets, and insufficient clearance',
+		checks.cellHelpers,
+	);
+
+	const dividerSmoke = runDividerPackSmoke();
+	checks.examplePackDivider = {
+		pass: dividerSmoke.pass,
+		geom: dividerSmoke.checks?.divider?.geom ?? null,
+		labelHard: dividerSmoke.checks?.divider?.labelHard ?? null,
+		firstFinding: dividerSmoke.findings?.[0] || null,
+	};
+	assertFinding(
+		findings,
+		dividerSmoke.pass === true,
+		'WS25-example-pack-generalizes',
+		'a non-AIHWDEBUGER circuit pack (circuit_packs/divider) built entirely from cell_helpers must produce geometry that passes the real geometry and label QC, proving the workflow is not a single-schematic regression harness',
+		checks.examplePackDivider,
+	);
+
+	/* 回归保护：geometry finding 必须带可操作的 suggest(编辑目标) + module(归属) */
+	const geomDiag = validateProjectGeometry({
+		components: [
+			{ designator: 'R9', bbox: { minX: 0, minY: 0, maxX: 40, maxY: 40 }, pins: [] },
+			{ designator: 'R10', bbox: { minX: 20, minY: 20, maxX: 60, maxY: 60 }, pins: [] },
+		],
+		wires: [{ net: 'X', line: [200, 200, 240, 260] }],
+		netflags: [],
+	}, { pack: 'aihwdebugger', designatorModules: { R9: 'usb', R10: 'usb' }, moduleRects: [] });
+	const pg2 = (geomDiag.findings || []).find(f => f.rule === 'PG2-component-overlap');
+	const pg1 = (geomDiag.findings || []).find(f => f.rule === 'PG1-wire-orthogonal');
+	checks.geometryFindingActionable = {
+		pg2Module: pg2?.where?.module ?? null,
+		pg2HasSuggest: !!pg2?.where?.suggest?.editFiles?.length,
+		pg1HasSuggest: !!pg1?.where?.suggest?.editFiles?.length,
+	};
+	assertFinding(
+		findings,
+		pg2?.where?.module === 'usb'
+			&& Array.isArray(pg2?.where?.suggest?.editFiles) && pg2.where.suggest.editFiles.length > 0
+			&& Array.isArray(pg1?.where?.suggest?.editFiles) && pg1.where.suggest.editFiles.length > 0,
+		'WS26-geometry-findings-actionable',
+		'geometry findings must carry an owning-module attribution and a suggested edit target so the failure-to-fix loop stays actionable',
+		checks.geometryFindingActionable,
+	);
+
+	/* 回归保护：label finding 必须带 suggest(编辑目标) + net→module 归属 */
+	const labelDiag = validateLabelLayout({
+		assembly: { projectId: 't', circuitPack: 'aihwdebugger', modules: [{ id: 'usb', nets: ['FOO'] }], layoutPolicy: { labelColumns: [] } },
+		contract: { modules: [] },
+		snap: {
+			components: [],
+			wires: [{ net: 'FOO', line: [0, 0, 40, 0] }],
+			netflags: [{ kind: 'sig', net: 'FOO', x: 0, y: 0, textX: 0, textY: 0, rot: 180, alignMode: 6, bbox: { minX: 0, minY: 0, maxX: 40, maxY: 8 } }],
+		},
+		liveMode: false,
+	});
+	const labelActionable = (labelDiag.findings || []).find(f => f.where?.module === 'usb' && f.where?.suggest?.editFiles?.length);
+	checks.labelFindingActionable = {
+		findingCount: (labelDiag.findings || []).length,
+		actionableRule: labelActionable?.rule ?? null,
+		module: labelActionable?.where?.module ?? null,
+	};
+	assertFinding(
+		findings,
+		!!labelActionable,
+		'WS27-label-findings-actionable',
+		'label findings must carry an owning-module attribution and a suggested edit target so the failure-to-fix loop stays actionable',
+		checks.labelFindingActionable,
 	);
 } catch (e) {
 	hard(findings, 'WS0-unhandled-error', 'workflow smoke gate crashed', { error: e.message, stack: e.stack });

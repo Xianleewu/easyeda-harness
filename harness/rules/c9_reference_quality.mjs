@@ -102,7 +102,10 @@ export function c9ReferenceQuality(m) {
 		const h = x.box.maxY - x.box.minY;
 		const area = w * h;
 		const maxArea = CONFIG.reference?.maxModuleArea?.[x.name] ?? 115000;
-		const maxAspect = CONFIG.reference?.maxModuleAspect?.[x.name] ?? 3.2;
+		/* 一个只含 <=2 个器件的模块（如串联分压/单串阻）天然是细长线性形，
+		 * 放宽其长宽比上限；AIHWDEBUGER 模块在 3.2 下已通过，放宽不会新增 finding。 */
+		const baseAspect = CONFIG.reference?.maxModuleAspect?.[x.name] ?? 3.2;
+		const maxAspect = (x.refs?.length ?? 99) <= 2 ? Math.max(baseAspect, 6) : baseAspect;
 		const aspect = round2(Math.max(w / Math.max(1, h), h / Math.max(1, w)));
 		if (area > maxArea) F.push({
 			rule: 'C9.1-module-sprawl',

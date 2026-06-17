@@ -19,6 +19,7 @@ const BASE_REPORTS = [
 	{ gate: 'project-pack', file: 'project_pack_report.json', rerun: 'npm.cmd run contract:pack' },
 	{ gate: 'project-library', file: 'project_library_report.json', rerun: 'npm.cmd run contract:library' },
 	{ gate: 'cell-manifest', file: 'cell_manifest_report.json', rerun: 'npm.cmd run contract:cells' },
+	{ gate: 'cell-helpers', file: 'cell_helpers_report.json', rerun: 'npm.cmd run contract:helpers' },
 	{ gate: 'project-assembly', file: 'project_assembly_report.json', rerun: 'npm.cmd run contract:assembly' },
 	{ gate: 'template', file: 'report.json', rerun: 'npm.cmd run fast' },
 	{ gate: 'pipeline', file: 'layout_planner_report.json', rerun: 'npm.cmd run pipeline' },
@@ -235,6 +236,13 @@ const RULE_PLANS = [
 		inspectFiles: ['cell_manifest_report.json', 'project_assembly_report.json'],
 		nextCommand: 'npm.cmd run contract:cells',
 		repairHint: 'Declare deterministic cell capabilities in the selected circuit-pack manifest and keep implemented builders plus project_assembly.json mappings in sync.',
+	}],
+	[/^CH/, {
+		area: 'cell-helpers',
+		editFiles: ['engine/cell_helpers.mjs', 'circuit_packs/<pack>/pack.mjs', 'engine/cell_helpers_gate.mjs'],
+		inspectFiles: ['cell_helpers_report.json', 'engine/cell_helpers.mjs', 'engine/cell_helpers_gate.mjs'],
+		nextCommand: 'npm.cmd run contract:helpers',
+		repairHint: 'Keep reusable cell-helper primitives gate-clean and fail-closed: helper-built modules must pass geomQC/labelQC with hard=0, and the diagonal/floating-label/oversized-stub/empty-net/clearance constraints must still throw. Fix engine/cell_helpers.mjs or the pack cell builder that misuses it, not the gate thresholds.',
 	}],
 	[/^GP8|^GP1[5-7]/, {
 		area: 'cell-builder-bootstrap',

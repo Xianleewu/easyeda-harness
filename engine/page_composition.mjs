@@ -188,7 +188,9 @@ export function auditPageComposition(snap, opts = {}) {
 		}
 	}
 
-	if (contentBox) {
+	/* 页面长宽比平衡只对多模块横向排布有意义；单模块项目的内容长宽比由该
+	 * 单元形状决定，不应据此判失败（AIHWDEBUGER 多模块 >=2，行为不变）。 */
+	if (contentBox && modules.length >= 2) {
 		const contentSize = boxSize(contentBox);
 		const aspect = contentSize.width / Math.max(1, contentSize.height);
 		const minAspect = opts.minContentAspect ?? 1.45;

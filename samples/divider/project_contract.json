@@ -1,0 +1,51 @@
+{
+  "schemaVersion": 1,
+  "projectId": "divider-project",
+  "status": "active",
+  "intent": "Resistor voltage divider: VIN -> R_top -> VMID tap -> R_bot -> GND.",
+  "agentWorkflow": {
+    "freeDrawAllowed": false,
+    "authoritativeEditPath": "project_spec.json -> project contract -> project_netlist.json -> project_assembly.json -> deterministic cells -> gates -> gated write-back",
+    "requiredEntrypoints": ["accept", "accept:live", "apply:gated"]
+  },
+  "modules": [
+    {
+      "id": "divider",
+      "title": "Voltage divider",
+      "requiredParts": ["R1", "R2"],
+      "requiredNets": ["VIN", "VMID", "GND"],
+      "visualEvidence": "divider",
+      "drawingRules": [
+        "orthogonal-wiring",
+        "real-net-labels",
+        "text-clearance",
+        "module-box-isolation",
+        "no-fake-net-text",
+        "no-unnecessary-net-ports"
+      ]
+    }
+  ],
+  "interfaces": [],
+  "visualEvidenceRegions": ["global-sheet", "divider", "title-template"],
+  "qualityPolicy": {
+    "severityMustBeZero": true,
+    "drcErrors": 0,
+    "drcWarnings": 0,
+    "drcInfo": 0,
+    "singleSheetNoNetPortsByDefault": true,
+    "fakeTextNetLabelsAllowed": false,
+    "wireNameLeftAlignMode": 6,
+    "wireNameRightAlignMode": 8,
+    "ruleProfile": {
+      "minModuleGap": 90,
+      "maxModuleWireIntrusions": 0,
+      "minComponentGap": 12,
+      "minTextClearance": 8,
+      "maxNamedStubLen": 55,
+      "wireNameLeftAlignMode": 6,
+      "wireNameRightAlignMode": 8,
+      "singleSheetNoNetPortsByDefault": true,
+      "fakeTextNetLabelsAllowed": false
+    }
+  }
+}

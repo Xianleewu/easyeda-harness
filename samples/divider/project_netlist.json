@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "projectId": "divider-project",
+  "source": "project_spec.json",
+  "nets": [
+    { "name": "VIN", "requiredPins": ["R1.2"], "modulePins": { "divider": ["R1.2"] } },
+    { "name": "VMID", "requiredPins": ["R1.1", "R2.2"], "modulePins": { "divider": ["R1.1", "R2.2"] } },
+    { "name": "GND", "requiredPins": ["R2.1"], "modulePins": { "divider": ["R2.1"] } }
+  ],
+  "allowedAnonymousNets": []
+}

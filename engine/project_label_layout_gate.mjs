@@ -41,6 +41,58 @@ function hard(findings, rule, msg, where = {}) {
 	findings.push({ rule, severity: 'hard', category: 'label-layout', msg, where });
 }
 
+/* 为每条 label finding 附建议编辑目标 + 修复提示，让 finding 自带可操作下一步 */
+function suggestForLabelRule(rule, pack) {
+	const cell = `circuit_packs/${pack}/pack.mjs`;
+	if (/^LL0/.test(rule)) {
+		return { editFiles: ['project_spec.json'], hint: 'Generate the model first (node bin/easyeda-gsd.mjs generate) so label evidence exists before the audit.' };
+	}
+	if (/^LL16/.test(rule)) {
+		return { editFiles: ['project_assembly.json', cell], hint: 'Either declare the net in layoutPolicy.labelColumns (if the interface is required) or stop emitting the visible label in the deterministic cell.' };
+	}
+	if (/^LL22/.test(rule)) {
+		return { editFiles: [cell, 'project_assembly.json'], hint: 'Use the LL22 expected column/net: generate a real same-net endpoint label at the declared side/x/module/routeEnd, or remove the stale layoutPolicy.labelColumns budget.' };
+	}
+	return {
+		editFiles: ['project_assembly.json', cell],
+		hint: 'Make the label geometry-driven: declare layoutPolicy.labelColumns, attach each label origin to a same-net wire endpoint, use alignMode=6 (left-bottom) or alignMode=8 (right-bottom); engine/cell_helpers.mjs attachLabelColumn enforces this by construction.',
+	};
+}
+
+function attachLabelSuggest(findings, pack) {
+	for (const f of asArray(findings)) {
+		if (!f.where || Array.isArray(f.where) || f.where.suggest != null) continue;
+		f.where.suggest = suggestForLabelRule(f.rule || '', pack);
+	}
+	return findings;
+}
+
+/* net -> 拥有该 net 的模块集合（来自 project_assembly.json 各模块 nets） */
+function netModulesFrom(assembly) {
+	const map = {};
+	for (const mod of asArray(assembly?.modules)) {
+		for (const net of asArray(mod.nets)) {
+			if (!net) continue;
+			(map[net] = map[net] || []).push(mod.id);
+		}
+	}
+	return map;
+}
+
+/* 把 label finding 归属到拥有其 net 的模块（"owning module if known"） */
+function attributeLabelModules(findings, netModules = {}) {
+	for (const f of asArray(findings)) {
+		if (!f.where || Array.isArray(f.where) || f.where.module != null || f.where.modules != null) continue;
+		const nets = [];
+		if (typeof f.where.net === 'string') nets.push(f.where.net);
+		if (Array.isArray(f.where.nets)) nets.push(...f.where.nets.filter(v => typeof v === 'string'));
+		const mods = [...new Set(nets.flatMap(n => netModules[n] || []))];
+		if (mods.length === 1) f.where.module = mods[0];
+		else if (mods.length > 1) f.where.modules = mods;
+	}
+	return findings;
+}
+
 function wireSegments(wires) {
 	const out = [];
 	for (const w of asArray(wires)) {
@@ -359,6 +411,7 @@ export function validateLabelLayout({ assembly, contract = null, snap, modelForT
 			matchedColumnNetKeys.add(`${column.module || ''}:${column.routeEnd || ''}:${column.side || ''}:${column.rawX ?? ''}:${label.net}`);
 		}
 		if (columns.length && !matchedColumns.length) {
+			const sameNetColumns = columns.filter(col => col.nets.has(label.net));
 			hard(findings, 'LL14-label-column-match', 'signal label must fit one declared layoutPolicy.labelColumns entry for its net, side, and x', {
 				net: label.net,
 				x: label.x,
@@ -366,7 +419,16 @@ export function validateLabelLayout({ assembly, contract = null, snap, modelForT
 				side,
 				source: label.source,
 				transform: liveMode ? transform : undefined,
-				allowedColumns: columns.filter(col => col.nets.has(label.net)).map(col => ({ id: col.id, side: col.side, x: col.x, rawX: col.rawX, tolerance: col.tolerance })),
+				allowedColumns: sameNetColumns.map(col => ({ id: col.id, side: col.side, x: col.x, rawX: col.rawX, tolerance: col.tolerance })),
+				xDeltas: sameNetColumns.map(col => ({
+					column: col.id,
+					expectedX: col.x,
+					actualX: label.x,
+					dx: finite(label.x) && finite(col.x) ? Number((label.x - col.x).toFixed(3)) : null,
+					tolerance: col.tolerance,
+					sideMismatch: col.side !== side,
+					withinTolerance: finite(label.x) && finite(col.x) && Math.abs(label.x - col.x) <= (col.tolerance ?? DEFAULT_COLUMN_TOL),
+				})),
 			});
 		}
 	}
@@ -423,6 +485,8 @@ export function validateLabelLayout({ assembly, contract = null, snap, modelForT
 		}
 	}
 
+	attributeLabelModules(findings, netModulesFrom(assembly));
+	attachLabelSuggest(findings, assembly?.circuitPack || 'aihwdebugger');
 	return {
 		findings,
 		stats: {
@@ -468,6 +532,8 @@ export function runProjectLabelLayoutGate({
 		audit = validateLabelLayout({ assembly, contract, snap, modelForTransform, liveMode });
 		findings.push(...audit.findings);
 	}
+	attributeLabelModules(findings, netModulesFrom(assembly));
+	attachLabelSuggest(findings, assembly?.circuitPack || 'aihwdebugger');
 	const report = {
 		generatedAt: new Date().toISOString(),
 		pass: findings.length === 0,

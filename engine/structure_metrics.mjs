@@ -103,12 +103,13 @@ const moduleAreaBudgets = modules.map(m => ({
 	maxArea: CONFIG.reference?.maxModuleArea?.[m.name] ?? 115000,
 	pass: m.area <= (CONFIG.reference?.maxModuleArea?.[m.name] ?? 115000),
 }));
-const moduleAspectBudgets = modules.map(m => ({
-	module: m.name,
-	aspect: m.aspect,
-	maxAspect: CONFIG.reference?.maxModuleAspect?.[m.name] ?? 3.2,
-	pass: m.aspect <= (CONFIG.reference?.maxModuleAspect?.[m.name] ?? 3.2),
-}));
+const moduleAspectBudgets = modules.map(m => {
+	/* 仅含 <=2 个器件的线性模块（串联分压/单串阻）天然细长，放宽长宽比上限；
+	 * AIHWDEBUGER 模块在 3.2 下已通过，放宽不会新增 finding。 */
+	const base = CONFIG.reference?.maxModuleAspect?.[m.name] ?? 3.2;
+	const maxAspect = (m.refs?.length ?? 99) <= 2 ? Math.max(base, 6) : base;
+	return { module: m.name, aspect: m.aspect, maxAspect, pass: m.aspect <= maxAspect };
+});
 const inputColumnSkew = centersByName.usb && centersByName.ldo ? round2(Math.abs(centersByName.usb.x - centersByName.ldo.x)) : null;
 const outputSubcolumnGap = centersByName.pmos && centersByName.relay1 ? round2(Math.abs(centersByName.relay1.x - centersByName.pmos.x)) : null;
 const relaySizeDelta = modulesByName.relay1 && modulesByName.relay2 ? moduleSizeDelta(modulesByName.relay1, modulesByName.relay2) : null;

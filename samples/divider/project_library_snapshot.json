@@ -1,0 +1,27 @@
+{
+  "project": "divider-project",
+  "source": "reuse of approved resistor geometry",
+  "components": [
+    {
+      "id": "divider-r1", "designator": "R1", "name": "10k", "value": "10k",
+      "x": 1000, "y": 1000, "rotation": 0, "mirror": false,
+      "bbox": { "minX": 989.5, "minY": 995.5, "maxX": 1010.5, "maxY": 1004.5 },
+      "pins": [
+        { "num": "1", "name": "1", "x": 980, "y": 1000, "rot": 180, "len": 10 },
+        { "num": "2", "name": "2", "x": 1020, "y": 1000, "rot": 0, "len": 10 }
+      ]
+    },
+    {
+      "id": "divider-r2", "designator": "R2", "name": "10k", "value": "10k",
+      "x": 1000, "y": 1100, "rotation": 0, "mirror": false,
+      "bbox": { "minX": 989.5, "minY": 1095.5, "maxX": 1010.5, "maxY": 1104.5 },
+      "pins": [
+        { "num": "1", "name": "1", "x": 980, "y": 1100, "rot": 180, "len": 10 },
+        { "num": "2", "name": "2", "x": 1020, "y": 1100, "rot": 0, "len": 10 }
+      ]
+    }
+  ],
+  "netflags": [],
+  "wires": [],
+  "texts": []
+}

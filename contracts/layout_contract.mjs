@@ -478,7 +478,8 @@ export function validateLayoutContract(assembly, layout, structure, options = {}
 	if (best.pass !== true) hard(findings, 'PL9-best-layout-pass', 'layout planner best candidate must pass all local layout audits', { bestPass: best.pass, score: best.score }, category);
 
 	const minGapRequired = policy.minModuleGap ?? 90;
-	if ((structure.minModuleGap ?? 0) < minGapRequired) {
+	/* 模块间距对单模块项目无意义（不存在模块对），>=2 模块才校验。 */
+	if (modules.length >= 2 && (structure.minModuleGap ?? 0) < minGapRequired) {
 		hard(findings, 'PL10-min-module-gap', 'final layout must keep module rectangles separated by the project minimum gap', {
 			minModuleGap: structure.minModuleGap,
 			required: minGapRequired,

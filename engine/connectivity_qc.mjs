@@ -74,7 +74,17 @@ export function connectivityQC(model) {
 		}
 	}
 
+	const presentRefs = new Set();
+	for (const part of (model.components || model.parts || [])) {
+		if (part?.designator) presentRefs.add(String(part.designator));
+	}
+	const refDesignatorPresent = ref => presentRefs.has(String(ref).split('.')[0]);
 	for (const req of [...FALLBACK_REQUIRED_PIN_NETS, ...requiredPinNetsList]) {
+		/* Skip pin-net assertions for parts absent from this project's model: the
+		 * FALLBACK_REQUIRED_PIN_NETS entries are AIHWDEBUGER-specific (D2/D3), so other
+		 * projects must not be flagged for their missing pins. A genuinely missing
+		 * required part is still caught by C10.1-required-part-missing. */
+		if (!refDesignatorPresent(req.ref)) continue;
 		const actual = pinNet.get(req.ref);
 		if (!actual) {
 			findings.push({ rule: 'E2-pin-missing', severity: 'hard', category: 'electrical',

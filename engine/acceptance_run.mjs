@@ -69,6 +69,7 @@ steps.push(runStep('contract:rules', 'node', ['engine/project_rule_gate.mjs']));
 steps.push(runStep('contract:pack', 'node', ['engine/project_pack_gate.mjs']));
 steps.push(runStep('contract:library', 'node', ['engine/project_library_gate.mjs']));
 steps.push(runStep('contract:cells', 'node', ['engine/project_cell_manifest_gate.mjs']));
+steps.push(runStep('contract:helpers', 'node', ['engine/cell_helpers_gate.mjs']));
 steps.push(runStep('contract:assembly', 'node', ['engine/project_assembly_gate.mjs']));
 steps.push(runStep('fast', 'node', ['engine/pipeline_fast.mjs']));
 steps.push(runStep('pipeline', 'node', ['engine/pipeline.mjs']));
@@ -157,6 +158,7 @@ const acceptance = {
 			projectPack: steps.find(s => s.name === 'contract:pack')?.pass === true,
 			projectLibrary: steps.find(s => s.name === 'contract:library')?.pass === true,
 			cellManifest: steps.find(s => s.name === 'contract:cells')?.pass === true,
+			cellHelpers: steps.find(s => s.name === 'contract:helpers')?.pass === true,
 			projectAssembly: steps.find(s => s.name === 'contract:assembly')?.pass === true,
 			fast: steps.find(s => s.name === 'fast')?.pass === true,
 			pipeline: steps.find(s => s.name === 'pipeline')?.pass === true,

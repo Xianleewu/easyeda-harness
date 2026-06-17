@@ -109,4 +109,4 @@ Agent rule index: wire crossings, object overlap, left-bottom/right-bottom origi
 
 ## License
 
-正式公开发布前请补充 LICENSE 文件。
+本项目以 MIT 许可证发布，见仓库根目录 `LICENSE`。

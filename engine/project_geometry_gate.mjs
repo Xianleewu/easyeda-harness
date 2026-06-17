@@ -8,7 +8,111 @@ const REPORT = process.env.EASYEDA_PROJECT_GEOMETRY_REPORT || DIR + 'project_geo
 const RUN_LIVE = process.argv.includes('--live') || process.env.EASYEDA_PROJECT_GEOMETRY_LIVE === '1';
 const SOURCE = RUN_LIVE ? LIVE : MODEL;
 const SOURCE_LABEL = RUN_LIVE ? 'live.json' : 'full_model.json';
+const ASSEMBLY = process.env.EASYEDA_PROJECT_ASSEMBLY || DIR + 'project_assembly.json';
 const EPS = 1e-6;
+
+/* 每条 geometry 规则的建议编辑目标 + 修复提示，让 finding 自带可操作下一步 */
+const GEOMETRY_SUGGEST = {
+	'PG1-wire-orthogonal': { editFiles: ['circuit_packs/<pack>/pack.mjs'], hint: 'Replace the diagonal segment in the deterministic cell with orthogonal segments; engine/cell_helpers.mjs orthPolyline/elbow build axis-aligned routes by construction.' },
+	'PG2-component-overlap': { editFiles: ['project_assembly.json'], hint: 'Separate the colliding module anchors/regions in layoutPolicy so component bodies no longer overlap.' },
+	'PG3-wire-crossing': { editFiles: ['circuit_packs/<pack>/pack.mjs', 'project_assembly.json'], hint: 'Reroute one net or change net ownership in the cell so different-net wires no longer cross or touch mid-segment.' },
+	'PG4-wire-through-visible-object': { editFiles: ['circuit_packs/<pack>/pack.mjs'], hint: 'Move the wire or the visible object in the deterministic cell so the wire no longer passes through it.' },
+	'PG5-visible-object-overlap': { editFiles: ['circuit_packs/<pack>/pack.mjs'], hint: 'Place labels/flags/attributes with clearance; engine/cell_helpers.mjs attributeAnchor and label-column helpers keep them apart.' },
+	'PG6-visible-object-over-component': { editFiles: ['circuit_packs/<pack>/pack.mjs', 'project_assembly.json'], hint: 'Move the label/flag/attribute out of the component keepout, or move the component in layoutPolicy.' },
+};
+
+function attachSuggest(findings, pack) {
+	for (const f of asArray(findings)) {
+		const s = GEOMETRY_SUGGEST[f.rule];
+		if (!s || !f.where || f.where.suggest != null) continue;
+		f.where.suggest = { editFiles: s.editFiles.map(p => p.replaceAll('<pack>', pack)), hint: s.hint };
+	}
+	return findings;
+}
+
+/* layoutPolicy.moduleRegions 是 anchor 相对：中心 = anchor + (dx,dy)，矩形 = 中心 ± (w/2,h/2)。
+ * 与 contracts/layout_contract.mjs rectFromRegion 同约定。 */
+function moduleRectsFrom(assembly) {
+	const anchors = assembly?.anchors || {};
+	const rects = [];
+	for (const region of asArray(assembly?.layoutPolicy?.moduleRegions)) {
+		const anchor = anchors[region.anchor];
+		if (!anchor || !finite(anchor.x) || !finite(anchor.y)) continue;
+		if (!finite(region.width) || !finite(region.height) || region.width <= 0 || region.height <= 0) continue;
+		const cx = anchor.x + Number(region.dx || 0);
+		const cy = anchor.y + Number(region.dy || 0);
+		const w = Number(region.width);
+		const h = Number(region.height);
+		rects.push({ module: region.module, rect: { minX: cx - w / 2, maxX: cx + w / 2, minY: cy - h / 2, maxY: cy + h / 2 } });
+	}
+	return rects;
+}
+
+function resolveAssemblyContext() {
+	try {
+		const assembly = JSON.parse(readFileSync(ASSEMBLY, 'utf8').replace(/^﻿/, ''));
+		const designatorModules = {};
+		for (const mod of asArray(assembly.modules)) {
+			const refs = mod.refs && typeof mod.refs === 'object' ? Object.values(mod.refs) : [];
+			for (const d of refs) {
+				if (d) designatorModules[String(d)] = mod.id;
+			}
+		}
+		return { pack: assembly?.circuitPack || 'aihwdebugger', designatorModules, moduleRects: moduleRectsFrom(assembly) };
+	} catch {
+		return { pack: 'aihwdebugger', designatorModules: {}, moduleRects: [] };
+	}
+}
+
+function rectHas(rect, x, y) {
+	return x >= rect.minX && x <= rect.maxX && y >= rect.minY && y <= rect.maxY;
+}
+
+/* 从 finding.where 抽取代表性采样点（线段中点 / 交叉采样点），用于纯导线 finding 的模块归属 */
+function pointsInWhere(where) {
+	const pts = [];
+	const seg = where.segment;
+	if (Array.isArray(seg) && seg.length >= 4) pts.push([(seg[0] + seg[2]) / 2, (seg[1] + seg[3]) / 2]);
+	for (const s of asArray(where.samples)) {
+		if (!s || typeof s !== 'object') continue;
+		if (Array.isArray(s.point) && s.point.length >= 2) pts.push([s.point[0], s.point[1]]);
+		else if (Array.isArray(s.segment) && s.segment.length >= 4) pts.push([(s.segment[0] + s.segment[2]) / 2, (s.segment[1] + s.segment[3]) / 2]);
+	}
+	return pts;
+}
+
+/* 从 finding.where 抽取涉及的器件位号（含 "DESIG:attr" 前缀与嵌套 samples） */
+function designatorsInWhere(where) {
+	const out = [];
+	const push = v => { if (typeof v === 'string' && v) out.push(v.split(':')[0]); };
+	for (const key of ['a', 'b', 'component', 'object']) push(where[key]);
+	for (const s of asArray(where.samples)) {
+		if (!s || typeof s !== 'object') continue;
+		push(s.object);
+		push(s.component);
+	}
+	return out;
+}
+
+/* 把 finding 归属到拥有它的模块（"owning module if known"）：
+ * 先按器件位号归属；纯导线 finding(PG1/PG3) 用采样点落入哪个模块矩形归属。 */
+function attributeModules(findings, designatorModules = {}, moduleRects = []) {
+	for (const f of asArray(findings)) {
+		if (!f.where || f.where.module != null || f.where.modules != null) continue;
+		let mods = [...new Set(designatorsInWhere(f.where).map(d => designatorModules[d]).filter(Boolean))];
+		if (!mods.length && moduleRects.length) {
+			const hit = new Set();
+			for (const [x, y] of pointsInWhere(f.where)) {
+				const r = moduleRects.find(m => rectHas(m.rect, x, y));
+				if (r) hit.add(r.module);
+			}
+			mods = [...hit];
+		}
+		if (mods.length === 1) f.where.module = mods[0];
+		else if (mods.length > 1) f.where.modules = mods;
+	}
+	return findings;
+}
 
 function readJson(path) {
 	return JSON.parse(readFileSync(path, 'utf8').replace(/^\uFEFF/, ''));
@@ -199,6 +303,7 @@ function normalizeSnap(snap, liveMode) {
 
 function validateProjectGeometry(snap, options = {}) {
 	const liveMode = options.liveMode === true;
+	const pack = options.pack || 'aihwdebugger';
 	const normalized = normalizeSnap(snap, liveMode);
 	const findings = [];
 	const segments = wireSegments(normalized.wires);
@@ -273,6 +378,8 @@ function validateProjectGeometry(snap, options = {}) {
 	}
 	if (componentTextOverlaps.length) hard(findings, 'PG6-visible-object-over-component', 'text, net labels, flags, and attributes must not overlap component bodies', { count: componentTextOverlaps.length, samples: componentTextOverlaps.slice(0, 30) });
 
+	attributeModules(findings, options.designatorModules, options.moduleRects);
+	attachSuggest(findings, pack);
 	return {
 		pass: findings.length === 0,
 		severity: { hard: findings.length, soft: 0, info: 0 },
@@ -300,13 +407,14 @@ function main() {
 		try { snap = readJson(SOURCE); }
 		catch (e) { hard(findings, 'PG0-source-parse', `${SOURCE_LABEL} must parse as JSON`, { path: SOURCE, error: e.message }); }
 	}
-	const result = snap ? validateProjectGeometry(snap, { liveMode: RUN_LIVE }) : {
+	const { pack, designatorModules, moduleRects } = resolveAssemblyContext();
+	const result = snap ? validateProjectGeometry(snap, { liveMode: RUN_LIVE, pack, designatorModules, moduleRects }) : {
 		pass: false,
 		severity: { hard: findings.length, soft: 0, info: 0 },
 		stats: null,
 		findings,
 	};
-	const allFindings = [...findings, ...asArray(result.findings)];
+	const allFindings = attachSuggest(attributeModules([...findings, ...asArray(result.findings)], designatorModules, moduleRects), pack);
 	const report = {
 		generatedAt: new Date().toISOString(),
 		pass: allFindings.length === 0,

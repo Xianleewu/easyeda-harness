@@ -195,4 +195,4 @@ For handoff, review the global sheet and local crops for USB, LDO, RESET, BOOT, 
 
 ## License
 
-Add a LICENSE file before a formal public release.
+Released under the MIT License. See `LICENSE` at the repository root.
