@@ -1,0 +1,30 @@
+name: gates
+
+# Fast, deterministic local-quality regression gates for the EasyEDA harness.
+# These do NOT need the live EasyEDA bridge: final delivery evidence
+# (drc / live-check / deliver) still requires a real EasyEDA editor and is
+# intentionally out of CI scope.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  local-gates:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install dependencies
+        run: npm install
+      - name: Entrypoint audit (package scripts + CLI commands resolve)
+        run: npm run entrypoints
+      - name: Agent instruction contract
+        run: npm run agent:instructions
+      - name: Workflow smoke (reusable workflow regressions; helpers WS24, generalization WS25, actionable reports WS26/WS27)
+        run: npm run workflow:smoke
+      - name: Example pack generalization (circuit_packs/divider builds gate-clean geometry/labels)
+        run: npm run examples:divider
