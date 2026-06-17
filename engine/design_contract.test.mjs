@@ -89,8 +89,10 @@ test('contractQC 负例:重叠区→DC3、孤儿标签→DC4、power 标签→DC
 	dup[1].region.row = dup[0].region.row;          // 强制同列重叠
 	bad.labelColumns.push({ id: 'X@ghost', net: 'X', module: 'ghost', side: 'left', routeEnd: 'from', class: 'signal' });
 	bad.labelColumns.push({ id: 'P@' + bad.modules[0].id, net: 'P', module: bad.modules[0].id, side: 'left', routeEnd: 'from', class: 'power' });
+	bad.labelColumns.push({ id: bad.labelColumns[0].id, net: 'DUP', module: bad.modules[0].id, side: 'left', routeEnd: 'to', class: 'signal' });
 	const rules = new Set(contractQC(bad).map(f => f.rule));
 	assert.ok(rules.has('DC3-region-overlap'));
 	assert.ok(rules.has('DC4-label-orphan'));
+	assert.ok(rules.has('DC4-label-duplicate'));
 	assert.ok(rules.has('DC5-label-class'));
 });
