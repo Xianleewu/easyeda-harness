@@ -48,6 +48,46 @@ function placeModules(modules, columns) {
 	return out.sort(byId);
 }
 
+const refOfPin = p => p.slice(0, p.lastIndexOf('.'));
+
+function buildLabelColumns(modules, columns, nets) {
+	const moduleByRef = new Map();
+	for (const m of modules) for (const r of m.parts) moduleByRef.set(r, m);
+	const orderOf = m => columns.find(c => c.id === COLUMN_META[m.column].id).order;
+	const labels = [];
+	for (const net of nets) {
+		if (net.class !== 'signal') continue;
+		const mods = [...new Set(net.pins.map(refOfPin).map(r => moduleByRef.get(r)).filter(Boolean))];
+		if (mods.length < 2) continue;
+		const source = mods.slice().sort((a, b) => orderOf(a) - orderOf(b) || byId(a, b))[0];
+		for (const m of mods) {
+			const others = mods.filter(x => x !== m);
+			const avgOther = others.reduce((s, x) => s + orderOf(x), 0) / others.length;
+			labels.push({
+				id: `${net.name}@${m.id}`,
+				net: net.name,
+				module: m.id,
+				side: orderOf(m) <= avgOther ? 'right' : 'left',
+				routeEnd: m === source ? 'from' : 'to',
+				class: 'signal',
+			});
+		}
+	}
+	return labels.sort(byId);
+}
+
+function buildChannels(columns) {
+	const out = [];
+	for (let i = 0; i + 1 < columns.length; i++) {
+		out.push({
+			id: `${columns[i].id}->${columns[i + 1].id}`,
+			betweenColumns: [columns[i].id, columns[i + 1].id],
+			widthCells: 2,
+		});
+	}
+	return out;
+}
+
 export function synthesizeContract(roles, logical, opts = {}) {
 	if (!roles || !Array.isArray(roles.modules)) {
 		throw new TypeError('synthesizeContract: roles.modules required');
@@ -55,13 +95,15 @@ export function synthesizeContract(roles, logical, opts = {}) {
 	const grid = { colPitch: opts.colPitch ?? 10, rowPitch: opts.rowPitch ?? 10 };
 	const columns = buildColumns(roles.modules);
 	const modules = placeModules(roles.modules, columns);
+	const labelColumns = buildLabelColumns(roles.modules, columns, (logical && logical.nets) || []);
+	const routingChannels = buildChannels(columns);
 	return {
 		schemaVersion: 1,
 		grid,
 		columns: columns.map(c => ({ id: c.id, role: c.role, order: c.order, modules: c.modules })),
 		modules,
-		labelColumns: [],
-		routingChannels: [],
+		labelColumns,
+		routingChannels,
 		meta: {
 			controller: roles.controller ?? null,
 			moduleCount: roles.modules.length,

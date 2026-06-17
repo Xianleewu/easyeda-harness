@@ -46,3 +46,21 @@ test('模块区:每模块有整数列号、正格尺寸、间距预算', () => {
 		assert.deepEqual(Object.keys(m.gap).sort(), ['bottom', 'left', 'right', 'top']);
 	}
 });
+
+test('标签列:跨模块 signal 网出标签;power/ground 不出;源端 routeEnd=from', () => {
+	const nets = contract.labelColumns.map(l => l.net);
+	assert.ok(nets.includes('LED_CTRL'));       // mctrl + LED 模块 → 跨模块
+	assert.ok(nets.includes('USB_DP_MCU'));     // R1 模块 + mctrl → 跨模块
+	assert.ok(!nets.includes('USB_DP'));        // J1 与 R1 同模块 → 不出
+	assert.ok(!nets.includes('VCC_3V3'));       // power
+	assert.ok(!nets.includes('GND'));           // ground
+	assert.ok(contract.labelColumns.every(l => l.class === 'signal'));
+	const led = contract.labelColumns.filter(l => l.net === 'LED_CTRL');
+	assert.equal(led.length, 2);                // 两个端模块各一条
+	assert.equal(led.filter(l => l.routeEnd === 'from').length, 1);
+});
+
+test('布线通道:相邻列之间各一条', () => {
+	assert.equal(contract.routingChannels.length, contract.columns.length - 1);
+	assert.deepEqual(contract.routingChannels[0].betweenColumns, ['input', 'control']);
+});
