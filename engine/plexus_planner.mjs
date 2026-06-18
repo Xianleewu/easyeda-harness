@@ -3,7 +3,9 @@ import { toWorld } from './transform.mjs';
 import { getArchetype } from '../circuit_packs/archetypes/registry.mjs';
 import { derivePinNets, deriveSupportEndpoints } from './net_derive.mjs';
 
-const DEF = { origin: { x: 1000, y: 1000 }, colWidth: 400, rowGap: 120 };
+// colWidth/rowGap 放宽到容纳密脚 IC 扇出(densefanout 标签 ±300+ 宽、列高);
+// 真实图实测 800/250 使完整合成 labelHard=0。自适应列宽(按模块真实宽)留作 follow-up。
+const DEF = { origin: { x: 1000, y: 1000 }, colWidth: 800, rowGap: 250 };
 const GRID = 10;
 const snapGrid = v => Math.round(v / GRID) * GRID;
 

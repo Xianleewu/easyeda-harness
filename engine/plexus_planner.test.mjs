@@ -23,7 +23,7 @@ const contract = {
 		{ id: 'm0', role: 'support', column: 'input', parts: ['R1', 'R2'], region: { col: 0, row: 0, wCells: 3, hCells: 4 } },
 		{ id: 'm1', role: 'support', column: 'input', parts: ['R3', 'R4'], region: { col: 0, row: 10, wCells: 3, hCells: 4 } },
 		{ id: 'm9', role: 'support', column: 'input', parts: ['R99'], region: { col: 0, row: 20, wCells: 3, hCells: 3 } },
-		{ id: 'mctrl', role: 'controller', column: 'control', parts: ['U1'], region: { col: 2, row: 0, wCells: 6, hCells: 5 } },
+		{ id: 'mctrl', role: 'other', column: 'control', parts: ['U1'], region: { col: 2, row: 0, wCells: 6, hCells: 5 } },
 	],
 	labelColumns: [
 		{ id: 'NET_A@m0', net: 'NET_A', module: 'm0', side: 'right', routeEnd: 'from', class: 'signal' },
