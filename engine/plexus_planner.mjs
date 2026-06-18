@@ -107,7 +107,8 @@ export function planLayout({ contract, byDes, logical, opts = {} } = {}) {
 			if (ep.top) nets.top = ep.top;
 			if (ep.bottom) nets.bottom = ep.bottom;
 			if (logical) {
-				if (parts.length === 1) nets.pinNets = derivePinNets(parts[0], logical);
+				// 单件:pin-num 键(densefanout/fanout);多件:des.num 键(support 结点校验 + multipart)。
+				nets.pinNets = parts.length === 1 ? derivePinNets(parts[0], logical) : deriveModulePinNets(parts, logical);
 				const sep = deriveSupportEndpoints(parts, logical);
 				if (!nets.top && sep.top) nets.top = sep.top;
 				if (!nets.bottom && sep.bottom) nets.bottom = sep.bottom;

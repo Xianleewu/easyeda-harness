@@ -63,6 +63,26 @@ test('support:负例(空 parts/非2端/侧信号<2件)抛错', () => {
 	assert.throws(() => supportArchetype({ parts: [passive('R1'), passive('R2')], anchor, nets: { side: { name: 'X', class: 'signal' } }, opts: { tapIndex: 5 } }));
 });
 
+test('support:结点电气校验 — 实际共享网不匹配 pin1/pin2 链式假设 → fail-closed 抛错', () => {
+	// 水平件 rot90 后结点正交,但实际结点是 RA.2-RB.1(非链式假设的 RA.1-RB.2)。
+	// supportArchetype 假设 parts[k].1 与 parts[k+1].2 同网;不符则抛错让 planner 回退 multipart。
+	const parts = [passive('RA'), passive('RB')];
+	const pinNets = {
+		'RA.1': { name: 'NETA', class: 'signal' }, 'RA.2': { name: 'MID', class: 'signal' },
+		'RB.1': { name: 'MID', class: 'signal' }, 'RB.2': { name: 'NETB', class: 'signal' },
+	};
+	assert.throws(() => supportArchetype({ parts, anchor, nets: { pinNets } }), /junction|结点|topology|同网/);
+});
+
+test('support:结点电气校验 — 匹配链式假设则正常出图', () => {
+	const parts = [passive('RA'), passive('RB')];
+	const pinNets = {
+		'RA.1': { name: 'MID', class: 'signal' }, 'RA.2': { name: 'TOP', class: 'power' },
+		'RB.1': { name: 'BOT', class: 'ground' }, 'RB.2': { name: 'MID', class: 'signal' },
+	};
+	assert.doesNotThrow(() => supportArchetype({ parts, anchor, nets: { pinNets } }));
+});
+
 function worldComponent(part, place) {
 	const pins = (part.pins || []).map(p => {
 		const [x, y] = toWorld(p.local, [place.x, place.y], place.rot, place.mirror);

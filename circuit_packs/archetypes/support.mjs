@@ -27,6 +27,22 @@ export function supportArchetype(spec = {}) {
 		throw new Error(`supportArchetype: tapIndex ${tapIndex} out of range (need 0..${parts.length - 2})`);
 	}
 
+	// 结点电气校验(有 pinNets 时):链式假设是 parts[k].pin1 与 parts[k+1].pin2 同网。
+	// 若实际共享网不符(脚编号/电气序与固定链不匹配),fail-closed 抛错让 planner 回退
+	// multipart(按网名接线、不依赖固定拓扑),杜绝"正交却电气接反"的门干净错图(M4)。
+	const pinNets = nets.pinNets;
+	if (pinNets && parts.length >= 2) {
+		for (let k = 0; k + 1 < parts.length; k++) {
+			const aNum = (pinOf(parts[k], '1') || parts[k].pins[0]).num;
+			const bNum = (pinOf(parts[k + 1], '2') || parts[k + 1].pins[1]).num;
+			const na = pinNets[`${parts[k].designator}.${aNum}`];
+			const nb = pinNets[`${parts[k + 1].designator}.${bNum}`];
+			if (!na || !nb || na.name !== nb.name) {
+				throw new Error(`supportArchetype: junction ${parts[k].designator}.${aNum}/${parts[k + 1].designator}.${bNum} 非同网(链式拓扑不匹配,fail-closed)`);
+			}
+		}
+	}
+
 	const place = {};
 	const pin = {};   // designator -> { p1:[x,y], p2:[x,y] }
 	parts.forEach((part, i) => {
