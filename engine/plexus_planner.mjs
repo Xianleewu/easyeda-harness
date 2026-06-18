@@ -1,6 +1,7 @@
 // Plexus 布局驱动:design_contract 模块区 → archetype cell → 组装模型(纯函数,与生成轨道解耦)。
 import { toWorld } from './transform.mjs';
 import { getArchetype } from '../circuit_packs/archetypes/registry.mjs';
+import { derivePinNets } from './net_derive.mjs';
 
 const DEF = { origin: { x: 1000, y: 1000 }, colWidth: 400, rowGap: 120 };
 const GRID = 10;
@@ -39,7 +40,7 @@ export function cellExtentMinY(worldComps, cell) {
 	return Math.min(...ys);
 }
 
-export function planLayout({ contract, byDes, opts = {} } = {}) {
+export function planLayout({ contract, byDes, logical, opts = {} } = {}) {
 	if (!contract || !Array.isArray(contract.modules)) {
 		throw new TypeError('planLayout: contract.modules required');
 	}
@@ -94,6 +95,9 @@ export function planLayout({ contract, byDes, opts = {} } = {}) {
 			const ep = (o.endpointNets || {})[m.id] || {};
 			if (ep.top) nets.top = ep.top;
 			if (ep.bottom) nets.bottom = ep.bottom;
+			if (parts.length === 1 && logical) {
+				nets.pinNets = derivePinNets(parts[0], logical);
+			}
 
 			const cell = fn({ parts, anchor: { x: colX, y: snapGrid(cursorY) }, nets });
 			const wcs = parts.map(p => worldComponent(p, cell.place[p.designator]));

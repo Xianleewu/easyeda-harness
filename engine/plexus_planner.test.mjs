@@ -107,3 +107,40 @@ test('planner:分数 localBox 件 → 引脚仍全格对齐、offgrid=0', () => 
 	}
 	assert.equal(geomQC(rr.model).offgrid, 0, 'offgrid');
 });
+
+test('planner:单件 connector + logical → 扇出有线有标;不传 logical 则裸件', () => {
+	// 6 脚连接器(脚 x=±30 体外、纵距 40),role=connector → fanout。
+	const conn = {
+		designator: 'J9',
+		pins: [
+			{ num: '1', local: [-30, -40] }, { num: '2', local: [-30, 0] }, { num: '3', local: [-30, 40] },
+			{ num: '4', local: [30, -40] }, { num: '5', local: [30, 0] }, { num: '6', local: [30, 40] },
+		],
+		localBox: { minX: -15, minY: -55, maxX: 15, maxY: 55 },
+	};
+	const bd = new Map([['J9', conn]]);
+	const ct = {
+		schemaVersion: 1, grid: { colPitch: 10, rowPitch: 10 },
+		columns: [{ id: 'input', role: 'in', order: 0, modules: ['c'] }],
+		modules: [{ id: 'c', role: 'connector', column: 'input', parts: ['J9'], region: { col: 0, row: 0, wCells: 4, hCells: 6 } }],
+		labelColumns: [], meta: { controller: null, moduleCount: 1, columnCount: 1 },
+	};
+	const lg = {
+		nets: [
+			{ name: 'GND', class: 'ground', pins: ['J9.1'] },
+			{ name: 'USB_DN', class: 'signal', pins: ['J9.2'] },
+			{ name: 'V5', class: 'power', pins: ['J9.3'] },
+			{ name: 'TX', class: 'signal', pins: ['J9.4'] },
+			{ name: 'RX', class: 'signal', pins: ['J9.5'] },
+			{ name: 'V3V3', class: 'power', pins: ['J9.6'] },
+		],
+	};
+	const withLog = planLayout({ contract: ct, byDes: bd, logical: lg });
+	assert.ok(withLog.model.wires.length > 0, 'wires with logical');
+	assert.ok(withLog.model.netflags.length > 0, 'flags with logical');
+	const g = geomQC(withLog.model);
+	assert.equal(g.overlaps.length + g.wireThruComp.length + g.offgrid + g.crossings, 0, 'geom clean');
+
+	const noLog = planLayout({ contract: ct, byDes: bd });
+	assert.equal(noLog.model.wires.length, 0, 'no wires without logical (backward compat)');
+});
