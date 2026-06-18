@@ -104,7 +104,13 @@ export function planLayout({ contract, byDes, logical, opts = {} } = {}) {
 				if (!nets.bottom && sep.bottom) nets.bottom = sep.bottom;
 			}
 
-			const cell = fn({ parts, anchor: { x: colX, y: snapGrid(cursorY) }, nets });
+			let cell;
+			try {
+				cell = fn({ parts, anchor: { x: colX, y: snapGrid(cursorY) }, nets });
+			} catch (e) {
+				skipped.push({ module: m.id, reason: 'render-error', error: e.message });
+				continue;
+			}
 			const wcs = parts.map(p => worldComponent(p, cell.place[p.designator]));
 			cursorY = cellExtentMinY(wcs, cell) - o.rowGap;
 

@@ -171,3 +171,20 @@ test('planner:单件 support + logical → 出电源/地桩;不传则裸件', ()
 	const noLog = planLayout({ contract: ct, byDes: bd });
 	assert.equal(noLog.model.wires.length, 0, 'no wires without logical (backward compat)');
 });
+
+test('planner:archetype 渲染抛错 → 模块进 skipped(render-error),不崩', () => {
+	const passive = d => ({ designator: d, pins: [{ num: '1', local: [-20, 0] }, { num: '2', local: [20, 0] }], localBox: { minX: -10, minY: -5, maxX: 10, maxY: 5 } });
+	const bd = new Map([['R1', passive('R1')], ['R2', passive('R2')]]);
+	// connector 模块给了 2 个零件,但 fanout 要求恰 1 个 → 渲染抛错 → 应安全跳过。
+	const ct = {
+		schemaVersion: 1, grid: { colPitch: 10, rowPitch: 10 },
+		columns: [{ id: 'input', role: 'in', order: 0, modules: ['bad'] }],
+		modules: [{ id: 'bad', role: 'connector', column: 'input', parts: ['R1', 'R2'], region: { col: 0, row: 0, wCells: 3, hCells: 4 } }],
+		labelColumns: [], meta: { controller: null, moduleCount: 1, columnCount: 1 },
+	};
+	let rr;
+	assert.doesNotThrow(() => { rr = planLayout({ contract: ct, byDes: bd }); });
+	const s = rr.skipped.find(x => x.module === 'bad');
+	assert.ok(s && s.reason === 'render-error');
+	assert.equal(rr.placed.length, 0);
+});
