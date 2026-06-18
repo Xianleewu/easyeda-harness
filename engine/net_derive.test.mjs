@@ -1,7 +1,7 @@
 // net_derive 单测:引脚→网+类派生(纯函数)。
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { derivePinNets } from './net_derive.mjs';
+import { derivePinNets, deriveSupportEndpoints } from './net_derive.mjs';
 
 const comp = { designator: 'J1', pins: [{ num: '1' }, { num: '2' }, { num: '3' }] };
 const logical = {
@@ -26,4 +26,22 @@ test('net_derive:空 pins / 无 nets → 空对象', () => {
 
 test('net_derive:确定性', () => {
 	assert.deepEqual(derivePinNets(comp, logical), derivePinNets(comp, logical));
+});
+
+test('net_derive:deriveSupportEndpoints 取首件 pin2(top)、末件 pin1(bottom)', () => {
+	const parts = [{ designator: 'R1' }, { designator: 'R2' }];
+	const lg = { nets: [
+		{ name: 'V5', class: 'power', pins: ['R1.2'] },
+		{ name: 'GND', class: 'ground', pins: ['R2.1'] },
+	] };
+	assert.deepEqual(deriveSupportEndpoints(parts, lg), { top: { name: 'V5', class: 'power' }, bottom: { name: 'GND', class: 'ground' } });
+});
+
+test('net_derive:deriveSupportEndpoints 单件取 pin2/pin1;空 parts 空对象', () => {
+	const lg = { nets: [
+		{ name: 'V3V3', class: 'power', pins: ['C1.2'] },
+		{ name: 'GND', class: 'ground', pins: ['C1.1'] },
+	] };
+	assert.deepEqual(deriveSupportEndpoints([{ designator: 'C1' }], lg), { top: { name: 'V3V3', class: 'power' }, bottom: { name: 'GND', class: 'ground' } });
+	assert.deepEqual(deriveSupportEndpoints([], lg), {});
 });
