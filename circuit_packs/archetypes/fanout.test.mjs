@@ -64,6 +64,21 @@ test('fanout:负例(空 parts/多器件/pinNets 指向不存在引脚)抛错', (
 	assert.throws(() => fanoutArchetype({ parts: [connector('J1')], anchor, nets: { pinNets: { '9': { name: 'X', class: 'signal' } } } }));
 });
 
+test('fanout:fail-closed — 自体内部脚(无正交逃逸)抛错', () => {
+	// 脚2 local(8,0) 落在体 x[-15..15]/y[-55..55] 内部 → 横向桩必穿自体,fail-closed 抛错。
+	const part = { designator: 'J9', localBox: { minX: -15, minY: -55, maxX: 15, maxY: 55 },
+		pins: [{ num: '1', local: [30, 40] }, { num: '2', local: [8, 0] }, { num: '3', local: [30, -40] }] };
+	const nets = { pinNets: { '1': { name: 'A', class: 'signal' }, '2': { name: 'B', class: 'signal' }, '3': { name: 'C', class: 'signal' } } };
+	assert.throws(() => fanoutArchetype({ parts: [part], anchor, nets }), /内部|interior/);
+});
+
+test('fanout:边缘脚(脚贴体边)不误判内部', () => {
+	const part = { designator: 'J9', localBox: { minX: -15, minY: -55, maxX: 15, maxY: 55 },
+		pins: [{ num: '1', local: [30, 40] }, { num: '2', local: [15, 0] }, { num: '3', local: [30, -40] }] };
+	const nets = { pinNets: { '1': { name: 'A', class: 'signal' }, '2': { name: 'B', class: 'signal' }, '3': { name: 'C', class: 'signal' } } };
+	assert.doesNotThrow(() => fanoutArchetype({ parts: [part], anchor, nets }));
+});
+
 function worldComponent(part, place) {
 	const pins = (part.pins || []).map(p => {
 		const [x, y] = toWorld(p.local, [place.x, place.y], place.rot, place.mirror);
