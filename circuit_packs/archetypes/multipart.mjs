@@ -2,7 +2,7 @@
 // 平面路由扇出到间隔标签列;模块内部网靠同名网标连通(EasyEDA 网名连通),无需显式内部连线。
 import { toWorld } from '../../engine/transform.mjs';
 import { regionOf, mergeParts } from '../../engine/cell_helpers.mjs';
-import { routeSide } from './densefanout.mjs';
+import { routeSide, assertEscapable } from './densefanout.mjs';
 
 const PART_GAP = 50;   // 件体间隙(按各件真实高度自适应堆叠)
 const snap10 = v => Math.round(v / 10) * 10;
@@ -23,13 +23,18 @@ export function multipartArchetype(spec = {}) {
 		const lb = comp.localBox || { minX: -5, minY: -5, maxX: 5, maxY: 5 };
 		const px = anchor.x, py = cursorY;
 		place[comp.designator] = { x: px, y: py, rot: 0, mirror: false };
+		const partPins = [];
 		for (const p of (comp.pins || [])) {
 			const world = toWorld(p.local, [px, py], 0, false);
 			pts.push(world);
 			const net = pinNets[`${comp.designator}.${p.num}`];
 			if (!net) continue;
-			(p.local[0] >= 0 ? right : left).push({ num: `${comp.designator}.${p.num}`, world, net });
+			const e = { num: `${comp.designator}.${p.num}`, world, net };
+			partPins.push(e);
+			(p.local[0] >= 0 ? right : left).push(e);
 		}
+		// 每件脚对自件世界体 fail-closed 检查(内部脚无正交逃逸 → 抛错让 planner 跳过)。
+		assertEscapable(partPins, { minX: px + lb.minX, minY: py + lb.minY, maxX: px + lb.maxX, maxY: py + lb.maxY }, comp.designator);
 		cursorY = snap10(py - (lb.maxY - lb.minY) - PART_GAP);   // 下一件落在本件真实底部之下
 	}
 	const frags = [...routeSide(right, 'right'), ...routeSide(left, 'left')];

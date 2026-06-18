@@ -11,6 +11,19 @@ const CH_STEP = 10;     // 通道间距
 const LABEL_GAP = 30;   // 标签列离最外通道(满足 L6 离体 ≥12)
 const STUB = 30;        // 末端水平命名 stub 长(≤STUB_MAX 55,满足 L9)
 
+// fail-closed:脚端点严格落在自体 bbox 内部(与 geomQC inset 1 同口径)时,
+// 任何正交逃逸段都必穿自体(拓扑事实:点在实心矩形内,轴向路径出矩形必经内部)——
+// 此类输入无解,抛错让 planner 跳过该模块,而非静默产出穿体几何拖垮整图几何门。
+export function assertEscapable(sidePins, body, designator) {
+	if (!body || ![body.minX, body.minY, body.maxX, body.maxY].every(Number.isFinite)) return;
+	for (const p of sidePins) {
+		const [x, y] = p.world;
+		if (x > body.minX + 1 && x < body.maxX - 1 && y > body.minY + 1 && y < body.maxY - 1) {
+			throw new Error(`densefanout ${designator}.${p.num} (${x},${y}) 在体内部、无正交逃逸 → fail-closed`);
+		}
+	}
+}
+
 export function routeSide(sidePins, side) {
 	const frags = [];
 	if (!sidePins.length) return frags;
@@ -71,6 +84,11 @@ export function densefanoutArchetype(spec = {}) {
 		const net = pinNets[String(p.num)];
 		if (!net) continue;
 		(p.local[0] >= 0 ? right : left).push({ num: p.num, world, net });
+	}
+	const lb = comp.localBox;
+	if (lb) {
+		const body = { minX: anchor.x + lb.minX, minY: anchor.y + lb.minY, maxX: anchor.x + lb.maxX, maxY: anchor.y + lb.maxY };
+		assertEscapable([...right, ...left], body, comp.designator);
 	}
 	const frags = [...routeSide(right, 'right'), ...routeSide(left, 'left')];
 	const merged = mergeParts(...frags);

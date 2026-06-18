@@ -68,6 +68,23 @@ test('densefanout:冒烟 — 密脚 IC 过真实 geomQC/labelQC hard=0(平面无
 	assert.deepEqual(labelHard, [], 'labelQC hard');
 });
 
+test('densefanout:fail-closed — 自体内部脚(无正交逃逸)抛错而非产穿体几何', () => {
+	// 右侧脚 local(10,0) 落在体 x[-20..20]/y[-40..40] 内部 → 横向逃逸段必穿自体,
+	// 拓扑上无正交路径能出实心矩形 → 原型应 fail-closed 抛错,让 planner 跳过该模块。
+	const part = { designator: 'U6', localBox: { minX: -20, minY: -40, maxX: 20, maxY: 40 },
+		pins: [{ num: '1', local: [40, 30] }, { num: '2', local: [10, 0] }, { num: '3', local: [40, -30] }] };
+	const nets = { pinNets: { '1': { name: 'A', class: 'signal' }, '2': { name: 'B', class: 'signal' }, '3': { name: 'C', class: 'signal' } } };
+	assert.throws(() => densefanoutArchetype({ parts: [part], anchor, nets }), /内部|interior/);
+});
+
+test('densefanout:边缘脚(脚贴体边)不误判内部,正常出图', () => {
+	// 右侧脚 local(20,0) 恰在体右边 x=20 上(非严格内部)→ 仍可逃逸,不应抛错。
+	const part = { designator: 'U6', localBox: { minX: -20, minY: -40, maxX: 20, maxY: 40 },
+		pins: [{ num: '1', local: [40, 30] }, { num: '2', local: [20, 0] }, { num: '3', local: [40, -30] }] };
+	const nets = { pinNets: { '1': { name: 'A', class: 'signal' }, '2': { name: 'B', class: 'signal' }, '3': { name: 'C', class: 'signal' } } };
+	assert.doesNotThrow(() => densefanoutArchetype({ parts: [part], anchor, nets }));
+});
+
 test('densefanout:宽标签名也过门(标签列让开通道,无 L4)', () => {
 	const part = denseIC('U7');
 	const wide = {};
