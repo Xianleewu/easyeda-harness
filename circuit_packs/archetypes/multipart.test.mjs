@@ -53,6 +53,12 @@ test('multipart:负例(空 parts/无 anchor)抛错', () => {
 	assert.throws(() => multipartArchetype({ parts: [synR()], anchor: {}, nets: { pinNets } }));
 });
 
+test('multipart:重复位号 fail-closed(place 以位号为键,重复会静默覆盖→堆叠重叠)', () => {
+	// 两件同位号 RA:place[RA] 会被第二件覆盖、cursor 仍推进 → 二者世界体重叠。
+	// place 按位号 key 的前提应显式化:重复位号直接抛错,而非产出重叠几何。
+	assert.throws(() => multipartArchetype({ parts: [synR(), synR()], anchor, nets: { pinNets } }), /位号|designator|duplicate/);
+});
+
 test('multipart:冒烟 — 2 件簇过真实 geomQC/labelQC hard=0', () => {
 	const parts = [synR(), synU()];
 	const c = multipartArchetype({ parts, anchor, nets: { pinNets } });

@@ -15,6 +15,13 @@ export function multipartArchetype(spec = {}) {
 	if (!anchor || !Number.isFinite(anchor.x) || !Number.isFinite(anchor.y)) {
 		throw new Error('multipartArchetype: spec.anchor {x,y} required');
 	}
+	// place 以位号为键:重复位号会静默覆盖(后件冲掉前件、cursor 仍推进)→ 世界体重叠。
+	// 显式化该前提,fail-closed 抛错。当前链 inferRoles 并查集分组保证 parts 位号唯一。
+	const dup = new Set();
+	for (const c of parts) {
+		if (dup.has(c.designator)) throw new Error(`multipartArchetype: duplicate designator ${c.designator} in parts`);
+		dup.add(c.designator);
+	}
 	const pinNets = nets.pinNets || {};   // 键 `${designator}.${num}`
 	const place = {};
 	const left = [], right = [], pts = [];
