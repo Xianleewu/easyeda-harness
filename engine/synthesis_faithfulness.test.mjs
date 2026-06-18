@@ -96,6 +96,14 @@ test('忠实度:跨模块网某模块缺标签(标签数<模块数)→ 检出', 
 	assert.ok(f.some(x => x.severity === 'hard' && x.where.net === 'SIG'), '应检出 SIG 标签数<模块数');
 });
 
+test('忠实度:跨模块电源网某模块跳过 → 检出(电源/地也在口径)', () => {
+	const logical = { nets: [{ name: 'VBUS', class: 'power', pins: ['U1.1', 'J1.1'] }] };
+	const contract = { modules: [{ id: 'mA', role: 'controller', parts: ['U1'] }, { id: 'mB', role: 'connector', parts: ['J1'] }] };
+	const model = { components: [{ designator: 'U1' }], wires: [], netflags: [{ kind: 'power', net: 'VBUS' }] };
+	const f = synthesisFaithfulness({ logical, contract, model });
+	assert.ok(f.some(x => x.severity === 'hard' && x.where.net === 'VBUS'), '应检出 VBUS 因模块跳过连通丢失');
+});
+
 test('忠实度:缺参数抛错', () => {
 	assert.throws(() => synthesisFaithfulness({}));
 	assert.throws(() => synthesisFaithfulness({ logical: {}, contract: {} }));
