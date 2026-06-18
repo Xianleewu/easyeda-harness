@@ -3,6 +3,9 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { supportArchetype } from './support.mjs';
 import { assertOrthogonalWires, assertLabelsAttached } from '../../engine/cell_helpers.mjs';
+import { toWorld } from '../../engine/transform.mjs';
+import { geomQC } from '../../engine/geom_qc.mjs';
+import { labelQC } from '../../engine/label_qc.mjs';
 
 function passive(designator) {
 	return {
@@ -58,4 +61,38 @@ test('support:负例(空 parts/非2端/侧信号<2件)抛错', () => {
 	}));
 	assert.throws(() => supportArchetype({ parts: [passive('R1')], anchor, nets: { side: { name: 'X', class: 'signal' } } }));
 	assert.throws(() => supportArchetype({ parts: [passive('R1'), passive('R2')], anchor, nets: { side: { name: 'X', class: 'signal' } }, opts: { tapIndex: 5 } }));
+});
+
+function worldComponent(part, place) {
+	const pins = (part.pins || []).map(p => {
+		const [x, y] = toWorld(p.local, [place.x, place.y], place.rot, place.mirror);
+		return { num: p.num, x, y };
+	});
+	const lb = part.localBox;
+	const corners = [[lb.minX, lb.minY], [lb.maxX, lb.maxY], [lb.minX, lb.maxY], [lb.maxX, lb.minY]]
+		.map(([lx, ly]) => toWorld([lx, ly], [place.x, place.y], place.rot, place.mirror));
+	const xs = corners.map(c => c[0]);
+	const ys = corners.map(c => c[1]);
+	return {
+		designator: part.designator,
+		pins,
+		bbox: { minX: Math.min(...xs), minY: Math.min(...ys), maxX: Math.max(...xs), maxY: Math.max(...ys) },
+	};
+}
+
+test('support:冒烟 — 真实 geomQC/labelQC hard=0', () => {
+	const parts = [passive('R1'), passive('R2'), passive('R3')];
+	const c = supportArchetype({ parts, anchor, nets });
+	const model = {
+		components: parts.map(p => worldComponent(p, c.place[p.designator])),
+		wires: c.wires,
+		netflags: c.flags,
+	};
+	const g = geomQC(model);
+	assert.equal(g.overlaps.length, 0, 'overlaps');
+	assert.equal(g.wireThruComp.length, 0, 'wireThruComp');
+	assert.equal(g.offgrid, 0, 'offgrid');
+	assert.equal(g.crossings, 0, 'crossings');
+	const labelHard = labelQC(model).filter(f => f.severity === 'hard');
+	assert.deepEqual(labelHard, [], 'labelQC hard');
 });
