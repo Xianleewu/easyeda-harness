@@ -23,7 +23,7 @@ function worldComponent(part, place) {
 }
 
 /* 模块真实几何范围最小 y(含桩):组件 bbox + 线顶点 + 标点。不用 cell.region(不含桩)。 */
-function cellExtentMinY(worldComps, cell) {
+export function cellExtentMinY(worldComps, cell) {
 	const ys = [];
 	for (const c of worldComps) ys.push(c.bbox.minY, c.bbox.maxY);
 	for (const w of cell.wires || []) {
@@ -31,6 +31,9 @@ function cellExtentMinY(worldComps, cell) {
 		for (let i = 1; i < l.length; i += 2) ys.push(l[i]);
 	}
 	for (const f of cell.flags || []) ys.push(f.y);
+	if (!ys.length) {
+		throw new Error('cellExtentMinY: archetype produced empty geometry (no components/wires/flags)');
+	}
 	return Math.min(...ys);
 }
 

@@ -1,7 +1,7 @@
 // plexus_planner 单测:contract→placement 通用驱动(纯函数)。
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { planLayout } from './plexus_planner.mjs';
+import { planLayout, cellExtentMinY } from './plexus_planner.mjs';
 
 const passive = d => ({
 	designator: d,
@@ -64,4 +64,8 @@ test('planner:确定性(同输入两次 model 深相等)', () => {
 test('planner:负例(畸形 contract / byDes 非 Map)抛错', () => {
 	assert.throws(() => planLayout({ contract: {}, byDes }));
 	assert.throws(() => planLayout({ contract, byDes: {} }));
+});
+
+test('planner:cellExtentMinY 空几何抛错', () => {
+	assert.throws(() => cellExtentMinY([], { wires: [], flags: [] }));
 });
