@@ -1,7 +1,7 @@
 // net_derive 单测:引脚→网+类派生(纯函数)。
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { derivePinNets, deriveSupportEndpoints } from './net_derive.mjs';
+import { derivePinNets, deriveSupportEndpoints, deriveModulePinNets } from './net_derive.mjs';
 
 const comp = { designator: 'J1', pins: [{ num: '1' }, { num: '2' }, { num: '3' }] };
 const logical = {
@@ -44,4 +44,20 @@ test('net_derive:deriveSupportEndpoints 单件取 pin2/pin1;空 parts 空对象'
 	] };
 	assert.deepEqual(deriveSupportEndpoints([{ designator: 'C1' }], lg), { top: { name: 'V3V3', class: 'power' }, bottom: { name: 'GND', class: 'ground' } });
 	assert.deepEqual(deriveSupportEndpoints([], lg), {});
+});
+
+test('net_derive:deriveModulePinNets 跨件以 des.num 为键', () => {
+	const parts = [
+		{ designator: 'Q1', pins: [{ num: '1' }, { num: '2' }] },
+		{ designator: 'R5', pins: [{ num: '1' }, { num: '2' }] },
+	];
+	const lg = { nets: [
+		{ name: 'BASE', class: 'signal', pins: ['Q1.1', 'R5.2'] },
+		{ name: 'GND', class: 'ground', pins: ['Q1.2'] },
+	] };
+	const pn = deriveModulePinNets(parts, lg);
+	assert.deepEqual(pn['Q1.1'], { name: 'BASE', class: 'signal' });
+	assert.deepEqual(pn['Q1.2'], { name: 'GND', class: 'ground' });
+	assert.deepEqual(pn['R5.2'], { name: 'BASE', class: 'signal' });
+	assert.ok(!('R5.1' in pn));   // R5.1 未连 → 不收
 });

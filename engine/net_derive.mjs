@@ -17,6 +17,16 @@ export function derivePinNets(component, logical) {
 	return out;
 }
 
+// 多件簇:所有件引脚 → 网+类,键 `${designator}.${num}`(multipart 用)。
+export function deriveModulePinNets(parts, logical) {
+	const out = {};
+	for (const comp of (parts || [])) {
+		const pn = derivePinNets(comp, logical);
+		for (const num of Object.keys(pn)) out[`${comp.designator}.${num}`] = pn[num];
+	}
+	return out;
+}
+
 // support 链:首件 pin2(顶)、末件 pin1(底)→ 端点网+类(support 用)。
 export function deriveSupportEndpoints(parts, logical) {
 	if (!Array.isArray(parts) || !parts.length) return {};
