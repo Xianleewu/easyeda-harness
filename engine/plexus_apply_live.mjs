@@ -35,6 +35,29 @@ async function liveSnapshot() {
 	return result;
 }
 
+// 把命名 stub 延伸到 channel、截掉逃逸线共线水平末段:让逃逸以竖直段接入命名 stub
+// (拐角而非共线)→ EDA 不合并 → 命名段保住网名。修 densefanout 7 个网丢名根因。
+function extendStubsToChannel(wires) {
+	const out = wires.map(w => ({ ...w, line: w.line.slice() }));
+	for (const stub of out) {
+		if (!stub.net || stub.line.length !== 4) continue;
+		const [ax, ay, bx, by] = stub.line;
+		if (ay !== by) continue;
+		for (const [ix, iy, isFirst] of [[ax, ay, true], [bx, by, false]]) {
+			const esc = out.find(w => !w.net && w.line.length >= 4 && Math.abs(w.line[w.line.length - 2] - ix) < 1 && Math.abs(w.line[w.line.length - 1] - iy) < 1);
+			if (!esc) continue;
+			const L = esc.line;
+			const prevY = L[L.length - 3];
+			if (Math.abs(prevY - iy) >= 1) continue;
+			const prevX = L[L.length - 4];
+			esc.line = L.slice(0, L.length - 2);
+			stub.line = isFirst ? [prevX, iy, bx, by] : [ax, ay, prevX, iy];
+			break;
+		}
+	}
+	return out;
+}
+
 // 网名传播:EDA 合并共线线段,若命名 stub 与无名逃逸线共线合并、结果取无名 → 丢连通。
 // 预先让同一几何连通簇的所有无名线都带该网名,合并后仍是该网 → 连通稳。命名线不显示符号。
 function propagateNets(wires) {
@@ -118,7 +141,9 @@ async function apply() {
 	await runOps('删原标', delFlagOps);
 
 	console.log('5) 画合成线 + 电源地符号(信号靠命名线连通,可选跳过重/不可靠的 netPort)...');
-	const wireOps = r.model.wires.map(w => `try{ await eda.sch_PrimitiveWire.create(${JSON.stringify(w.line)}, ${JSON.stringify(w.net || '')}); n++; }catch(e){}`);
+	// 延伸命名 stub 到 channel、截共线逃逸末段 → 命名段与逃逸成拐角、EDA 不合并丢名。
+	const fixedWires = extendStubsToChannel(r.model.wires);
+	const wireOps = fixedWires.map(w => `try{ await eda.sch_PrimitiveWire.create(${JSON.stringify(w.line)}, ${JSON.stringify(w.net || '')}); n++; }catch(e){}`);
 	await runOps('画线', wireOps);
 	const noSig = process.argv.includes('--no-sig-port') || process.env.PLEXUS_NO_SIG_PORT;
 	const flagOps = r.model.netflags.map(f => {
