@@ -32,6 +32,20 @@ export function geomQC(model, opt = {}) {
 	const wireThruComp = [];
 	for (const s of segs) for (const c of comps) if (segInRect(s, c.bbox)) wireThruComp.push(`net=${s.net || ''} thru ${c.designator}`);
 
+	// 2b) 导线内部压到引脚（非端点）→ 短路外部脚:EDA 拒建此类线（wireThruComp 只查
+	//     本体 bbox,漏了伸出本体外的引脚;这是 live 写回丢线的真实根因）。
+	const pins = [];
+	for (const c of comps) for (const p of (c.pins || [])) pins.push({ ref: `${c.designator}.${p.num}`, x: p.x, y: p.y });
+	const ptOnSegInterior = (px, py, s) => {
+		const [ax, ay] = s.a, [bx, by] = s.b;
+		if ((Math.abs(px - ax) < 1 && Math.abs(py - ay) < 1) || (Math.abs(px - bx) < 1 && Math.abs(py - by) < 1)) return false; // 端点不算
+		if (ay === by) return Math.abs(py - ay) < 1 && px > Math.min(ax, bx) && px < Math.max(ax, bx);
+		if (ax === bx) return Math.abs(px - ax) < 1 && py > Math.min(ay, by) && py < Math.max(ay, by);
+		return false;
+	};
+	const wireThruPin = [];
+	for (const s of segs) for (const p of pins) if (ptOnSegInterior(p.x, p.y, s)) wireThruPin.push(`net=${s.net || ''} thru pin ${p.ref}`);
+
 	// 3) 出格（引脚 / 导线点不在栅格）
 	let offgrid = 0; const offEx = [];
 	const chk = (x, y, tag) => { if (x % grid !== 0 || y % grid !== 0) { offgrid++; if (offEx.length < 8) offEx.push(`${tag}(${x},${y})`); } };
@@ -47,7 +61,7 @@ export function geomQC(model, opt = {}) {
 		if (vx > hx0 && vx < hx1 && hy > vy0 && hy < vy1 && (h.net || '') !== (v.net || '')) { crossings++; if (crossEx.length < 8) crossEx.push(`${h.net}x${v.net}@(${vx},${hy})`); }
 	}
 
-	return { overlaps, wireThruComp, offgrid, offEx, crossings, crossEx };
+	return { overlaps, wireThruComp, wireThruPin, offgrid, offEx, crossings, crossEx };
 }
 
 if (process.argv[1] && process.argv[1].endsWith('geom_qc.mjs') && process.argv[2]) {
