@@ -25,6 +25,7 @@ export function runPlexusSynthesize() {
 	const byDes = new Map((snap.components || []).map(c => [c.designator, withLocalPins(c)]));
 	const r = planLayout({ contract, byDes, logical });
 	const g = geomQC(r.model);
+	const g5 = geomQC(r.model, { grid: 5 });   // 真实件多在 5-栅:grid=5 的 offgrid 反映合成几何真实清白度
 	const labelHard = labelQC(r.model).filter(f => f.severity === 'hard').length;
 
 	const skipByReason = {};
@@ -38,7 +39,7 @@ export function runPlexusSynthesize() {
 		skipped: r.skipped.length,
 		skipByReason,
 		model: { components: r.model.components.length, wires: r.model.wires.length, flags: r.model.netflags.length },
-		geom: { overlaps: g.overlaps.length, wireThruComp: g.wireThruComp.length, offgrid: g.offgrid, crossings: g.crossings },
+		geom: { overlaps: g.overlaps.length, wireThruComp: g.wireThruComp.length, offgrid: g.offgrid, offgrid5: g5.offgrid, crossings: g.crossings },
 		labelHard,
 	};
 }
@@ -50,7 +51,8 @@ if (import.meta.url === `file://${process.argv[1]}`) {
 	const hard = out.geom.overlaps + out.geom.wireThruComp + out.geom.crossings + out.labelHard;
 	writeFileSync(REPORT, JSON.stringify({ generatedAt: new Date().toISOString(), ...out }, null, 2), 'utf8');
 	console.log(`Plexus 合成:placed=${out.placed}/${out.modules} wires=${out.model.wires} flags=${out.model.flags}`
-		+ ` | geom overlaps=${out.geom.overlaps} wireThruComp=${out.geom.wireThruComp} offgrid=${out.geom.offgrid} crossings=${out.geom.crossings} labelHard=${out.labelHard}`);
+		+ ` | geom overlaps=${out.geom.overlaps} wireThruComp=${out.geom.wireThruComp} crossings=${out.geom.crossings} labelHard=${out.labelHard}`
+		+ ` | offgrid=${out.geom.offgrid}@10栅 ${out.geom.offgrid5}@5栅(器件原生栅)`);
 	console.log(`report -> ${REPORT}`);
 	process.exit(hard ? 1 : 0);
 }
