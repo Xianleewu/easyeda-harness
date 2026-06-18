@@ -3,6 +3,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { getArchetype, renderArchetype } from './registry.mjs';
 import { supportArchetype } from './support.mjs';
+import { fanoutArchetype } from './fanout.mjs';
 
 const passive = d => ({
 	designator: d,
@@ -23,4 +24,8 @@ test('registry:renderArchetype 分发到对应原型', () => {
 test('registry:未知 role 抛错', () => {
 	assert.throws(() => getArchetype('nope'));
 	assert.throws(() => renderArchetype('nope', {}));
+});
+
+test('registry:getArchetype(connector) 返回 fanoutArchetype', () => {
+	assert.equal(getArchetype('connector'), fanoutArchetype);
 });
