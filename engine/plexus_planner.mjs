@@ -6,7 +6,7 @@ import { multipartArchetype } from '../circuit_packs/archetypes/multipart.mjs';
 
 // colWidth/rowGap 放宽到容纳密脚 IC 扇出(densefanout 标签 ±300+ 宽、列高);
 // 真实图实测 800/250 使完整合成 labelHard=0。自适应列宽(按模块真实宽)留作 follow-up。
-const DEF = { origin: { x: 1000, y: 1000 }, colWidth: 800, rowGap: 250 };
+const DEF = { origin: { x: 1000, y: 1000 }, colWidth: 650, rowGap: 180 };
 const GRID = 10;
 const snapGrid = v => Math.round(v / GRID) * GRID;
 
