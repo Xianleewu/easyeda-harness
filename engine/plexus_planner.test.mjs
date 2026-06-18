@@ -10,7 +10,10 @@ const passive = d => ({
 	pins: [{ num: '1', local: [-20, 0] }, { num: '2', local: [20, 0] }],
 	localBox: { minX: -10, minY: -5, maxX: 10, maxY: 5 },
 });
-const byDes = new Map([['R1', passive('R1')], ['R2', passive('R2')], ['R3', passive('R3')], ['R4', passive('R4')]]);
+const byDes = new Map([
+	['R1', passive('R1')], ['R2', passive('R2')], ['R3', passive('R3')], ['R4', passive('R4')],
+	['U1', { designator: 'U1', pins: [{ num: '1', local: [0, 0] }], localBox: { minX: -5, minY: -5, maxX: 5, maxY: 5 } }],
+]);
 
 const contract = {
 	schemaVersion: 1,
@@ -173,13 +176,13 @@ test('planner:单件 support + logical → 出电源/地桩;不传则裸件', ()
 });
 
 test('planner:archetype 渲染抛错 → 模块进 skipped(render-error),不崩', () => {
-	const passive = d => ({ designator: d, pins: [{ num: '1', local: [-20, 0] }, { num: '2', local: [20, 0] }], localBox: { minX: -10, minY: -5, maxX: 10, maxY: 5 } });
-	const bd = new Map([['R1', passive('R1')], ['R2', passive('R2')]]);
-	// connector 模块给了 2 个零件,但 fanout 要求恰 1 个 → 渲染抛错 → 应安全跳过。
+	// support 要求 2 端;单件 3 脚 Q1 → support 抛错,且单件无 multipart 回退 → render-error。
+	const q = { designator: 'Q1', pins: [{ num: '1', local: [-20, 0] }, { num: '2', local: [0, 0] }, { num: '3', local: [20, 0] }], localBox: { minX: -10, minY: -5, maxX: 10, maxY: 5 } };
+	const bd = new Map([['Q1', q]]);
 	const ct = {
 		schemaVersion: 1, grid: { colPitch: 10, rowPitch: 10 },
 		columns: [{ id: 'input', role: 'in', order: 0, modules: ['bad'] }],
-		modules: [{ id: 'bad', role: 'connector', column: 'input', parts: ['R1', 'R2'], region: { col: 0, row: 0, wCells: 3, hCells: 4 } }],
+		modules: [{ id: 'bad', role: 'support', column: 'input', parts: ['Q1'], region: { col: 0, row: 0, wCells: 3, hCells: 4 } }],
 		labelColumns: [], meta: { controller: null, moduleCount: 1, columnCount: 1 },
 	};
 	let rr;

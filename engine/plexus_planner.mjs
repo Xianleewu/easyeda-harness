@@ -1,7 +1,8 @@
 // Plexus 布局驱动:design_contract 模块区 → archetype cell → 组装模型(纯函数,与生成轨道解耦)。
 import { toWorld } from './transform.mjs';
 import { getArchetype } from '../circuit_packs/archetypes/registry.mjs';
-import { derivePinNets, deriveSupportEndpoints } from './net_derive.mjs';
+import { derivePinNets, deriveSupportEndpoints, deriveModulePinNets } from './net_derive.mjs';
+import { multipartArchetype } from '../circuit_packs/archetypes/multipart.mjs';
 
 // colWidth/rowGap 放宽到容纳密脚 IC 扇出(densefanout 标签 ±300+ 宽、列高);
 // 真实图实测 800/250 使完整合成 labelHard=0。自适应列宽(按模块真实宽)留作 follow-up。
@@ -73,13 +74,6 @@ export function planLayout({ contract, byDes, logical, opts = {} } = {}) {
 		const colX = o.origin.x + col * o.colWidth;
 		let cursorY = o.origin.y;
 		for (const m of mods) {
-			let fn;
-			try {
-				fn = getArchetype(m.role);
-			} catch {
-				skipped.push({ module: m.id, reason: 'no-archetype' });
-				continue;
-			}
 			const parts = [];
 			let missing = false;
 			for (const ref of m.parts) {
@@ -91,26 +85,33 @@ export function planLayout({ contract, byDes, logical, opts = {} } = {}) {
 				skipped.push({ module: m.id, reason: 'missing-parts' });
 				continue;
 			}
+			// 先试角色原型(support 处理多件链、fanout/dense 处理单件);抛错且多件 → 回退 multipart。
+			let fn = null;
+			try { fn = getArchetype(m.role); } catch { fn = null; }
 			const nets = {};
 			const side = sideByModule.get(m.id);
 			if (side) nets.side = { name: side.net, class: 'signal' };
 			const ep = (o.endpointNets || {})[m.id] || {};
 			if (ep.top) nets.top = ep.top;
 			if (ep.bottom) nets.bottom = ep.bottom;
-			if (parts.length === 1 && logical) {
-				nets.pinNets = derivePinNets(parts[0], logical);
-			}
 			if (logical) {
+				if (parts.length === 1) nets.pinNets = derivePinNets(parts[0], logical);
 				const sep = deriveSupportEndpoints(parts, logical);
 				if (!nets.top && sep.top) nets.top = sep.top;
 				if (!nets.bottom && sep.bottom) nets.bottom = sep.bottom;
 			}
-
-			let cell;
-			try {
-				cell = fn({ parts, anchor: { x: colX, y: snapGrid(cursorY) }, nets });
-			} catch (e) {
-				skipped.push({ module: m.id, reason: 'render-error', error: e.message });
+			const anchorPt = { x: colX, y: snapGrid(cursorY) };
+			let cell = null;
+			if (fn) {
+				try { cell = fn({ parts, anchor: anchorPt, nets }); } catch { cell = null; }
+			}
+			if (!cell && parts.length > 1) {
+				try {
+					cell = multipartArchetype({ parts, anchor: anchorPt, nets: { pinNets: logical ? deriveModulePinNets(parts, logical) : {} } });
+				} catch { cell = null; }
+			}
+			if (!cell) {
+				skipped.push({ module: m.id, reason: fn ? 'render-error' : 'no-archetype' });
 				continue;
 			}
 			const wcs = parts.map(p => worldComponent(p, cell.place[p.designator]));
