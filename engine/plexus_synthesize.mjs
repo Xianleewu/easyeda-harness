@@ -9,6 +9,7 @@ import { planLayout } from './plexus_planner.mjs';
 import { withLocalPins } from './transform.mjs';
 import { geomQC } from './geom_qc.mjs';
 import { labelQC } from './label_qc.mjs';
+import { synthesisFaithfulness } from './synthesis_faithfulness.mjs';
 
 const ROOT = (process.env.EASYEDA_WORKDIR || process.cwd()).replace(/\\/g, '/');
 const LIVE = process.env.EASYEDA_LIVE_MODEL || `${ROOT}/live.json`;
@@ -27,6 +28,8 @@ export function runPlexusSynthesize() {
 	const g = geomQC(r.model);
 	const g5 = geomQC(r.model, { grid: 5 });   // 真实件多在 5-栅:grid=5 的 offgrid 反映合成几何真实清白度
 	const labelHard = labelQC(r.model).filter(f => f.severity === 'hard').length;
+	const faith = synthesisFaithfulness({ logical, contract, model: r.model });
+	const faithHard = faith.filter(f => f.severity === 'hard');
 
 	const skipByReason = {};
 	for (const s of r.skipped) skipByReason[s.reason] = (skipByReason[s.reason] || 0) + 1;
@@ -41,17 +44,19 @@ export function runPlexusSynthesize() {
 		model: { components: r.model.components.length, wires: r.model.wires.length, flags: r.model.netflags.length },
 		geom: { overlaps: g.overlaps.length, wireThruComp: g.wireThruComp.length, offgrid: g.offgrid, offgrid5: g5.offgrid, crossings: g.crossings },
 		labelHard,
+		faithHard: faithHard.length,
+		faithFindings: faithHard.slice(0, 8),
 	};
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
 	const out = runPlexusSynthesize();
 	if (!out.ok) { console.error(out.error); process.exit(2); }
-	// 硬判:重叠/线穿件/异网交叉/标签硬伤为 0 才算几何过门(offgrid 暂列软,见 sub-grid 件 follow-up)。
-	const hard = out.geom.overlaps + out.geom.wireThruComp + out.geom.crossings + out.labelHard;
+	// 硬判:重叠/线穿件/异网交叉/标签硬伤/跨模块连通丢失为 0 才过门(offgrid 暂列软,见 sub-grid 件 follow-up)。
+	const hard = out.geom.overlaps + out.geom.wireThruComp + out.geom.crossings + out.labelHard + out.faithHard;
 	writeFileSync(REPORT, JSON.stringify({ generatedAt: new Date().toISOString(), ...out }, null, 2), 'utf8');
 	console.log(`Plexus 合成:placed=${out.placed}/${out.modules} wires=${out.model.wires} flags=${out.model.flags}`
-		+ ` | geom overlaps=${out.geom.overlaps} wireThruComp=${out.geom.wireThruComp} crossings=${out.geom.crossings} labelHard=${out.labelHard}`
+		+ ` | geom overlaps=${out.geom.overlaps} wireThruComp=${out.geom.wireThruComp} crossings=${out.geom.crossings} labelHard=${out.labelHard} faithHard=${out.faithHard}`
 		+ ` | offgrid=${out.geom.offgrid}@10栅 ${out.geom.offgrid5}@5栅(器件原生栅)`);
 	console.log(`report -> ${REPORT}`);
 	process.exit(hard ? 1 : 0);
