@@ -10,6 +10,7 @@ import { withLocalPins } from './transform.mjs';
 import { geomQC } from './geom_qc.mjs';
 import { labelQC } from './label_qc.mjs';
 import { synthesisFaithfulness } from './synthesis_faithfulness.mjs';
+import { wireConnectivity } from './wire_connectivity.mjs';
 
 const ROOT = (process.env.EASYEDA_WORKDIR || process.cwd()).replace(/\\/g, '/');
 const LIVE = process.env.EASYEDA_LIVE_MODEL || `${ROOT}/live.json`;
@@ -30,6 +31,8 @@ export function runPlexusSynthesize() {
 	const labelHard = labelQC(r.model).filter(f => f.severity === 'hard').length;
 	const faith = synthesisFaithfulness({ logical, contract, model: r.model });
 	const faithHard = faith.filter(f => f.severity === 'hard');
+	const conn = wireConnectivity({ model: r.model, logical });
+	const connHard = conn.filter(f => f.severity === 'hard');
 
 	const skipByReason = {};
 	for (const s of r.skipped) skipByReason[s.reason] = (skipByReason[s.reason] || 0) + 1;
@@ -46,17 +49,19 @@ export function runPlexusSynthesize() {
 		labelHard,
 		faithHard: faithHard.length,
 		faithFindings: faithHard.slice(0, 8),
+		connHard: connHard.length,
+		connFindings: connHard.slice(0, 8),
 	};
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
 	const out = runPlexusSynthesize();
 	if (!out.ok) { console.error(out.error); process.exit(2); }
-	// 硬判:重叠/线穿件/异网交叉/标签硬伤/跨模块连通丢失为 0 才过门(offgrid 暂列软,见 sub-grid 件 follow-up)。
-	const hard = out.geom.overlaps + out.geom.wireThruComp + out.geom.crossings + out.labelHard + out.faithHard;
+	// 硬判:重叠/线穿件/异网交叉/标签硬伤/跨模块连通丢失/导线连通断为 0 才过门(offgrid 暂列软)。
+	const hard = out.geom.overlaps + out.geom.wireThruComp + out.geom.crossings + out.labelHard + out.faithHard + out.connHard;
 	writeFileSync(REPORT, JSON.stringify({ generatedAt: new Date().toISOString(), ...out }, null, 2), 'utf8');
 	console.log(`Plexus 合成:placed=${out.placed}/${out.modules} wires=${out.model.wires} flags=${out.model.flags}`
-		+ ` | geom overlaps=${out.geom.overlaps} wireThruComp=${out.geom.wireThruComp} crossings=${out.geom.crossings} labelHard=${out.labelHard} faithHard=${out.faithHard}`
+		+ ` | geom overlaps=${out.geom.overlaps} wireThruComp=${out.geom.wireThruComp} crossings=${out.geom.crossings} labelHard=${out.labelHard} faithHard=${out.faithHard} connHard=${out.connHard}`
 		+ ` | offgrid=${out.geom.offgrid}@10栅 ${out.geom.offgrid5}@5栅(器件原生栅)`);
 	console.log(`report -> ${REPORT}`);
 	process.exit(hard ? 1 : 0);
