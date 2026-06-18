@@ -35,6 +35,23 @@ async function liveSnapshot() {
 	return result;
 }
 
+// 把整条 pin→label 路径拼成一条命名折线:不留可被 EDA 合并丢名的独立无名段。
+function concatNamedPaths(wires) {
+	const used = new Set();
+	const result = [];
+	for (const stub of wires) {
+		if (!stub.net || stub.line.length !== 4) continue;
+		const [ax, ay, bx, by] = stub.line;
+		if (ay !== by) continue;
+		for (const [ix, iy, fx, fy] of [[ax, ay, bx, by], [bx, by, ax, ay]]) {
+			const esc = wires.find(w => !w.net && !used.has(w) && (w.line || []).length >= 4 && Math.abs(w.line[w.line.length - 2] - ix) < 1 && Math.abs(w.line[w.line.length - 1] - iy) < 1);
+			if (esc) { used.add(esc); used.add(stub); result.push({ net: stub.net, line: [...esc.line, fx, fy] }); break; }
+		}
+	}
+	for (const w of wires) if (!used.has(w)) result.push(w);
+	return result;
+}
+
 // 把命名 stub 延伸到 channel、截掉逃逸线共线水平末段:让逃逸以竖直段接入命名 stub
 // (拐角而非共线)→ EDA 不合并 → 命名段保住网名。修 densefanout 7 个网丢名根因。
 function extendStubsToChannel(wires) {
@@ -141,8 +158,8 @@ async function apply() {
 	await runOps('删原标', delFlagOps);
 
 	console.log('5) 画合成线 + 电源地符号(信号靠命名线连通,可选跳过重/不可靠的 netPort)...');
-	// 延伸命名 stub 到 channel、截共线逃逸末段 → 命名段与逃逸成拐角、EDA 不合并丢名。
-	const fixedWires = extendStubsToChannel(r.model.wires);
+	// 整条 pin→label 路径拼成单条命名折线 → 无独立无名段可被 EDA 合并丢名。
+	const fixedWires = concatNamedPaths(r.model.wires);
 	const wireOps = fixedWires.map(w => `try{ await eda.sch_PrimitiveWire.create(${JSON.stringify(w.line)}, ${JSON.stringify(w.net || '')}); n++; }catch(e){}`);
 	await runOps('画线', wireOps);
 	const noSig = process.argv.includes('--no-sig-port') || process.env.PLEXUS_NO_SIG_PORT;
