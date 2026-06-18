@@ -64,6 +64,45 @@ export function routeSide(sidePins, side) {
 	return frags;
 }
 
+// 上/下边引脚:竖直逃逸(vdir -1 下 / +1 上)的阶梯,水平走到侧标签列(hside left/right,
+// 复用 alignMode 6/8 侧标签,不触标签门旋转问题)。平面性:近标签侧者最浅,深者更靠外侧
+// → 深线的竖直段不被浅线水平段挡、浅线竖直段不挡深线水平段(已推演无交叉)。
+export function routeEdge(pins, vdir, hside, clearY) {
+	const frags = [];
+	if (!pins.length) return frags;
+	const hdir = hside === 'right' ? 1 : -1;
+	// 近标签侧者最浅:按 x 朝标签侧降序(最靠标签侧的先)。
+	const sorted = pins.slice().sort((a, b) => hdir > 0 ? b.world[0] - a.world[0] : a.world[0] - b.world[0]);
+	// 深度从 clearY(侧边布线最低/高 y)之外起:底边引脚的竖直段在器件 x-阴影内(侧边布线
+	// 都在器件外侧),标签降到 clearY 之外 → 不撞侧边布线、竖直段也清。无 clearY 退回引脚排。
+	const pinRow = vdir < 0 ? Math.min(...pins.map(p => p.world[1])) : Math.max(...pins.map(p => p.world[1]));
+	const rowY = clearY != null ? (vdir < 0 ? Math.min(pinRow, clearY) : Math.max(pinRow, clearY)) : pinRow;
+	const labelLen = name => Math.max(40, String(name).length * 6 + 18);
+	const maxLen = Math.max(...sorted.map(p => labelLen(p.net.name)));
+	const edgeX = hdir > 0 ? Math.max(...pins.map(p => p.world[0])) : Math.min(...pins.map(p => p.world[0]));
+	const labelX = snap10(edgeX) + hdir * (maxLen + LABEL_GAP);
+	const preX = labelX - hdir * STUB;
+	for (let i = 0; i < sorted.length; i++) {
+		const [px, py] = sorted[i].world;
+		const depthY = snap10(rowY) + vdir * (i + 1) * ROW_PITCH;   // 每条更深(离体更远),不与引脚排同 y
+		// 无名:pin → 竖直逃逸到 depthY → 水平到 preX
+		frags.push({ wires: [wire('', [[px, py], [px, depthY], [preX, depthY]])], flags: [] });
+		// 短命名 stub + 侧标签
+		frags.push({ wires: [wire(sorted[i].net.name, [[preX, depthY], [labelX, depthY]])], flags: [sigFlag(sorted[i].net.name, labelX, depthY, hside)] });
+	}
+	return frags;
+}
+
+// 按 localBox 最近边把引脚分到 left/right/bottom/top(优先左右,再上下;内部回退 x 符号)。
+function classifyEdge(local, lb, m = 2) {
+	const [lx, ly] = local;
+	if (lx <= lb.minX + m) return 'left';
+	if (lx >= lb.maxX - m) return 'right';
+	if (ly <= lb.minY + m) return 'bottom';
+	if (ly >= lb.maxY - m) return 'top';
+	return lx >= 0 ? 'right' : 'left';
+}
+
 export function densefanoutArchetype(spec = {}) {
 	const { parts, anchor, nets = {} } = spec;
 	if (!Array.isArray(parts) || parts.length !== 1) {
@@ -77,20 +116,41 @@ export function densefanoutArchetype(spec = {}) {
 	if (!pins.length) throw new Error('densefanoutArchetype: component has no pins');
 	const pinNets = nets.pinNets || {};
 	const place = { [comp.designator]: { x: anchor.x, y: anchor.y, rot: 0, mirror: false } };
-	const left = [], right = [], pts = [];
+	const lb = comp.localBox;
+	const left = [], right = [], bottom = [], top = [], pts = [];
 	for (const p of pins) {
 		const world = toWorld(p.local, [anchor.x, anchor.y], 0, false);
 		pts.push(world);
 		const net = pinNets[String(p.num)];
 		if (!net) continue;
-		(p.local[0] >= 0 ? right : left).push({ num: p.num, world, net });
+		const entry = { num: p.num, world, net };
+		// 有 localBox 时按真实边分类(修底/顶边引脚被误判左右、水平横穿引脚排的根因);
+		// 无 localBox 退回 x 符号(老行为)。
+		const edge = lb ? classifyEdge(p.local, lb) : (p.local[0] >= 0 ? 'right' : 'left');
+		({ left, right, bottom, top })[edge].push(entry);
 	}
-	const lb = comp.localBox;
 	if (lb) {
 		const body = { minX: anchor.x + lb.minX, minY: anchor.y + lb.minY, maxX: anchor.x + lb.maxX, maxY: anchor.y + lb.maxY };
 		assertEscapable([...right, ...left], body, comp.designator);
 	}
-	const frags = [...routeSide(right, 'right'), ...routeSide(left, 'left')];
+	// 先布左右侧,量其布线 y 范围:上/下边引脚的标签要降到侧边布线之外(floor/ceil)以免碰撞。
+	const sideFrags = [...routeSide(right, 'right'), ...routeSide(left, 'left')];
+	const sideYs = [];
+	for (const fr of sideFrags) {
+		for (const w of fr.wires || []) { const l = w.line || []; for (let i = 1; i < l.length; i += 2) sideYs.push(l[i]); }
+		for (const f of fr.flags || []) sideYs.push(f.y);
+	}
+	const floorY = sideYs.length ? Math.min(...sideYs) - ROW_PITCH : null;
+	const ceilY = sideYs.length ? Math.max(...sideYs) + ROW_PITCH : null;
+	// 上/下边引脚按器件中心分左右标签侧,竖直阶梯逃逸(下边向下、上边向上)。
+	const splitSide = arr => [arr.filter(p => p.world[0] < anchor.x), arr.filter(p => p.world[0] >= anchor.x)];
+	const [bL, bR] = splitSide(bottom);
+	const [tL, tR] = splitSide(top);
+	const frags = [
+		...sideFrags,
+		...routeEdge(bL, -1, 'left', floorY), ...routeEdge(bR, -1, 'right', floorY),
+		...routeEdge(tL, 1, 'left', ceilY), ...routeEdge(tR, 1, 'right', ceilY),
+	];
 	const merged = mergeParts(...frags);
 	return { place, wires: merged.wires, flags: merged.flags, noConnects: [], region: regionOf(pts, 20) };
 }

@@ -95,3 +95,30 @@ test('densefanout:宽标签名也过门(标签列让开通道,无 L4)', () => {
 	assert.equal(g.overlaps.length + g.wireThruComp.length + g.offgrid + g.crossings, 0, 'geom clean');
 	assert.deepEqual(labelQC(model).filter(f => f.severity === 'hard'), [], 'labelQC hard');
 });
+
+// 4 边密脚 IC(含上/下边引脚):回归底/顶边引脚被误判左右、水平横穿引脚排(wireThruPin)的根因。
+function quadIC(designator) {
+	const pins = [];
+	let n = 1;
+	for (let i = 0; i < 5; i++) pins.push({ num: String(n++), local: [-40, 20 - i * 10] });  // 左
+	for (let i = 0; i < 5; i++) pins.push({ num: String(n++), local: [40, 20 - i * 10] });    // 右
+	for (let i = 0; i < 6; i++) pins.push({ num: String(n++), local: [-25 + i * 10, -60] });  // 底(伸出体下)
+	for (let i = 0; i < 4; i++) pins.push({ num: String(n++), local: [-15 + i * 10, 60] });   // 顶(伸出体上)
+	return { designator, pins, localBox: { minX: -20, minY: -40, maxX: 20, maxY: 40 } };
+}
+
+test('densefanout:4 边引脚 IC — 底/顶边引脚竖直逃逸,wireThruPin=0、无交叉、标签门净', () => {
+	const part = quadIC('U8');
+	const nets = {};
+	part.pins.forEach((p, i) => { nets[p.num] = { name: 'Q' + p.num, class: cls[i % 3] }; });
+	const c = densefanoutArchetype({ parts: [part], anchor, nets: { pinNets: nets } });
+	const model = { components: [worldComponent(part, c.place.U8)], wires: c.wires, netflags: c.flags };
+	const g = geomQC(model);
+	assert.equal(g.wireThruPin.length, 0, `wireThruPin ${g.wireThruPin.join(' ')}`);
+	assert.equal(g.wireThruComp.length, 0, 'wireThruComp');
+	assert.equal(g.overlaps.length, 0, 'overlaps');
+	assert.equal(g.crossings, 0, 'crossings');
+	assert.deepEqual(labelQC(model).filter(f => f.severity === 'hard'), [], 'labelQC hard');
+	// 每个有网的脚都出一条标签(20 脚全有网)
+	assert.equal(c.flags.filter(f => f.kind === 'sig').length, 20);
+});
