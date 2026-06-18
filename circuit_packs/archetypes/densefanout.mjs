@@ -11,7 +11,7 @@ const CH_STEP = 10;     // 通道间距
 const LABEL_GAP = 30;   // 标签列离最外通道(满足 L6 离体 ≥12)
 const STUB = 30;        // 末端水平命名 stub 长(≤STUB_MAX 55,满足 L9)
 
-function routeSide(sidePins, side) {
+export function routeSide(sidePins, side) {
 	const frags = [];
 	if (!sidePins.length) return frags;
 	const pins = sidePins.slice().sort((a, b) => b.world[1] - a.world[1]); // 顶→底
