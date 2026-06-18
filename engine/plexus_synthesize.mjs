@@ -1,0 +1,56 @@
+// Plexus 合成 CLI:快照 → 抽取 → 角色 → 契约 → 布局(带 logical)→ 几何/标签判决 → 报告(只读)。
+// 把 extract→infer→synthesizeContract→planLayout 整条合成链跑在 live.json 上,
+// 报告落地/跳过模块 + 组装模型几何/标签实况。只读,不写回工程文件。
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { extractLogical } from './schematic_extract.mjs';
+import { inferRoles } from './role_infer.mjs';
+import { synthesizeContract } from './design_contract.mjs';
+import { planLayout } from './plexus_planner.mjs';
+import { withLocalPins } from './transform.mjs';
+import { geomQC } from './geom_qc.mjs';
+import { labelQC } from './label_qc.mjs';
+
+const ROOT = (process.env.EASYEDA_WORKDIR || process.cwd()).replace(/\\/g, '/');
+const LIVE = process.env.EASYEDA_LIVE_MODEL || `${ROOT}/live.json`;
+const REPORT = process.env.PLEXUS_SYNTHESIZE_REPORT || `${ROOT}/plexus_synthesize_report.json`;
+
+export function runPlexusSynthesize() {
+	if (!existsSync(LIVE)) {
+		return { ok: false, error: `快照缺失：${LIVE}（先跑 plexus live:save / audit 拉快照）` };
+	}
+	const snap = JSON.parse(readFileSync(LIVE, 'utf8').replace(/^﻿/, ''));
+	const logical = extractLogical(snap);
+	const roles = inferRoles(logical);
+	const contract = synthesizeContract(roles, logical);
+	const byDes = new Map((snap.components || []).map(c => [c.designator, withLocalPins(c)]));
+	const r = planLayout({ contract, byDes, logical });
+	const g = geomQC(r.model);
+	const labelHard = labelQC(r.model).filter(f => f.severity === 'hard').length;
+
+	const skipByReason = {};
+	for (const s of r.skipped) skipByReason[s.reason] = (skipByReason[s.reason] || 0) + 1;
+
+	return {
+		ok: true,
+		controller: roles.controller,
+		modules: contract.modules.length,
+		placed: r.placed.length,
+		skipped: r.skipped.length,
+		skipByReason,
+		model: { components: r.model.components.length, wires: r.model.wires.length, flags: r.model.netflags.length },
+		geom: { overlaps: g.overlaps.length, wireThruComp: g.wireThruComp.length, offgrid: g.offgrid, crossings: g.crossings },
+		labelHard,
+	};
+}
+
+if (import.meta.url === `file://${process.argv[1]}`) {
+	const out = runPlexusSynthesize();
+	if (!out.ok) { console.error(out.error); process.exit(2); }
+	// 硬判:重叠/线穿件/异网交叉/标签硬伤为 0 才算几何过门(offgrid 暂列软,见 sub-grid 件 follow-up)。
+	const hard = out.geom.overlaps + out.geom.wireThruComp + out.geom.crossings + out.labelHard;
+	writeFileSync(REPORT, JSON.stringify({ generatedAt: new Date().toISOString(), ...out }, null, 2), 'utf8');
+	console.log(`Plexus 合成:placed=${out.placed}/${out.modules} wires=${out.model.wires} flags=${out.model.flags}`
+		+ ` | geom overlaps=${out.geom.overlaps} wireThruComp=${out.geom.wireThruComp} offgrid=${out.geom.offgrid} crossings=${out.geom.crossings} labelHard=${out.labelHard}`);
+	console.log(`report -> ${REPORT}`);
+	process.exit(hard ? 1 : 0);
+}
