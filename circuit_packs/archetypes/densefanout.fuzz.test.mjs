@@ -36,12 +36,16 @@ function genConfig(rnd, idx) {
 	if (nL + nR === 0) return genConfig(rnd, idx);   // 至少 1 脚
 	const pins = []; const pinNets = {};
 	let k = 1;
+	// 网名宽度也随机(含超长名),压 L4(线穿标签)/L6(标签离体):密脚 × 宽名是真实硬组合。
+	const widths = [4, 8, 14, 22, 30];
 	const mk = (side) => {
 		const x = side === 'L' ? -bw : bw;
 		const y = (pick(-bh / 10, bh / 10)) * 10;     // 10 栅、可与他脚同 y(压 staircase)
 		const num = String(k++);
 		pins.push({ num, local: [x, y] });
-		pinNets[num] = { name: `${side}${num}_NET`, class: cls[pick(0, 2)] };
+		const w = widths[pick(0, widths.length - 1)];
+		const name = `${side}${num}_${'X'.repeat(Math.max(1, w - String(num).length - 2))}`;
+		pinNets[num] = { name, class: cls[pick(0, 2)] };
 	};
 	for (let i = 0; i < nL; i++) mk('L');
 	for (let i = 0; i < nR; i++) mk('R');
