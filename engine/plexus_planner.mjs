@@ -3,6 +3,7 @@ import { toWorld } from './transform.mjs';
 import { getArchetype } from '../circuit_packs/archetypes/registry.mjs';
 import { derivePinNets, deriveSupportEndpoints, deriveModulePinNets } from './net_derive.mjs';
 import { multipartArchetype } from '../circuit_packs/archetypes/multipart.mjs';
+import { resolveLabelCollisions } from './label_resolve.mjs';
 
 // 列宽自适应(每列按真实几何含标签框紧排,见列循环 COL_GAP);rowGap 为列内件纵向间距。
 const DEF = { origin: { x: 1000, y: 1000 }, rowGap: 180 };
@@ -147,5 +148,7 @@ export function planLayout({ contract, byDes, logical, opts = {} } = {}) {
 		runningX += (xMax - xMin) + COL_GAP;
 	}
 
-	return { model: { components, wires, netflags }, placed, skipped };
+	// 装配后消解跨模块同名网标的 L10 碰撞(门精确、只接受严格改善;无碰撞则原样)。
+	const model = resolveLabelCollisions({ components, wires, netflags });
+	return { model, placed, skipped };
 }
