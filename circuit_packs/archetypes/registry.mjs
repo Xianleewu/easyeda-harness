@@ -11,6 +11,7 @@ const ARCHETYPES = {
 	controller: densefanoutArchetype,
 	ic: densefanoutArchetype,
 	regulator: densefanoutArchetype,
+	testpoint: fanoutArchetype,
 };
 
 export function getArchetype(role) {

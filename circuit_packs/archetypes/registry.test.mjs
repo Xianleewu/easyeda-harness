@@ -31,9 +31,10 @@ test('registry:getArchetype(connector) 返回 fanoutArchetype', () => {
 	assert.equal(getArchetype('connector'), fanoutArchetype);
 });
 
-test('registry:getArchetype(input) 返回 supportArchetype;indicator(多脚 LED)返回 fanoutArchetype', () => {
+test('registry:getArchetype(input) 返回 supportArchetype;indicator/testpoint 返回 fanoutArchetype', () => {
 	assert.equal(getArchetype('input'), supportArchetype);
 	assert.equal(getArchetype('indicator'), fanoutArchetype);
+	assert.equal(getArchetype('testpoint'), fanoutArchetype);
 });
 
 test('registry:getArchetype(controller/ic/regulator) 返回 densefanoutArchetype', () => {
