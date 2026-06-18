@@ -29,3 +29,8 @@ test('registry:未知 role 抛错', () => {
 test('registry:getArchetype(connector) 返回 fanoutArchetype', () => {
 	assert.equal(getArchetype('connector'), fanoutArchetype);
 });
+
+test('registry:getArchetype(indicator/input) 返回 supportArchetype', () => {
+	assert.equal(getArchetype('indicator'), supportArchetype);
+	assert.equal(getArchetype('input'), supportArchetype);
+});

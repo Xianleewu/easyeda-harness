@@ -2,7 +2,12 @@
 import { supportArchetype } from './support.mjs';
 import { fanoutArchetype } from './fanout.mjs';
 
-const ARCHETYPES = { support: supportArchetype, connector: fanoutArchetype };
+const ARCHETYPES = {
+	support: supportArchetype,
+	indicator: supportArchetype,
+	input: supportArchetype,
+	connector: fanoutArchetype,
+};
 
 export function getArchetype(role) {
 	const fn = ARCHETYPES[role];
