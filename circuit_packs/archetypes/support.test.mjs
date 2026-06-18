@@ -57,4 +57,5 @@ test('support:负例(空 parts/非2端/侧信号<2件)抛错', () => {
 		anchor,
 	}));
 	assert.throws(() => supportArchetype({ parts: [passive('R1')], anchor, nets: { side: { name: 'X', class: 'signal' } } }));
+	assert.throws(() => supportArchetype({ parts: [passive('R1'), passive('R2')], anchor, nets: { side: { name: 'X', class: 'signal' } }, opts: { tapIndex: 5 } }));
 });

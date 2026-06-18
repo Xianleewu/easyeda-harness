@@ -23,6 +23,9 @@ export function supportArchetype(spec = {}) {
 	if (nets.side && nets.side.class === 'signal' && parts.length < 2) {
 		throw new Error('supportArchetype: side signal tap needs >= 2 parts (no internal junction)');
 	}
+	if (nets.side && nets.side.class === 'signal' && tapIndex > parts.length - 2) {
+		throw new Error(`supportArchetype: tapIndex ${tapIndex} out of range (need 0..${parts.length - 2})`);
+	}
 
 	const place = {};
 	const pin = {};   // designator -> { p1:[x,y], p2:[x,y] }
