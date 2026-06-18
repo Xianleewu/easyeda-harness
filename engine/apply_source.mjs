@@ -153,10 +153,24 @@ export async function applySource() {
 	const { r, idByDes } = synth();
 	const { result: src } = await executeCode('return await eda.sys_FileManager.getDocumentSource();', { timeoutMs: 60000 });
 	const { newSrc, delivered, synthWireCount, groupCount } = buildSource(src, r, idByDes);
-	console.log(`源式投递:合成线=${synthWireCount} 现有组=${groupCount} 投递=${delivered}（封顶 min）`);
+	console.log(`源式投递:合成线=${synthWireCount} 现有组=${groupCount} 投递=${delivered}（封顶 min,溢出同网并组）`);
 	const code = `await eda.sys_FileManager.setDocumentSource(${JSON.stringify(newSrc)}); return { ok: true };`;
-	const { result } = await executeCode(code, { timeoutMs: 90000 });
-	console.log('setDocumentSource:', JSON.stringify(result));
+	await executeCode(code, { timeoutMs: 90000 });
+
+	// 投递后自检:回读源,验证首个器件确实移到了合成位。setDocumentSource 在归一化源上会
+	// ok 却静默整体回退 → 这里 fail-loud,提示先 `--undo` 重建自然源。
+	const firstPl = r.placements[0];
+	const firstId = idByDes.get(firstPl.designator);
+	const { result: back } = await executeCode('return await eda.sys_FileManager.getDocumentSource();', { timeoutMs: 60000 });
+	const rec = parseSource(back).find(x => x.head?.type === 'COMPONENT' && x.head.id === firstId);
+	const applied = rec && Math.abs(rec.data.x - firstPl.x) < 1 && Math.abs(rec.data.y - (-firstPl.y)) < 1;
+	if (applied) {
+		console.log(`✓ 投递生效(${firstPl.designator} 已到合成位 [${firstPl.x},${-firstPl.y}])`);
+	} else {
+		console.error(`✗ 投递静默回退(${firstPl.designator} 仍在 [${rec?.data.x},${rec?.data.y}])——源已被归一化,`
+			+ '先运行 `node engine/plexus_apply_live.mjs --undo` 重建自然源再重试。');
+		process.exitCode = 1;
+	}
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
