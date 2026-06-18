@@ -25,11 +25,14 @@ export function routeSide(sidePins, side) {
 	const maxLen = Math.max(...pins.map(p => labelLen(p.net.name)));
 	const outerCh = snap10(pinEdge) + dir * N * CH_STEP;          // 最外通道
 	const labelX = snap10(outerCh + dir * (maxLen + LABEL_GAP));  // 标签列让开最宽标签框(否则标签压通道竖直段=L4)
+	// 行 snap 到 ROW_PITCH 栅 + 侧相位(右 +10):左右行永不同 y → 跨侧同网不触 L10。
+	const phase = side === 'right' ? 10 : 0;
+	const snapRow = v => Math.round((v - phase) / ROW_PITCH) * ROW_PITCH + phase;
 	let prevRow = Infinity;
 	const rows = [];
 	for (let i = 0; i < N; i++) {
 		const py = pins[i].world[1];
-		const r = snap10(Math.min(py, prevRow - ROW_PITCH)); // 向下、≥ROW_PITCH
+		const r = snapRow(Math.min(py, prevRow - ROW_PITCH)); // 向下、≥ROW_PITCH
 		rows.push(r);
 		prevRow = r;
 	}
