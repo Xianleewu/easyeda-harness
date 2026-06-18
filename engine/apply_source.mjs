@@ -19,7 +19,7 @@ import { executeCode } from './bridge_client.mjs';
 const ROOT = (process.env.EASYEDA_WORKDIR || process.cwd()).replace(/\\/g, '/');
 
 // 解析源为记录数组(保序)。每行 `{head}||{data}|`。
-function parseSource(src) {
+export function parseSource(src) {
 	return String(src || '').split('\n').map((raw, i) => {
 		const s = raw.indexOf('||');
 		if (s < 0) return { raw, i, head: null, data: null };
@@ -57,7 +57,7 @@ function concatNamedPaths(wires) {
 	return result;
 }
 
-function buildSource(src, r, idByDes) {
+export function buildSource(src, r, idByDes) {
 	const recs = parseSource(src);
 	const placeBy = new Map(r.placements.map(p => [p.designator, p]));
 	const synthWires = concatNamedPaths(r.model.wires);
