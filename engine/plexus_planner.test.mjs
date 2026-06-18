@@ -81,3 +81,29 @@ test('planner:组装 model 过真实 geomQC/labelQC hard=0', () => {
 	const labelHard = labelQC(r.model).filter(f => f.severity === 'hard');
 	assert.deepEqual(labelHard, [], 'labelQC hard');
 });
+
+test('planner:分数 localBox 件 → 引脚仍全格对齐、offgrid=0', () => {
+	const fpassive = d => ({
+		designator: d,
+		pins: [{ num: '1', local: [-20, 0] }, { num: '2', local: [20, 0] }],
+		localBox: { minX: -10.5, minY: -5.5, maxX: 10.5, maxY: 5.5 },
+	});
+	const bd = new Map([['F1', fpassive('F1')], ['F2', fpassive('F2')], ['F3', fpassive('F3')], ['F4', fpassive('F4')]]);
+	const ct = {
+		schemaVersion: 1, grid: { colPitch: 10, rowPitch: 10 },
+		columns: [{ id: 'input', role: 'in', order: 0, modules: ['a', 'b'] }],
+		modules: [
+			{ id: 'a', role: 'support', column: 'input', parts: ['F1', 'F2'], region: { col: 0, row: 0, wCells: 3, hCells: 4 } },
+			{ id: 'b', role: 'support', column: 'input', parts: ['F3', 'F4'], region: { col: 0, row: 10, wCells: 3, hCells: 4 } },
+		],
+		labelColumns: [], meta: { controller: null, moduleCount: 2, columnCount: 1 },
+	};
+	const rr = planLayout({ contract: ct, byDes: bd });
+	for (const c of rr.model.components) {
+		for (const p of c.pins) {
+			assert.equal(p.x % 10, 0, `pin ${c.designator}.${p.num} x off-grid: ${p.x}`);
+			assert.equal(p.y % 10, 0, `pin ${c.designator}.${p.num} y off-grid: ${p.y}`);
+		}
+	}
+	assert.equal(geomQC(rr.model).offgrid, 0, 'offgrid');
+});

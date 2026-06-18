@@ -3,6 +3,8 @@ import { toWorld } from './transform.mjs';
 import { getArchetype } from '../circuit_packs/archetypes/registry.mjs';
 
 const DEF = { origin: { x: 1000, y: 1000 }, colWidth: 400, rowGap: 120 };
+const GRID = 10;
+const snapGrid = v => Math.round(v / GRID) * GRID;
 
 /* 由 place + 库件构造世界坐标元件(引脚 + bbox),等价 buildmodel 核心一步 */
 function worldComponent(part, place) {
@@ -93,7 +95,7 @@ export function planLayout({ contract, byDes, opts = {} } = {}) {
 			if (ep.top) nets.top = ep.top;
 			if (ep.bottom) nets.bottom = ep.bottom;
 
-			const cell = fn({ parts, anchor: { x: colX, y: cursorY }, nets });
+			const cell = fn({ parts, anchor: { x: colX, y: snapGrid(cursorY) }, nets });
 			const wcs = parts.map(p => worldComponent(p, cell.place[p.designator]));
 			cursorY = cellExtentMinY(wcs, cell) - o.rowGap;
 
