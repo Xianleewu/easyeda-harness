@@ -131,7 +131,7 @@ export function planLayout({ contract, byDes, logical, opts = {} } = {}) {
 			cursorY = cellExtentMinY(wcs, cell) - o.rowGap;
 			cComps.push(...wcs);
 			cWires.push(...(cell.wires || []));
-			cFlags.push(...(cell.flags || []));
+			cFlags.push(...(cell.flags || []).map(f => ({ ...f, module: m.id })));   // 打模块标签:供忠实度逐模块校验
 			cPlaced.push(m.id);
 			for (const c of wcs) { xMin = Math.min(xMin, c.bbox.minX); xMax = Math.max(xMax, c.bbox.maxX); }
 			for (const w of (cell.wires || [])) { const l = w.line || []; for (let i = 0; i < l.length; i += 2) { xMin = Math.min(xMin, l[i]); xMax = Math.max(xMax, l[i]); } }

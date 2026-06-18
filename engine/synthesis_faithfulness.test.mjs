@@ -96,6 +96,17 @@ test('忠实度:跨模块网某模块缺标签(标签数<模块数)→ 检出', 
 	assert.ok(f.some(x => x.severity === 'hard' && x.where.net === 'SIG'), '应检出 SIG 标签数<模块数');
 });
 
+test('忠实度:逐模块覆盖 — 同名标签全挤在一个模块、另一模块 0 个 → 检出(I3)', () => {
+	// 两模块都落地,SIG 共 2 个标签但都在 mA(mB 界面无标签)→ 计数=2≥模块数过不了关,
+	// 须按 flag.module 逐模块校验:mB 未产 SIG 标签 → 不可重连。
+	const logical = { nets: [{ name: 'SIG', class: 'signal', pins: ['R1.1', 'R2.1'] }] };
+	const contract = { modules: [{ id: 'mA', role: 'support', parts: ['R1'] }, { id: 'mB', role: 'support', parts: ['R2'] }] };
+	const model = { components: [{ designator: 'R1' }, { designator: 'R2' }], wires: [],
+		netflags: [{ kind: 'sig', net: 'SIG', module: 'mA' }, { kind: 'sig', net: 'SIG', module: 'mA' }] };
+	const f = synthesisFaithfulness({ logical, contract, model });
+	assert.ok(f.some(x => x.severity === 'hard' && x.where.net === 'SIG'), '应检出 mB 界面缺 SIG 标签');
+});
+
 test('忠实度:跨模块电源网某模块跳过 → 检出(电源/地也在口径)', () => {
 	const logical = { nets: [{ name: 'VBUS', class: 'power', pins: ['U1.1', 'J1.1'] }] };
 	const contract = { modules: [{ id: 'mA', role: 'controller', parts: ['U1'] }, { id: 'mB', role: 'connector', parts: ['J1'] }] };

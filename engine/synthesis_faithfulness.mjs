@@ -13,8 +13,8 @@
 // 每个模块脚各有一个符号才连得上)。真实 50/50 实测电源/地扩入零误报。
 // 范围之外(不误报):
 //   - 单模块网(脚全在同一契约模块):靠模块内物理线/同名标签,非跨模块重连范畴。
-//   残留限界:标签按网名计数,不验"逐标签确切附着到对应模块"(见 review I3;需 flat
-//   model 给标签打模块标签,属后续);"标签数≥模块数"是逐模块覆盖的必要条件。
+//   逐模块校验:planner 给每个 flag 打 `module` 标签 → 验"每个触及模块都产 ≥1 同名标签"
+//   (闭合 review I3)。手搭模型(flag 无 module)回退按"标签数≥模块数"。
 
 const refOfPin = p => p.slice(0, p.lastIndexOf('.'));
 
@@ -30,8 +30,15 @@ export function synthesisFaithfulness({ logical, contract, model } = {}) {
 		modPlaced.set(m.id, (m.parts || []).every(r => placed.has(r)));
 		for (const ref of (m.parts || [])) modOfRef.set(ref, m.id);
 	}
+	// 每网:总标签数 + 产标签的模块集(flag.module 由 planner 打标;无标签时回退按计数)。
 	const labelCount = new Map();
-	for (const f of (model.netflags || [])) if (f.net) labelCount.set(f.net, (labelCount.get(f.net) || 0) + 1);
+	const labelMods = new Map();
+	for (const f of (model.netflags || [])) {
+		if (!f.net) continue;
+		labelCount.set(f.net, (labelCount.get(f.net) || 0) + 1);
+		if (!labelMods.has(f.net)) labelMods.set(f.net, new Set());
+		if (f.module != null) labelMods.get(f.net).add(f.module);
+	}
 
 	const findings = [];
 	for (const net of logical.nets) {
@@ -49,13 +56,27 @@ export function synthesisFaithfulness({ logical, contract, model } = {}) {
 			});
 			continue;
 		}
-		const got = labelCount.get(net.name) || 0;
-		if (got < mods.size) {
-			findings.push({
-				rule: 'F1-cross-module-unreconnectable', severity: 'hard', category: 'faithfulness',
-				msg: `跨模块网 ${net.name}(${net.class}) 落在 ${mods.size} 模块,输出仅 ${got} 标签/符号(<模块数,某界面缺标签无法逐模块重连)`,
-				where: { net: net.name, class: net.class, modules: mods.size, labels: got },
-			});
+		const emit = labelMods.get(net.name) || new Set();
+		if (emit.size > 0) {
+			// flag 已打模块标签 → 逐模块精确校验:每个触及模块都须产 ≥1 同名标签(闭合 review I3)。
+			const unlabeled = [...mods].filter(m => !emit.has(m));
+			if (unlabeled.length) {
+				findings.push({
+					rule: 'F1-cross-module-unreconnectable', severity: 'hard', category: 'faithfulness',
+					msg: `跨模块网 ${net.name}(${net.class}) 模块界面 ${unlabeled.join(',')} 缺同名标签 → 无法逐模块重连`,
+					where: { net: net.name, class: net.class, modules: mods.size, unlabeled },
+				});
+			}
+		} else {
+			// 未打模块标签(手搭模型)→ 回退:标签/符号总数须 ≥ 模块数(逐模块覆盖的必要条件)。
+			const got = labelCount.get(net.name) || 0;
+			if (got < mods.size) {
+				findings.push({
+					rule: 'F1-cross-module-unreconnectable', severity: 'hard', category: 'faithfulness',
+					msg: `跨模块网 ${net.name}(${net.class}) 落在 ${mods.size} 模块,输出仅 ${got} 标签/符号(<模块数,某界面缺标签无法逐模块重连)`,
+					where: { net: net.name, class: net.class, modules: mods.size, labels: got },
+				});
+			}
 		}
 	}
 	return findings;
