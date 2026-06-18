@@ -2,6 +2,12 @@
 // 而是改 EDA 文档源(setDocumentSource)——改 COMPONENT 位 + 复用现有 WIRE 组改/加 LINE 到
 // 合成几何 + 改 Name ATTR,原子加载、零合并 → faithful live 投递。
 // 实验确证:setDocumentSource 接受「改现有记录」「给现有组加 LINE」,拒「加顶层 WIRE」;源 y 取负。
+//
+// ⚠️ 工作流约束(重要):本工具只在「自然源」(create 路径产生的源)上生效。setDocumentSource
+//    每次往返会归一化源,我的 re-emit 不再匹配归一化格式 → setDocumentSource ok 却静默整体回退。
+//    可靠用法:先 `node engine/plexus_apply_live.mjs --undo`(create 重建自然源)再跑本工具。
+//    还原:`--undo` 即可(create 路径重建原图)。实测成果:画布 1232×909→3076×2291(紧凑 1.34
+//    =美观)、extract floating 45 ≈ 原图 42(create 式 72-92)= 电气近乎等价(自洽)。
 import { readFileSync } from 'node:fs';
 import { extractLogical } from './schematic_extract.mjs';
 import { inferRoles } from './role_infer.mjs';
@@ -103,7 +109,8 @@ function buildSource(src, r, idByDes) {
 			}
 		}
 		for (let s = segCount; s < g.lineRecs.length; s++) drop.add(g.lineRecs[s].i);   // 多余段删
-		// Name attr:命名线设 value=net;无名线清空。
+		// Name attr:命名线设 value=net(连通靠同名)。无 Name attr 的组暂不补(批量加 ATTR 会破坏
+		// setDocumentSource 一致性致整体回退;单条可行,批量待查)→ 这些线靠几何 + 网标连通。
 		if (g.nameAttr) { g.nameAttr.data.value = w.net || ''; dirty.add(g.nameAttr); }
 	}
 	// 4) 多余的 WIRE 组(synth 不足时)→ 删其 wire+line+name。
