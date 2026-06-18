@@ -67,3 +67,14 @@ test('densefanout:冒烟 — 密脚 IC 过真实 geomQC/labelQC hard=0(平面无
 	const labelHard = labelQC(model).filter(f => f.severity === 'hard');
 	assert.deepEqual(labelHard, [], 'labelQC hard');
 });
+
+test('densefanout:宽标签名也过门(标签列让开通道,无 L4)', () => {
+	const part = denseIC('U7');
+	const wide = {};
+	part.pins.forEach(p => { wide[p.num] = { name: 'I2S_SPK_BCLK_' + p.num, class: 'signal' }; });
+	const c = densefanoutArchetype({ parts: [part], anchor, nets: { pinNets: wide } });
+	const model = { components: [worldComponent(part, c.place.U7)], wires: c.wires, netflags: c.flags };
+	const g = geomQC(model);
+	assert.equal(g.overlaps.length + g.wireThruComp.length + g.offgrid + g.crossings, 0, 'geom clean');
+	assert.deepEqual(labelQC(model).filter(f => f.severity === 'hard'), [], 'labelQC hard');
+});

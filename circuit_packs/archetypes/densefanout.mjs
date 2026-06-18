@@ -21,8 +21,11 @@ function routeSide(sidePins, side) {
 		? Math.max(...pins.map(p => p.world[0]))
 		: Math.min(...pins.map(p => p.world[0]));
 	const channelX = i => snap10(pinEdge) + dir * (N - i) * CH_STEP; // 顶脚 i=0 最外
-	const labelX = snap10(pinEdge) + dir * ((N + 1) * CH_STEP + LABEL_GAP);
-	let prevRow = side === 'right' ? Infinity : Infinity;
+	const labelLen = name => Math.max(40, String(name).length * 6 + 18);
+	const maxLen = Math.max(...pins.map(p => labelLen(p.net.name)));
+	const outerCh = snap10(pinEdge) + dir * N * CH_STEP;          // 最外通道
+	const labelX = snap10(outerCh + dir * (maxLen + LABEL_GAP));  // 标签列让开最宽标签框(否则标签压通道竖直段=L4)
+	let prevRow = Infinity;
 	const rows = [];
 	for (let i = 0; i < N; i++) {
 		const py = pins[i].world[1];
