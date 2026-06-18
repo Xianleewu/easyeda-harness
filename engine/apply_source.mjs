@@ -113,7 +113,26 @@ function buildSource(src, r, idByDes) {
 		// setDocumentSource 一致性致整体回退;单条可行,批量待查)→ 这些线靠几何 + 网标连通。
 		if (g.nameAttr) { g.nameAttr.data.value = w.net || ''; dirty.add(g.nameAttr); }
 	}
-	// 4) 多余的 WIRE 组(synth 不足时)→ 删其 wire+line+name。
+	// 4a) 槽不够时,把溢出合成线的段并入同网的现有组(WIRE 组=一个网,同网段共网→脚连通,
+	//     不占新槽)。实测溢出 4 条全是电源/地(GND/+5V/VCC_3V3),都有同网组可并 → 达 floating 42。
+	const netToGroup = new Map();
+	for (let i = 0; i < cap; i++) { const n = synthWires[i].net; if (n && !netToGroup.has(n)) netToGroup.set(n, groupIds[i]); }
+	let packed = 0;
+	for (let i = cap; i < synthWires.length; i++) {
+		const w = synthWires[i]; const gid = netToGroup.get(w.net); if (!gid) continue;
+		const g = groups.get(gid);
+		const pts = []; for (let k = 0; k + 1 < w.line.length; k += 2) pts.push([w.line[k], -w.line[k + 1]]);
+		for (let s = 0; s < pts.length - 1; s++) {
+			const [sx, sy] = pts[s], [ex, ey] = pts[s + 1];
+			const nl = emit({ type: 'LINE', ticket: 900500 + hexCtr, id: hexId() },
+				{ fillColor: null, fillStyle: null, strokeColor: null, strokeStyle: null, strokeWidth: null, startX: sx, startY: sy, endX: ex, endY: ey, lineGroup: gid });
+			const anchor = g.lineRecs[g.lineRecs.length - 1] || g.wireRec;
+			if (!addAfter.has(anchor.i)) addAfter.set(anchor.i, []);
+			addAfter.get(anchor.i).push(nl);
+		}
+		packed++;
+	}
+	// 4b) 多余的 WIRE 组(synth 不足时)→ 删其 wire+line+name。
 	for (let i = cap; i < groupIds.length; i++) {
 		const g = groups.get(groupIds[i]);
 		drop.add(g.wireRec.i); for (const lr of g.lineRecs) drop.add(lr.i); if (g.nameAttr) drop.add(g.nameAttr.i);
