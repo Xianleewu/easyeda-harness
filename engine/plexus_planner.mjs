@@ -69,10 +69,23 @@ export function planLayout({ contract, byDes, logical, opts = {} } = {}) {
 	const wires = [];
 	const netflags = [];
 
+	// 每列先在 x=0 临时渲染,量真实 x 跨度(含标签框宽),再整列左缘紧排(自适应列宽,替代固定 colWidth)。
+	const COL_GAP = 120;
+	const labelLen = f => Math.max(40, String(f.net || '').length * 6 + 18);
+	const labelLo = f => { const fx = f.textX ?? f.x; return (f.alignMode === 6 || f.alignMode === 7) ? fx : fx - labelLen(f); };
+	const labelHi = f => { const fx = f.textX ?? f.x; return (f.alignMode === 6 || f.alignMode === 7) ? fx + labelLen(f) : fx; };
+	const shiftX = (dx, comps, ws, fs) => {
+		for (const c of comps) { c.bbox.minX += dx; c.bbox.maxX += dx; for (const p of c.pins) p.x += dx; }
+		for (const w of ws) { const l = w.line || []; for (let i = 0; i < l.length; i += 2) l[i] += dx; }
+		for (const f of fs) { f.x += dx; if (f.textX != null) f.textX += dx; }
+	};
+
+	let runningX = o.origin.x;
 	for (const col of [...cols.keys()].sort((a, b) => a - b)) {
 		const mods = cols.get(col).slice().sort((a, b) => a.region.row - b.region.row);
-		const colX = o.origin.x + col * o.colWidth;
+		const cComps = [], cWires = [], cFlags = [], cPlaced = [];
 		let cursorY = o.origin.y;
+		let xMin = Infinity, xMax = -Infinity;
 		for (const m of mods) {
 			const parts = [];
 			let missing = false;
@@ -100,7 +113,7 @@ export function planLayout({ contract, byDes, logical, opts = {} } = {}) {
 				if (!nets.top && sep.top) nets.top = sep.top;
 				if (!nets.bottom && sep.bottom) nets.bottom = sep.bottom;
 			}
-			const anchorPt = { x: colX, y: snapGrid(cursorY) };
+			const anchorPt = { x: 0, y: snapGrid(cursorY) };   // 临时 x=0,整列后偏移
 			let cell = null;
 			if (fn) {
 				try { cell = fn({ parts, anchor: anchorPt, nets }); } catch { cell = null; }
@@ -116,12 +129,22 @@ export function planLayout({ contract, byDes, logical, opts = {} } = {}) {
 			}
 			const wcs = parts.map(p => worldComponent(p, cell.place[p.designator]));
 			cursorY = cellExtentMinY(wcs, cell) - o.rowGap;
-
-			components.push(...wcs);
-			wires.push(...(cell.wires || []));
-			netflags.push(...(cell.flags || []));
-			placed.push(m.id);
+			cComps.push(...wcs);
+			cWires.push(...(cell.wires || []));
+			cFlags.push(...(cell.flags || []));
+			cPlaced.push(m.id);
+			for (const c of wcs) { xMin = Math.min(xMin, c.bbox.minX); xMax = Math.max(xMax, c.bbox.maxX); }
+			for (const w of (cell.wires || [])) { const l = w.line || []; for (let i = 0; i < l.length; i += 2) { xMin = Math.min(xMin, l[i]); xMax = Math.max(xMax, l[i]); } }
+			for (const f of (cell.flags || [])) { xMin = Math.min(xMin, labelLo(f)); xMax = Math.max(xMax, labelHi(f)); }
 		}
+		if (!cPlaced.length) continue;
+		const dx = snapGrid(runningX - xMin);   // 整列左缘对齐到 runningX(snap 保格)
+		shiftX(dx, cComps, cWires, cFlags);
+		components.push(...cComps);
+		wires.push(...cWires);
+		netflags.push(...cFlags);
+		placed.push(...cPlaced);
+		runningX += (xMax - xMin) + COL_GAP;
 	}
 
 	return { model: { components, wires, netflags }, placed, skipped };
