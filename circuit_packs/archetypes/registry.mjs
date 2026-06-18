@@ -1,12 +1,16 @@
 // 角色原型注册表:role -> 原型 fn;renderArchetype 薄分发。
 import { supportArchetype } from './support.mjs';
 import { fanoutArchetype } from './fanout.mjs';
+import { densefanoutArchetype } from './densefanout.mjs';
 
 const ARCHETYPES = {
 	support: supportArchetype,
 	indicator: supportArchetype,
 	input: supportArchetype,
 	connector: fanoutArchetype,
+	controller: densefanoutArchetype,
+	ic: densefanoutArchetype,
+	regulator: densefanoutArchetype,
 };
 
 export function getArchetype(role) {

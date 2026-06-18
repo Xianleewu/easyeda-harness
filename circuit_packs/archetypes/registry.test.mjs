@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import { getArchetype, renderArchetype } from './registry.mjs';
 import { supportArchetype } from './support.mjs';
 import { fanoutArchetype } from './fanout.mjs';
+import { densefanoutArchetype } from './densefanout.mjs';
 
 const passive = d => ({
 	designator: d,
@@ -33,4 +34,10 @@ test('registry:getArchetype(connector) 返回 fanoutArchetype', () => {
 test('registry:getArchetype(indicator/input) 返回 supportArchetype', () => {
 	assert.equal(getArchetype('indicator'), supportArchetype);
 	assert.equal(getArchetype('input'), supportArchetype);
+});
+
+test('registry:getArchetype(controller/ic/regulator) 返回 densefanoutArchetype', () => {
+	assert.equal(getArchetype('controller'), densefanoutArchetype);
+	assert.equal(getArchetype('ic'), densefanoutArchetype);
+	assert.equal(getArchetype('regulator'), densefanoutArchetype);
 });
