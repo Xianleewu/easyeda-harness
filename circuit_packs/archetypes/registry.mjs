@@ -5,7 +5,7 @@ import { densefanoutArchetype } from './densefanout.mjs';
 
 const ARCHETYPES = {
 	support: supportArchetype,
-	indicator: supportArchetype,
+	indicator: fanoutArchetype,
 	input: supportArchetype,
 	connector: fanoutArchetype,
 	controller: densefanoutArchetype,
