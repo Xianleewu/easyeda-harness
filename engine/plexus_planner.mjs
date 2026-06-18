@@ -68,6 +68,7 @@ export function planLayout({ contract, byDes, logical, opts = {} } = {}) {
 	const components = [];
 	const wires = [];
 	const netflags = [];
+	const placements = [];   // 每器件最终世界摆位 {designator,x,y,rot,mirror}(供就地写回移器件)
 
 	// 每列先在 x=0 临时渲染,量真实 x 跨度(含标签框宽),再整列左缘紧排(自适应列宽,替代固定 colWidth)。
 	const COL_GAP = 120;
@@ -81,11 +82,24 @@ export function planLayout({ contract, byDes, logical, opts = {} } = {}) {
 	};
 
 	let runningX = o.origin.x;
+	const MAX_COL_H = Number.isFinite(o.maxColHeight) ? o.maxColHeight : 2200;   // 子列最大高,超则折行成 2D 块(紧凑布局,避免细高条)
 	for (const col of [...cols.keys()].sort((a, b) => a - b)) {
 		const mods = cols.get(col).slice().sort((a, b) => a.region.row - b.region.row);
-		const cComps = [], cWires = [], cFlags = [], cPlaced = [];
+		// 子列累加器:超过 MAX_COL_H 就 flush 落盘并右移,角色列折成多子列。
+		let cComps = [], cWires = [], cFlags = [], cPlaced = [], cPlace = [];
 		let cursorY = o.origin.y;
 		let xMin = Infinity, xMax = -Infinity;
+		const flush = () => {
+			if (!cPlaced.length) return;
+			const dx = snapGrid(runningX - xMin);
+			shiftX(dx, cComps, cWires, cFlags);
+			for (const pl of cPlace) pl.x += dx;
+			components.push(...cComps); wires.push(...cWires); netflags.push(...cFlags);
+			placements.push(...cPlace); placed.push(...cPlaced);
+			runningX += (xMax - xMin) + COL_GAP;
+			cComps = []; cWires = []; cFlags = []; cPlaced = []; cPlace = [];
+			cursorY = o.origin.y; xMin = Infinity; xMax = -Infinity;
+		};
 		for (const m of mods) {
 			const parts = [];
 			let missing = false;
@@ -98,6 +112,8 @@ export function planLayout({ contract, byDes, logical, opts = {} } = {}) {
 				skipped.push({ module: m.id, reason: 'missing-parts' });
 				continue;
 			}
+			// 折行:子列已有内容且当前游标已超过最大高 → 先 flush,本模块落到新子列顶部。
+			if (cPlaced.length && (o.origin.y - cursorY) > MAX_COL_H) flush();
 			// 先试角色原型(support 处理多件链、fanout/dense 处理单件);抛错且多件 → 回退 multipart。
 			let fn = null;
 			try { fn = getArchetype(m.role); } catch { fn = null; }
@@ -129,6 +145,7 @@ export function planLayout({ contract, byDes, logical, opts = {} } = {}) {
 				continue;
 			}
 			const wcs = parts.map(p => worldComponent(p, cell.place[p.designator]));
+			for (const p of parts) { const pl = cell.place[p.designator]; cPlace.push({ designator: p.designator, x: pl.x, y: pl.y, rot: pl.rot || 0, mirror: !!pl.mirror }); }
 			cursorY = cellExtentMinY(wcs, cell) - o.rowGap;
 			cComps.push(...wcs);
 			cWires.push(...(cell.wires || []));
@@ -138,17 +155,10 @@ export function planLayout({ contract, byDes, logical, opts = {} } = {}) {
 			for (const w of (cell.wires || [])) { const l = w.line || []; for (let i = 0; i < l.length; i += 2) { xMin = Math.min(xMin, l[i]); xMax = Math.max(xMax, l[i]); } }
 			for (const f of (cell.flags || [])) { xMin = Math.min(xMin, labelLo(f)); xMax = Math.max(xMax, labelHi(f)); }
 		}
-		if (!cPlaced.length) continue;
-		const dx = snapGrid(runningX - xMin);   // 整列左缘对齐到 runningX(snap 保格)
-		shiftX(dx, cComps, cWires, cFlags);
-		components.push(...cComps);
-		wires.push(...cWires);
-		netflags.push(...cFlags);
-		placed.push(...cPlaced);
-		runningX += (xMax - xMin) + COL_GAP;
+		flush();   // 列尾:落盘最后一个子列
 	}
 
 	// 装配后消解跨模块同名网标的 L10 碰撞(门精确、只接受严格改善;无碰撞则原样)。
 	const model = resolveLabelCollisions({ components, wires, netflags });
-	return { model, placed, skipped };
+	return { model, placed, skipped, placements };
 }
