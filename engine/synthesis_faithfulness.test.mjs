@@ -77,6 +77,25 @@ test('忠实度:单脚网/模块内网不误报(范围外)', () => {
 	assert.deepEqual(synthesisFaithfulness({ logical, contract, model }), []);
 });
 
+test('忠实度:跨模块网触及的模块被跳过(连通丢失)→ 检出', () => {
+	// planner 跳过 mB(R2 不在 model.components)→ SIG 跨模块连通断,只剩 1 标签。
+	// 旧实现按 placed 界定跨度 → 塌缩成单端静默通过(fail-open);应改按 contract 成员检出。
+	const logical = { nets: [{ name: 'SIG', class: 'signal', pins: ['R1.1', 'R2.1'] }] };
+	const contract = { modules: [{ id: 'mA', role: 'support', parts: ['R1'] }, { id: 'mB', role: 'support', parts: ['R2'] }] };
+	const model = { components: [{ designator: 'R1' }], wires: [], netflags: [{ kind: 'sig', net: 'SIG' }] };
+	const f = synthesisFaithfulness({ logical, contract, model });
+	assert.ok(f.some(x => x.severity === 'hard' && x.where.net === 'SIG'), '应检出 SIG 因模块跳过而连通丢失');
+});
+
+test('忠实度:跨模块网某模块缺标签(标签数<模块数)→ 检出', () => {
+	// 两模块都落地,但只产 1 个 SIG 标签(应 ≥2,逐模块各一)→ 不可逐模块重连。
+	const logical = { nets: [{ name: 'SIG', class: 'signal', pins: ['R1.1', 'R2.1'] }] };
+	const contract = { modules: [{ id: 'mA', role: 'support', parts: ['R1'] }, { id: 'mB', role: 'support', parts: ['R2'] }] };
+	const model = { components: [{ designator: 'R1' }, { designator: 'R2' }], wires: [], netflags: [{ kind: 'sig', net: 'SIG' }] };
+	const f = synthesisFaithfulness({ logical, contract, model });
+	assert.ok(f.some(x => x.severity === 'hard' && x.where.net === 'SIG'), '应检出 SIG 标签数<模块数');
+});
+
 test('忠实度:缺参数抛错', () => {
 	assert.throws(() => synthesisFaithfulness({}));
 	assert.throws(() => synthesisFaithfulness({ logical: {}, contract: {} }));
