@@ -2,6 +2,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { planLayout, cellExtentMinY } from './plexus_planner.mjs';
+import { geomQC } from './geom_qc.mjs';
+import { labelQC } from './label_qc.mjs';
 
 const passive = d => ({
 	designator: d,
@@ -68,4 +70,14 @@ test('planner:负例(畸形 contract / byDes 非 Map)抛错', () => {
 
 test('planner:cellExtentMinY 空几何抛错', () => {
 	assert.throws(() => cellExtentMinY([], { wires: [], flags: [] }));
+});
+
+test('planner:组装 model 过真实 geomQC/labelQC hard=0', () => {
+	const g = geomQC(r.model);
+	assert.equal(g.overlaps.length, 0, 'overlaps');
+	assert.equal(g.wireThruComp.length, 0, 'wireThruComp');
+	assert.equal(g.offgrid, 0, 'offgrid');
+	assert.equal(g.crossings, 0, 'crossings');
+	const labelHard = labelQC(r.model).filter(f => f.severity === 'hard');
+	assert.deepEqual(labelHard, [], 'labelQC hard');
 });
