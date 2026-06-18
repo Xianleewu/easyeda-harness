@@ -35,17 +35,46 @@ async function liveSnapshot() {
 	return result;
 }
 
+// 网名传播:EDA 合并共线线段,若命名 stub 与无名逃逸线共线合并、结果取无名 → 丢连通。
+// 预先让同一几何连通簇的所有无名线都带该网名,合并后仍是该网 → 连通稳。命名线不显示符号。
+function propagateNets(wires) {
+	const key = (x, y) => Math.round(x) + ',' + Math.round(y);
+	const par = new Map();
+	const find = x => { if (!par.has(x)) par.set(x, x); let r = x; while (par.get(r) !== r) r = par.get(r); while (par.get(x) !== r) { const n = par.get(x); par.set(x, r); x = n; } return r; };
+	const uni = (a, b) => par.set(find(a), find(b));
+	for (const w of wires) { const l = w.line || []; const pts = []; for (let i = 0; i < l.length; i += 2) pts.push(key(l[i], l[i + 1])); for (let i = 1; i < pts.length; i++) uni(pts[i - 1], pts[i]); }
+	const clusterNet = new Map();
+	for (const w of wires) { if (!w.net) continue; const l = w.line; if (l.length < 2) continue; const r = find(key(l[0], l[1])); if (!clusterNet.has(r)) clusterNet.set(r, w.net); }
+	return wires.map(w => {
+		if (w.net) return w;
+		const l = w.line; if (l.length < 2) return w;
+		const net = clusterNet.get(find(key(l[0], l[1])));
+		return net ? { ...w, net } : w;
+	});
+}
+
 // 分批执行一串 op 脚本片段(每片返回 {ids?} 可选)。ops 为字符串数组(EDA 端代码)。
+const batchScript = chunk => `let n=0; const ids=[];\n${chunk.join('\n')}\nreturn { n, ids };`;
+
 async function runOps(label, ops) {
-	let done = 0, failed = 0;
+	let done = 0;
+	let failedChunks = [];
 	for (let i = 0; i < ops.length; i += BATCH) {
 		const chunk = ops.slice(i, i + BATCH);
-		const script = `let n=0; const ids=[];\n${chunk.join('\n')}\nreturn { n, ids };`;
-		const r = await execRetry(script);
-		if (r && r.result) done += r.result.n; else failed += chunk.length;
+		const r = await execRetry(batchScript(chunk));
+		if (r && r.result) done += r.result.n; else failedChunks.push(chunk);
 		await sleep(350);
 	}
-	console.log(`  ${label}: ${done}/${ops.length}${failed ? ` (失败跳过 ${failed})` : ''}`);
+	// 第二/三遍:只重试失败批(填补缺口、不产重复),给 EDA 重连时间。
+	for (let pass = 0; pass < 3 && failedChunks.length; pass++) {
+		const retry = failedChunks; failedChunks = [];
+		for (const chunk of retry) {
+			await sleep(2500);
+			const r = await execRetry(batchScript(chunk));
+			if (r && r.result) done += r.result.n; else failedChunks.push(chunk);
+		}
+	}
+	console.log(`  ${label}: ${done}/${ops.length}${failedChunks.length ? ` (仍失败 ${failedChunks.length * BATCH})` : ' ✓'}`);
 	return done;
 }
 
