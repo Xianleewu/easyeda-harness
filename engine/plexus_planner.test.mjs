@@ -144,3 +144,30 @@ test('planner:单件 connector + logical → 扇出有线有标;不传 logical �
 	const noLog = planLayout({ contract: ct, byDes: bd });
 	assert.equal(noLog.model.wires.length, 0, 'no wires without logical (backward compat)');
 });
+
+test('planner:单件 support + logical → 出电源/地桩;不传则裸件', () => {
+	const cap = {
+		designator: 'C1',
+		pins: [{ num: '1', local: [-20, 0] }, { num: '2', local: [20, 0] }],
+		localBox: { minX: -10, minY: -5, maxX: 10, maxY: 5 },
+	};
+	const bd = new Map([['C1', cap]]);
+	const ct = {
+		schemaVersion: 1, grid: { colPitch: 10, rowPitch: 10 },
+		columns: [{ id: 'input', role: 'in', order: 0, modules: ['s'] }],
+		modules: [{ id: 's', role: 'support', column: 'input', parts: ['C1'], region: { col: 0, row: 0, wCells: 3, hCells: 3 } }],
+		labelColumns: [], meta: { controller: null, moduleCount: 1, columnCount: 1 },
+	};
+	const lg = { nets: [
+		{ name: 'V5', class: 'power', pins: ['C1.2'] },
+		{ name: 'GND', class: 'ground', pins: ['C1.1'] },
+	] };
+	const withLog = planLayout({ contract: ct, byDes: bd, logical: lg });
+	assert.ok(withLog.model.wires.length > 0, 'wires with logical');
+	assert.ok(withLog.model.netflags.length > 0, 'flags with logical');
+	const g = geomQC(withLog.model);
+	assert.equal(g.overlaps.length + g.wireThruComp.length + g.offgrid + g.crossings, 0, 'geom clean');
+
+	const noLog = planLayout({ contract: ct, byDes: bd });
+	assert.equal(noLog.model.wires.length, 0, 'no wires without logical (backward compat)');
+});
