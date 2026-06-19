@@ -2,6 +2,8 @@ node_modules/
 
 # Generated schematic outputs
 full_model.json
+apply_source_report.json
+live_clean.json
 report.json
 loop_report.json
 layout_planner_report.json
