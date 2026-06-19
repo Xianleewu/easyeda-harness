@@ -72,6 +72,11 @@ test('fanout 属性:300 随机连接器 — 出图者全门 0,过密者 fail-clo
 		assert.equal(g.wireThruComp.length, 0, `${ctx} wireThruComp ${g.wireThruComp.join(' ')}`);
 		assert.equal(g.overlaps.length, 0, `${ctx} overlaps ${g.overlaps.join(' ')}`);
 		assert.equal(g.offgrid, 0, `${ctx} offgrid ${g.offEx.join(' ')}`);
+		// escX snap 修复:合成线/标签坐标须全落 5 栅(不对称体的 minX/maxX 半单位不得泄漏到标签位)。
+		const off5 = [];
+		for (const w of cell.wires) for (const v of w.line) if (v % 5) off5.push(v);
+		for (const f of cell.flags) { if (f.x % 5) off5.push(f.x); if (f.y % 5) off5.push(f.y); }
+		assert.equal(off5.length, 0, `${ctx} 半单位坐标 ${off5.slice(0, 4).join(' ')}`);
 		assert.equal(labelQC(model).filter(f => f.severity === 'hard').length, 0, `${ctx} labelHard`);
 		rendered++;
 	}

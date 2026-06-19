@@ -9,13 +9,17 @@ const labelLen = name => Math.max(40, String(name).length * 6 + 18);
 
 // sig 标签列 x:右向文字(alignMode8)反向左生长、左向(6)右生长,宽名会压回器件体(L2/L6)。
 // 按标签宽外推 escX,确保文字框清开体边 ≥LABEL_KEEP(同 densefanout 的宽名处理),让宽名也能渲染。
+// escX 朝「远离体」方向 snap 到 5 栅(器件原生栅):消除不对称体 minX/maxX 的半单位泄漏到标签位,
+// 让合成标签/线全落 5 栅(与脚一致),snap 方向保证净空不减(左向下取、右向上取)。
+const q5floor = x => Math.floor(x / 5) * 5;
+const q5ceil = x => Math.ceil(x / 5) * 5;
 function sigEscX(world, side, name, body) {
 	if (side === 'right') {
 		const need = body ? body.maxX + LABEL_KEEP + labelLen(name) : -Infinity;
-		return Math.max(world[0] + 30, need);
+		return q5ceil(Math.max(world[0] + 30, need));
 	}
 	const need = body ? body.minX - LABEL_KEEP - labelLen(name) : Infinity;
-	return Math.min(world[0] - 30, need);
+	return q5floor(Math.min(world[0] - 30, need));
 }
 
 export function fanoutArchetype(spec = {}) {
