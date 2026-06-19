@@ -107,8 +107,9 @@ export async function elkLayout({ snapshot, logical, byDes, elk = new ELK(), lay
 	for (const c of res.children) {
 		const m = meta.get(c.id);
 		const nx = snap(c.x), ny = snap(c.y);
-		const cMinX = nx + m.pad.left, cTopElk = ny + m.pad.top;
-		const cMaxX = cMinX + m.compW, cBotElk = cTopElk + m.compH;
+		// 件体边 snap 到栅,与【已 snap 的引脚位】一致(否则边脚落在体框内 2~5 格 → 标签桩擦体 wtc)。
+		const cMinX = snap(nx + m.pad.left), cTopElk = snap(ny + m.pad.top);
+		const cMaxX = snap(nx + m.pad.left + m.compW), cBotElk = snap(ny + m.pad.top + m.compH);
 		const pins = [];
 		for (const pt of (c.ports || [])) {
 			const px = snap(nx + (pt.x || 0)), py = snap(ny + (pt.y || 0));
