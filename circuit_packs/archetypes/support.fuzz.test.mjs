@@ -44,6 +44,7 @@ test('support 属性:240 随机串全部满足几何/标签不变量', () => {
 		const ctx = `cfg#${i} parts=${parts.length}`;
 		assert.equal(g.crossings, 0, `${ctx} crossings=${g.crossings} ${g.crossEx.join(' ')}`);
 		assert.equal(g.wireThruPin.length, 0, `${ctx} wireThruPin ${g.wireThruPin.join(' ')}`);
+		assert.equal(g.collinear, 0, `${ctx} collinear ${g.collEx.join(' ')}`);
 		assert.equal(g.wireThruComp.length, 0, `${ctx} wireThruComp ${g.wireThruComp.join(' ')}`);
 		assert.equal(g.overlaps.length, 0, `${ctx} overlaps ${g.overlaps.join(' ')}`);
 		assert.equal(g.offgrid, 0, `${ctx} offgrid=${g.offgrid} ${g.offEx.join(' ')}`);

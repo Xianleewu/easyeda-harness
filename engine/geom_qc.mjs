@@ -61,7 +61,26 @@ export function geomQC(model, opt = {}) {
 		if (vx > hx0 && vx < hx1 && hy > vy0 && hy < vy1 && (h.net || '') !== (v.net || '')) { crossings++; if (crossEx.length < 8) crossEx.push(`${h.net}x${v.net}@(${vx},${hy})`); }
 	}
 
-	return { overlaps, wireThruComp, wireThruPin, offgrid, offEx, crossings, crossEx };
+	// 5) 共线异网重叠（两段同 y/同 x、范围内部重叠、异网 = 电气短路；上面的正交点相交检测漏掉这类）
+	let collinear = 0; const collEx = [];
+	const Hs = segs.filter(s => s.a[1] === s.b[1] && s.net);
+	const Vs = segs.filter(s => s.a[0] === s.b[0] && s.net);
+	const rng = (s, ax) => [Math.min(s.a[ax], s.b[ax]), Math.max(s.a[ax], s.b[ax])];
+	const checkColl = (arr, lineAx, rngAx) => {
+		for (let i = 0; i < arr.length; i++) for (let j = i + 1; j < arr.length; j++) {
+			const s = arr[i], t = arr[j];
+			if (s.a[lineAx] !== t.a[lineAx]) continue;            // 不同线坐标
+			if ((s.net || '') === (t.net || '')) continue;        // 同网不是短路
+			const [s0, s1] = rng(s, rngAx), [t0, t1] = rng(t, rngAx);
+			if (Math.max(s0, t0) < Math.min(s1, t1)) {            // 内部重叠（严格,端点相贴不算）
+				collinear++; if (collEx.length < 8) collEx.push(`${s.net}|${t.net}@${lineAx === 1 ? 'y' : 'x'}=${s.a[lineAx]}`);
+			}
+		}
+	};
+	checkColl(Hs, 1, 0);   // 水平段:同 y(轴1)、比 x 范围(轴0)
+	checkColl(Vs, 0, 1);   // 竖直段:同 x(轴0)、比 y 范围(轴1)
+
+	return { overlaps, wireThruComp, wireThruPin, offgrid, offEx, crossings, crossEx, collinear, collEx };
 }
 
 if (process.argv[1] && process.argv[1].endsWith('geom_qc.mjs') && process.argv[2]) {

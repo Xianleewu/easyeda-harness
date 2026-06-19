@@ -38,10 +38,35 @@ test('wireThruPin:线不经过任何引脚 → 不报', () => {
 	assert.equal(r.wireThruPin.length, 0);
 });
 
-test('回归:既有字段仍在(overlaps/wireThruComp/crossings)', () => {
+test('collinear:两段同 y 异网、x 范围内部重叠 → 报短路(正交点相交检测漏的这类)', () => {
+	const r = geomQC({ components: [], netflags: [], wires: [
+		{ net: 'NETA', line: [0, 100, 50, 100] },
+		{ net: 'NETB', line: [30, 100, 80, 100] },   // 与 NETA 在 [30..50] 共线重叠
+	] });
+	assert.equal(r.collinear, 1, '一处共线异网短路');
+	assert.ok(r.collEx[0].includes('y=100'));
+});
+
+test('collinear:竖直同 x 异网重叠 → 报;同网重叠 / 端点相贴 → 不报', () => {
+	const vert = geomQC({ components: [], netflags: [], wires: [
+		{ net: 'A', line: [100, 0, 100, 50] }, { net: 'B', line: [100, 30, 100, 80] },
+	] });
+	assert.equal(vert.collinear, 1, '竖直异网重叠=短路');
+	const same = geomQC({ components: [], netflags: [], wires: [
+		{ net: 'A', line: [0, 100, 50, 100] }, { net: 'A', line: [30, 100, 80, 100] },
+	] });
+	assert.equal(same.collinear, 0, '同网重叠不是短路');
+	const touch = geomQC({ components: [], netflags: [], wires: [
+		{ net: 'A', line: [0, 100, 50, 100] }, { net: 'B', line: [50, 100, 80, 100] },
+	] });
+	assert.equal(touch.collinear, 0, '端点相贴不算重叠');
+});
+
+test('回归:既有字段仍在(overlaps/wireThruComp/crossings/collinear)', () => {
 	const r = geomQC({ components: [], wires: [], netflags: [] });
 	assert.deepEqual(r.overlaps, []);
 	assert.deepEqual(r.wireThruComp, []);
 	assert.equal(r.crossings, 0);
 	assert.deepEqual(r.wireThruPin, []);
+	assert.equal(r.collinear, 0);
 });
