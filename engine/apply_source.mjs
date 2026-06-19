@@ -168,7 +168,7 @@ export function buildSource(src, r, idByDes) {
 }
 
 // 投递一次:取源 → 变换 → setDocumentSource → 自检。返回是否生效。
-async function deliverOnce(r, idByDes) {
+export async function deliverOnce(r, idByDes) {
 	const { result: src } = await executeCode('return await eda.sys_FileManager.getDocumentSource();', { timeoutMs: 60000 });
 	const { newSrc, delivered, synthWireCount, groupCount, packed, missingDes, expectedLines } = buildSource(src, r, idByDes);
 	console.log(`源式投递:合成线=${synthWireCount} 现有组=${groupCount} 投递=${delivered}+并组${packed}（封顶 min,溢出同网并组）`);
@@ -266,19 +266,26 @@ export async function applySource({ robust = false, maxTries = 3 } = {}) {
 		return;
 	}
 	// 自愈:回退则 `--undo`(create 重建自然源)后重试,守 post-check、有界 maxTries(应对 setDocumentSource 非确定性)。
+	const res = await deliverRobust(r, idByDes, maxTries);
+	writeReport({ success: res.ok, delivery: res, tries: res.tries });
+	if (!res.ok) process.exitCode = 1;
+}
+
+// 健壮投递:回退则 `--undo`(create 重建自然源)后重试,有界 maxTries(应对 setDocumentSource 非确定性)。
+// 导出供官方门控适配器(apply_source_run.mjs)复用——投递任意 {r, idByDes}(含官方 full_model.json 构造的)。
+export async function deliverRobust(r, idByDes, maxTries = 3) {
 	const UNDO = `${ROOT}/engine/plexus_apply_live.mjs`;
-	let last = null;
+	let last = { ok: false };
 	for (let t = 1; t <= maxTries; t++) {
 		last = await deliverOnce(r, idByDes);
-		if (last.ok) { console.log(`✓ robust:第 ${t} 次成功`); writeReport({ success: true, delivery: last, tries: t }); return; }
+		if (last.ok) { console.log(`✓ robust:第 ${t} 次成功`); return { ...last, tries: t }; }
 		if (t < maxTries) {
 			console.log(`  robust:第 ${t} 次回退,--undo 重建自然源后重试…`);
 			try { execFileSync('node', [UNDO, '--undo'], { stdio: 'ignore' }); } catch (e) { console.error('  undo 失败:', e.message.slice(0, 60)); }
 		}
 	}
 	console.error(`✗ robust:${maxTries} 次均回退——EDA setDocumentSource 持续拒绝,请人工检查 bridge/文档状态。`);
-	writeReport({ success: false, delivery: last, tries: maxTries });
-	process.exitCode = 1;
+	return { ...last, tries: maxTries };
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {

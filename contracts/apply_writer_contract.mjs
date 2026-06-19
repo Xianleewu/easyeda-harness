@@ -13,10 +13,13 @@ export function resolveApplyWriter({ assembly, pack, root }) {
 		return {
 			pass: true,
 			mode: 'bundled-aihwdebugger',
+			// run 用源式投递(apply_source_run.mjs:setDocumentSource 原子加载官方 full_model.json),
+			// 替代旧 create 式 apply_run.mjs(逐条 create 受 EDA 合并丢线)。generate 仍产 full_model.json
+			// (源适配器读它投递;旧 af_*.js 被忽略,无害)。源式=门验证的与实际写回的同一模型。
 			writer: {
-				id: 'aihwdebugger-low-level-writer',
+				id: 'aihwdebugger-source-writer',
 				generate: 'engine/apply_full.mjs',
-				run: 'engine/apply_run.mjs',
+				run: 'engine/apply_source_run.mjs',
 			},
 			severity: { hard: 0, soft: 0, info: 0 },
 			findings,
