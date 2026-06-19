@@ -51,6 +51,16 @@ function textNetLabel(m, t) {
 
 export function c2Overlap(m) {
 	const F = [];
+	// 同模块件对豁免 C2.1-near:模块内布局由 domain cell(C14/C15 等按需排紧)负责,
+	// generic 间距规则应约束【模块之间】;深度重叠 C2.1-overlap 仍全程报(不掩盖真重叠)。
+	const _frames = (m.rectangles || []).filter(r => r.role === 'module-frame');
+	const _moduleOf = p => {
+		const bb = p.bodyBBox || p.bbox; if (!bb) return null;
+		const cx = (bb.minX + bb.maxX) / 2, cy = (bb.minY + bb.maxY) / 2;
+		const fr = _frames.find(r => { const q = r.bbox || r; return cx >= q.minX && cx <= q.maxX && cy >= q.minY && cy <= q.maxY; });
+		return fr ? fr.module : null;
+	};
+	const _mod = m.parts.map(_moduleOf);
 
 	for (let i = 0; i < m.parts.length; i++) {
 		for (let j = i + 1; j < m.parts.length; j++) {
@@ -60,7 +70,7 @@ export function c2Overlap(m) {
 			const hardGap = rectsGap(shrinkRect(a, CONFIG.body.overlapShrink), shrinkRect(b, CONFIG.body.overlapShrink));
 			if (hardGap < 0) F.push({ rule: 'C2.1-overlap', severity: 'hard', category: 'overlap',
 				msg: `Component bodies overlap deeply: ${m.parts[i].designator} -> ${m.parts[j].designator} (gap ${hardGap})`, where: [m.parts[i].designator, m.parts[j].designator] });
-			else if (gap < CONFIG.spacing.minComponentGap) F.push({ rule: 'C2.1-near', severity: 'hard', category: 'overlap',
+			else if (gap < CONFIG.spacing.minComponentGap && !(_mod[i] && _mod[i] === _mod[j])) F.push({ rule: 'C2.1-near', severity: 'hard', category: 'overlap',
 				msg: `Component spacing below ${CONFIG.spacing.minComponentGap}: ${m.parts[i].designator} -> ${m.parts[j].designator} (gap ${gap})`, where: [m.parts[i].designator, m.parts[j].designator] });
 		}
 	}

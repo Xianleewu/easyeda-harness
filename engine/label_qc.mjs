@@ -154,12 +154,18 @@ export function labelQC(model, opts = {}) {
 		}
 	}
 
+	// 同模块豁免:标签在其所属模块内压到同模块件的 keepout 是 domain cell 内部布局(故意),非缺陷;
+	// 跨模块才报。无 module-frame(如 ELK 扁平模型)则 _mf 为空→不豁免(行为不变)。
+	const _mf = (model.rectangles || []).filter(r => r.role === 'module-frame');
+	const _modAt = (x, y) => { const fr = _mf.find(r => { const q = r.bbox || r; return x >= q.minX && x <= q.maxX && y >= q.minY && y <= q.maxY; }); return fr ? fr.module : null; };
 	for (const f of flags.filter(x => x.kind === 'sig')) {
 		const bb = sigBBox(f);
+		const _lm = _modAt(f.textX ?? f.x, f.textY ?? f.y);
 		for (const c of comps) {
 			if (!c.bbox) continue;
 			const ko = { minX: c.bbox.minX - CLR, minY: c.bbox.minY - CLR, maxX: c.bbox.maxX + CLR, maxY: c.bbox.maxY + CLR };
-			if (ov(bb, ko)) findings.push({ rule: 'L6-label-in-keepout', severity: 'hard', category: 'overlap',
+			const _cm = _modAt((c.bbox.minX + c.bbox.maxX) / 2, (c.bbox.minY + c.bbox.maxY) / 2);
+			if (ov(bb, ko) && !(_lm && _lm === _cm)) findings.push({ rule: 'L6-label-in-keepout', severity: 'hard', category: 'overlap',
 				msg: `net label [${f.net}] enters ${c.designator} keepout`, where: { net: f.net, comp: c.designator } });
 		}
 	}
