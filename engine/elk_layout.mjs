@@ -145,7 +145,7 @@ export async function elkLayout({ snapshot, logical, byDes, elk = new ELK(), lay
 }
 
 // CLI:node engine/elk_layout.mjs [snapshot.json] [out.png] — 合成并渲染,打印质量指标。
-if (import.meta.url === `file:///${process.argv[1]?.replace(/\\/g, '/')}`) {
+if (process.argv[1] && process.argv[1].replace(/\\/g, '/').endsWith('engine/elk_layout.mjs')) {
 	const { readFileSync, writeFileSync } = await import('node:fs');
 	const { extractLogical } = await import('./schematic_extract.mjs');
 	const { withLocalPins } = await import('./transform.mjs');
