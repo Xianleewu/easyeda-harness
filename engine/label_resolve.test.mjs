@@ -5,18 +5,20 @@ import { resolveLabelCollisions } from './label_resolve.mjs';
 import { labelQC } from './label_qc.mjs';
 import { geomQC } from './geom_qc.mjs';
 
-// 两模块同名网 SIG 的网标都落 y=1000(不同 x)→ L10;附近有空闲 y 可重路由。
+// 两模块同名网 SIG 的命名 stub 都落 y=1000 且 x 范围【真重叠】(830–850)→ 真 L10(导线互压);附近有空闲 y 可重路由。
+// (跨列同 y 但 x 不重叠的同名标签不是 L10——见 wire_label_qc L10 的 x 重叠判定,那是合法的跨模块双标签。)
+// 器件置于 y=500–600,远离 y=1000 的 stub,使消解重路由不会撞 wireThruComp。
 function collidingModel() {
-	const comp = (d, x0, x1) => ({ designator: d, bbox: { minX: x0, minY: 900, maxX: x1, maxY: 1100 }, pins: [] });
+	const comp = (d, x0, x1) => ({ designator: d, bbox: { minX: x0, minY: 500, maxX: x1, maxY: 600 }, pins: [] });
 	return {
-		components: [comp('A', 700, 740), comp('B', 1260, 1300)],
+		components: [comp('A', 700, 740), comp('B', 900, 940)],
 		wires: [
-			{ net: 'SIG', line: [770, 1000, 800, 1000] },     // A 侧命名 stub(右向)
-			{ net: 'SIG', line: [1230, 1000, 1200, 1000] },   // B 侧命名 stub(左向)
+			{ net: 'SIG', line: [800, 1000, 840, 1000] },     // A 侧命名 stub(左逃逸→右标签) x 800–840 len40
+			{ net: 'SIG', line: [860, 1000, 820, 1000] },     // B 侧命名 stub(右逃逸→左标签) x 820–860(与 A 重叠 820–840)len40
 		],
 		netflags: [
-			{ kind: 'sig', net: 'SIG', x: 800, y: 1000, textX: 800, textY: 1000, rot: 0, alignMode: 6 },
-			{ kind: 'sig', net: 'SIG', x: 1200, y: 1000, textX: 1200, textY: 1000, rot: 0, alignMode: 8 },
+			{ kind: 'sig', net: 'SIG', x: 840, y: 1000, textX: 840, textY: 1000, rot: 0, alignMode: 6 },
+			{ kind: 'sig', net: 'SIG', x: 820, y: 1000, textX: 820, textY: 1000, rot: 0, alignMode: 8 },
 		],
 	};
 }

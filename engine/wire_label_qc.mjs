@@ -202,8 +202,14 @@ export function wireLabelQC(model) {
 	for (const [k, arr] of buckets) {
 		if (arr.length < 2) continue;
 		const net = k.split('|')[0];
+		// 仅当同网同 y 的水平命名段【x 范围真重叠】才算重复/覆盖(视觉互压)。同 y 但 x 相距远 = 不同列的
+		// 同一跨模块网的两个合法标签(各模块界面一个),不重叠、非缺陷——不报,避免密集板跨列误报。
+		const ranges = arr.map(s => [Math.min(s.a[0], s.b[0]), Math.max(s.a[0], s.b[0])]).sort((p, q) => p[0] - q[0]);
+		let overlap = false;
+		for (let i = 1; i < ranges.length; i++) { if (ranges[i][0] < ranges[i - 1][1] - 1) { overlap = true; break; } }
+		if (!overlap) continue;
 		findings.push({ rule: 'L10-dup-named-stub', severity: 'hard', category: 'wiring',
-			msg: `网名 [${net}] 在 y=${k.split('|')[1]} 有多条水平命名段`, where: { net, count: arr.length } });
+			msg: `网名 [${net}] 在 y=${k.split('|')[1]} 有多条 x 重叠的水平命名段`, where: { net, count: arr.length } });
 	}
 
 	return findings;
