@@ -3,11 +3,12 @@
 // 合成几何 + 改 Name ATTR,原子加载、零合并 → faithful live 投递。
 // 实验确证:setDocumentSource 接受「改现有记录」「给现有组加 LINE」,拒「加顶层 WIRE」;源 y 取负。
 //
-// ⚠️ 工作流约束(重要):本工具只在「自然源」(create 路径产生的源)上生效。setDocumentSource
-//    每次往返会归一化源,我的 re-emit 不再匹配归一化格式 → setDocumentSource ok 却静默整体回退。
-//    可靠用法:先 `node engine/plexus_apply_live.mjs --undo`(create 重建自然源)再跑本工具。
-//    还原:`--undo` 即可(create 路径重建原图)。实测成果:画布 1232×909→3076×2291(紧凑 1.34
-//    =美观)、extract floating 45 ≈ 原图 42(create 式 72-92)= 电气近乎等价(自洽)。
+// ⚠️ 可靠性(实测校正):setDocumentSource 是**非确定性**的——同一源、同一改动,有时生效有时
+//    `ok:true` 却静默整体回退(早先误判为「只在自然源生效」,但 `--undo`(自然源)→ apply 也偶尔
+//    回退;且往返归一化只改 DOCHEAD client id + 少数 ATTR 的 bbox 重算,结构/记录数全保留、无害)。
+//    **正解 = `--robust`**:投递后自检(回读源验证首器件移位),回退则 `--undo` 重建源+重试(有界 3 次)。
+//    可靠用法:`node engine/apply_source.mjs --robust`。还原:`plexus_apply_live.mjs --undo`。
+//    实测成果:画布 1232×909→3076×2291(紧凑 1.34=美观)、extract floating 41 ≤ 原图 42 = 完全等价。
 import { readFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { extractLogical } from './schematic_extract.mjs';
