@@ -1,8 +1,7 @@
-// multipart 平面性属性测试(种子化 fuzz):随机多件簇(2–4 件、各件随机尺寸/左右脚 + 栈底件底边
-// 排脚 / 栈顶件顶边排脚)断言路由器不变量:geomQC overlaps/wireThruComp/wireThruPin/crossings/
-// offgrid=0、labelQC hard=0、确定性。守护堆叠 + 边路由(栈选择/floorY)对任意配置的健壮性。
-// 注:中层件的底/顶边脚仍走 routeSide(向下/上会穿邻件,无解),故 fuzz 只在栈底/顶件放边脚——
-// 这正是 multipart 边路由支持的范围(与真实板 SW2 在栈底一致)。
+// multipart 平面性属性测试(种子化 fuzz):随机多件簇(2–4 件、各件随机尺寸/左右脚 + 随机一件含
+// 底边排脚、另一件含顶边排脚、脚位去重)断言路由器不变量:geomQC overlaps/wireThruComp/
+// wireThruPin/crossings/offgrid=0、labelQC hard=0、确定性。守护两个限界的修复:① 重排把含边脚件
+// 移到栈端(routeEdge 竖直逃逸)② 侧脚对齐公共边(不同宽件同侧脚同 x 喂 routeSide)——对任意件序健壮。
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { multipartArchetype } from './multipart.mjs';
@@ -27,7 +26,8 @@ function genPart(rnd, di, atBottom, atTop, pinNets) {
 	const bw = pick(2, 6) * 10, bh = pick(3, 8) * 10;
 	const widths = [4, 10, 20];
 	const pins = [];
-	const add = (num, side, local) => { pins.push({ num, local }); const w = widths[pick(0, 2)]; pinNets[`${di}.${num}`] = { name: `${side}${di}_${num}_${'X'.repeat(w)}`, class: cls[pick(0, 2)] }; };
+	const usedPos = new Set();   // 真实原理图脚位各异;去重避免 fuzz 生成同位置脚(退化输入)
+	const add = (num, side, local) => { const key = local.join(','); if (usedPos.has(key)) return; usedPos.add(key); pins.push({ num, local }); const w = widths[pick(0, 2)]; pinNets[`${di}.${num}`] = { name: `${side}${di}_${num}_${'X'.repeat(w)}`, class: cls[pick(0, 2)] }; };
 	let k = 1;
 	for (let i = 0, n = pick(0, 5); i < n; i++) add(k, 'L', [-bw, pick(-bh / 10, bh / 10) * 10]), k++;
 	for (let i = 0, n = pick(0, 5); i < n; i++) add(k, 'R', [bw, pick(-bh / 10, bh / 10) * 10]), k++;
@@ -42,7 +42,11 @@ function genConfig(rnd, idx) {
 	const nParts = pick(2, 4);
 	const pinNets = {};
 	const parts = [];
-	for (let i = 0; i < nParts; i++) parts.push(genPart(rnd, `U${idx}_${i}`, i === nParts - 1, i === 0, pinNets));
+	// 边脚放在随机件上(底边一件、顶边另一件)——multipart 重排把它们移到栈端、侧脚对齐公共边,
+	// 验证「含边脚件不必预先在栈端 + 不同宽件」两个限界的修复对任意件序健壮。
+	const botPart = pick(0, nParts - 1);
+	let topPart = pick(0, nParts - 1); if (topPart === botPart) topPart = (topPart + 1) % nParts;
+	for (let i = 0; i < nParts; i++) parts.push(genPart(rnd, `U${idx}_${i}`, i === botPart, i === topPart, pinNets));
 	const anchor = { x: pick(80, 200) * 10, y: pick(80, 200) * 10 };
 	return { parts, anchor, pinNets };
 }

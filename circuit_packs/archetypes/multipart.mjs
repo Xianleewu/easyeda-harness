@@ -1,7 +1,7 @@
 // 角色原型:多件簇模块。把模块内 N 个器件纵向堆叠,所有器件引脚并集用 densefanout 的
 // 平面路由扇出到间隔标签列;模块内部网靠同名网标连通(EasyEDA 网名连通),无需显式内部连线。
 import { toWorld } from '../../engine/transform.mjs';
-import { regionOf, mergeParts } from '../../engine/cell_helpers.mjs';
+import { wire, regionOf, mergeParts } from '../../engine/cell_helpers.mjs';
 import { routeSide, routeEdge, classifyEdge, assertEscapable } from './densefanout.mjs';
 
 const PART_GAP = 50;   // 件体间隙(按各件真实高度自适应堆叠)
@@ -23,12 +23,25 @@ export function multipartArchetype(spec = {}) {
 		dup.add(c.designator);
 	}
 	const pinNets = nets.pinNets || {};   // 键 `${designator}.${num}`
+	// 限界①修:把含底边脚的件排到栈底、含顶边脚的件排到栈顶(rank=底边脚−顶边脚,升序;稳定保序)
+	// → 边脚总落栈端,routeEdge 竖直逃逸;否则非栈端件边脚 fall to routeSide(x 不在侧边)→ 交叉。
+	const edgeRank = comp => {
+		const lb = comp.localBox; if (!lb) return 0;
+		let r = 0;
+		for (const p of (comp.pins || [])) {
+			if (!pinNets[`${comp.designator}.${p.num}`]) continue;
+			const e = classifyEdge(p.local, lb);
+			if (e === 'bottom') r++; else if (e === 'top') r--;
+		}
+		return r;
+	};
+	const ordered = parts.map((c, i) => [c, i]).sort((a, b) => (edgeRank(a[0]) - edgeRank(b[0])) || (a[1] - b[1])).map(x => x[0]);
 	const place = {};
 	const left = [], right = [], botPins = [], topPins = [], pts = [];
 	let cursorY = anchor.y;
 	let stackBottom = anchor.y;
-	const lastIdx = parts.length - 1;
-	parts.forEach((comp, pi) => {
+	const lastIdx = ordered.length - 1;
+	ordered.forEach((comp, pi) => {
 		const lb = comp.localBox || { minX: -5, minY: -5, maxX: 5, maxY: 5 };
 		const px = anchor.x, py = cursorY;
 		place[comp.designator] = { x: px, y: py, rot: 0, mirror: false };
@@ -52,7 +65,21 @@ export function multipartArchetype(spec = {}) {
 		assertEscapable(partPins, { minX: px + lb.minX, minY: py + lb.minY, maxX: px + lb.maxX, maxY: py + lb.maxY }, comp.designator);
 		cursorY = snap10(py - (lb.maxY - lb.minY) - PART_GAP);   // 下一件落在本件真实底部之下
 	});
-	const sideFrags = [...routeSide(right, 'right'), ...routeSide(left, 'left')];
+	// 限界②修:不同宽件的同侧脚 world x 各异、喂给假设同 x 的 routeSide 会交叉。把各侧脚水平延伸
+	// 到公共边 x(窄件补 stub 到最外件边缘),使喂入 routeSide 的同侧脚同 x。分层件不同 y、且同件
+	// 同侧脚同 x,延伸 stub 不交叉任何脚。
+	const alignStubs = [];
+	const alignSide = (pins, edgeX) => {
+		for (const e of pins) {
+			if (Math.abs(e.world[0] - edgeX) > 0.5) {
+				alignStubs.push({ wires: [wire('', [[e.world[0], e.world[1]], [edgeX, e.world[1]]])], flags: [] });
+				e.world = [edgeX, e.world[1]];
+			}
+		}
+	};
+	if (left.length) alignSide(left, Math.min(...left.map(p => p.world[0])));
+	if (right.length) alignSide(right, Math.max(...right.map(p => p.world[0])));
+	const sideFrags = [...alignStubs, ...routeSide(right, 'right'), ...routeSide(left, 'left')];
 	// 底/顶边引脚的标签降到侧布线之外(floor/ceil)以免碰撞(同 densefanout)。
 	const sideYs = [];
 	for (const fr of sideFrags) {
