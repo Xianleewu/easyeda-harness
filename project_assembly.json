@@ -480,106 +480,106 @@
         "usbX": 620,
         "ldoX": 420,
         "mcuX": 860,
-        "pmosX": 1260,
-        "relayX": 1620
+        "pmosX": 1330,
+        "relayX": 1690
       },
       {
         "usbX": 620,
         "ldoX": 420,
         "mcuX": 860,
-        "pmosX": 1260,
-        "relayX": 1560
+        "pmosX": 1330,
+        "relayX": 1630
       },
       {
         "usbX": 620,
         "ldoX": 420,
         "mcuX": 860,
-        "pmosX": 1250,
-        "relayX": 1590
+        "pmosX": 1320,
+        "relayX": 1660
       },
       {
         "usbX": 620,
         "ldoX": 420,
         "mcuX": 860,
-        "pmosX": 1260,
-        "relayX": 1600
+        "pmosX": 1330,
+        "relayX": 1670
       },
       {
         "usbX": 620,
         "ldoX": 420,
         "mcuX": 880,
-        "pmosX": 1280,
-        "relayX": 1580
+        "pmosX": 1350,
+        "relayX": 1650
       },
       {
         "usbX": 620,
         "ldoX": 430,
         "mcuX": 880,
-        "pmosX": 1300,
-        "relayX": 1600
-      },
-      {
-        "usbX": 640,
-        "ldoX": 440,
-        "mcuX": 900,
-        "pmosX": 1300,
-        "relayX": 1600
-      },
-      {
-        "usbX": 640,
-        "ldoX": 440,
-        "mcuX": 920,
-        "pmosX": 1320,
-        "relayX": 1620
-      },
-      {
-        "usbX": 640,
-        "ldoX": 440,
-        "mcuX": 920,
-        "pmosX": 1340,
-        "relayX": 1680
-      },
-      {
-        "usbX": 640,
-        "ldoX": 440,
-        "mcuX": 900,
-        "pmosX": 1340,
-        "relayX": 1680
+        "pmosX": 1370,
+        "relayX": 1670
       },
       {
         "usbX": 640,
         "ldoX": 440,
         "mcuX": 900,
         "pmosX": 1370,
-        "relayX": 1710
+        "relayX": 1670
+      },
+      {
+        "usbX": 640,
+        "ldoX": 440,
+        "mcuX": 920,
+        "pmosX": 1390,
+        "relayX": 1690
+      },
+      {
+        "usbX": 640,
+        "ldoX": 440,
+        "mcuX": 920,
+        "pmosX": 1410,
+        "relayX": 1750
+      },
+      {
+        "usbX": 640,
+        "ldoX": 440,
+        "mcuX": 900,
+        "pmosX": 1410,
+        "relayX": 1750
+      },
+      {
+        "usbX": 640,
+        "ldoX": 440,
+        "mcuX": 900,
+        "pmosX": 1440,
+        "relayX": 1780
       },
       {
         "usbX": 620,
         "ldoX": 440,
         "mcuX": 920,
-        "pmosX": 1340,
-        "relayX": 1680
+        "pmosX": 1410,
+        "relayX": 1750
       },
       {
         "usbX": 620,
         "ldoX": 440,
         "mcuX": 900,
-        "pmosX": 1340,
-        "relayX": 1680
+        "pmosX": 1410,
+        "relayX": 1750
       },
       {
         "usbX": 640,
         "ldoX": 460,
         "mcuX": 920,
-        "pmosX": 1340,
-        "relayX": 1700
+        "pmosX": 1410,
+        "relayX": 1770
       },
       {
         "usbX": 640,
         "ldoX": 440,
         "mcuX": 940,
-        "pmosX": 1360,
-        "relayX": 1700
+        "pmosX": 1430,
+        "relayX": 1770
       }
     ],
     "derivedAnchors": {
