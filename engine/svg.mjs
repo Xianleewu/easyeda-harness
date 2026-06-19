@@ -69,7 +69,7 @@ export function renderSVG(model, opts = {}) {
 			out.push(`<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${bw.toFixed(1)}" height="${bh.toFixed(1)}" fill="none" stroke="#1565c0" stroke-width="0.6" stroke-dasharray="2 2"/>`);
 		}
 		out.push(`<circle cx="${tx(n.x).toFixed(1)}" cy="${ty(n.y).toFixed(1)}" r="2.5" fill="${col}"/>`);
-		out.push(`<text x="${(tx(n.x) + 4).toFixed(1)}" y="${(ty(n.y) - 3).toFixed(1)}" font-size="10" fill="${col}" font-family="monospace">${n.net} (r${n.rotation})</text>`);
+		out.push(`<text x="${(tx(n.x) + 4).toFixed(1)}" y="${(ty(n.y) - 3).toFixed(1)}" font-size="10" fill="${col}" font-family="monospace">${n.net} (r${n.rot ?? n.rotation ?? 0})</text>`);
 	}
 	out.push(`</svg>`);
 	return out.join('\n');
