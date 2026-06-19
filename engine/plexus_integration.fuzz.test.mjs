@@ -16,7 +16,8 @@ import { wireConnectivity } from './wire_connectivity.mjs';
 
 function lcg(seed) { let s = seed >>> 0; return () => { s = (Math.imul(s, 1664525) + 1013904223) >>> 0; return s / 0x100000000; }; }
 
-// 随机多模块快照:1 控制器 IC(中心列)+ k 个连接器外设(侧列),控制器脚↔外设脚连跨模块信号网,电源/地加 flag。
+// 随机多模块快照:1 控制器 IC(中心列)+ k 个连接器外设(侧列)+ m 个分压器链(无源→support),
+// 控制器脚↔外设/分压器脚连跨模块信号网,电源/地加 flag。覆盖多样原型在多模块装配中的鲁棒性。
 function genSnap(rnd) {
 	const pick = (lo, hi) => lo + Math.floor(rnd() * (hi - lo + 1));
 	const comp = (d, x, y, pins, bw, bh) => ({ designator: d, x, y, rotation: 0, mirror: false, bbox: { minX: x - bw, minY: y - bh, maxX: x + bw, maxY: y + bh }, pins });
@@ -31,6 +32,18 @@ function genSnap(rnd) {
 		comps.push(J);
 		for (let i = 0; i < np; i++) { const un = pick(1, nU); wires.push({ id: 'w' + (wi++), net: `S${p}_${i}`, line: [px - 40, 1030 - i * 20, U.pins[un - 1].x, U.pins[un - 1].y] }); }
 		flags.push({ net: 'GND', symbol: 'ground', x: px - 40, y: 1030 - np * 20 });
+	}
+	// m 个分压器链:Ra(VCC-MID)+Rb(MID-GND)共享 MID → inferRoles 组成 support 模块,MID 跨模块连控制器。
+	const m = pick(1, 3);
+	for (let k = 0; k < m; k++) {
+		const bx = 1500 + k * 200, by = 600;
+		const Ra = comp(`Ra${k}`, bx, by, [{ num: '1', x: bx, y: by + 20 }, { num: '2', x: bx, y: by - 20 }], 8, 12);
+		const Rb = comp(`Rb${k}`, bx, by - 80, [{ num: '1', x: bx, y: by - 60 }, { num: '2', x: bx, y: by - 100 }], 8, 12);
+		comps.push(Ra, Rb);
+		wires.push({ id: 'w' + (wi++), net: `MID${k}`, line: [bx, by - 20, bx, by - 60] });
+		wires.push({ id: 'w' + (wi++), net: `MID${k}`, line: [bx, by - 40, U.pins[pick(1, nU) - 1].x, U.pins[pick(1, nU) - 1].y] });
+		flags.push({ net: 'VCC', symbol: 'power', x: bx, y: by + 20 });
+		flags.push({ net: 'GND', symbol: 'ground', x: bx, y: by - 100 });
 	}
 	flags.push({ net: 'VCC', symbol: 'power', x: 960, y: 840 });
 	flags.push({ net: 'GND', symbol: 'ground', x: 960, y: 820 });
