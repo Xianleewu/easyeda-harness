@@ -19,6 +19,11 @@ if (process.env.EASYEDA_APPLY_RUN_AUTHORIZED !== '1') {
 	process.exit(1);
 }
 
+// 多窗口:apply_gated 经 --window-id 传目标窗口(与 apply_run 一致)。设入 EASYEDA_WINDOW_ID,
+// 这样 deliverRobust→executeCode(默认读该 env)投到正确窗口,不回退到活动窗口。
+const winI = process.argv.indexOf('--window-id');
+if (winI >= 0 && process.argv[winI + 1]) process.env.EASYEDA_WINDOW_ID = process.argv[winI + 1];
+
 async function main() {
 	const m = JSON.parse(readFileSync(MODEL, 'utf8').replace(/^﻿/, ''));
 	const comps = m.components || [];
