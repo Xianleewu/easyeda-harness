@@ -80,7 +80,22 @@ export function geomQC(model, opt = {}) {
 	checkColl(Hs, 1, 0);   // 水平段:同 y(轴1)、比 x 范围(轴0)
 	checkColl(Vs, 0, 1);   // 竖直段:同 x(轴0)、比 y 范围(轴1)
 
-	return { overlaps, wireThruComp, wireThruPin, offgrid, offEx, crossings, crossEx, collinear, collEx };
+	// 6) 异网端点重合（两条异网线在同一点都有端点 = 该点把两网短在一起；crossings/collinear/wireThruPin 都排端点故漏）
+	let endpointShort = 0; const endEx = [];
+	const ptNet = new Map();   // "x,y" → Set(net)
+	for (const s of segs) {
+		if (!s.net) continue;
+		for (const [px, py] of [s.a, s.b]) {
+			const k = `${px},${py}`;
+			if (!ptNet.has(k)) ptNet.set(k, new Set());
+			ptNet.get(k).add(s.net);
+		}
+	}
+	for (const [k, nets] of ptNet) {
+		if (nets.size > 1) { endpointShort++; if (endEx.length < 8) endEx.push(`${[...nets].join('|')}@${k}`); }
+	}
+
+	return { overlaps, wireThruComp, wireThruPin, offgrid, offEx, crossings, crossEx, collinear, collEx, endpointShort, endEx };
 }
 
 if (process.argv[1] && process.argv[1].endsWith('geom_qc.mjs') && process.argv[2]) {

@@ -62,11 +62,24 @@ test('collinear:竖直同 x 异网重叠 → 报;同网重叠 / 端点相贴 →
 	assert.equal(touch.collinear, 0, '端点相贴不算重叠');
 });
 
-test('回归:既有字段仍在(overlaps/wireThruComp/crossings/collinear)', () => {
+test('endpointShort:两条异网线共享端点 → 报短路;同网相接 → 不报', () => {
+	const sh = geomQC({ components: [], netflags: [], wires: [
+		{ net: 'NA', line: [0, 50, 50, 50] }, { net: 'NB', line: [50, 50, 50, 80] },   // (50,50) 异网共点
+	] });
+	assert.equal(sh.endpointShort, 1, '异网端点重合=短路');
+	assert.ok(sh.endEx[0].includes('50,50'));
+	const same = geomQC({ components: [], netflags: [], wires: [
+		{ net: 'A', line: [0, 50, 50, 50] }, { net: 'A', line: [50, 50, 50, 80] },   // 同网折点
+	] });
+	assert.equal(same.endpointShort, 0, '同网端点相接=正常折线');
+});
+
+test('回归:既有字段仍在(overlaps/wireThruComp/crossings/collinear/endpointShort)', () => {
 	const r = geomQC({ components: [], wires: [], netflags: [] });
 	assert.deepEqual(r.overlaps, []);
 	assert.deepEqual(r.wireThruComp, []);
 	assert.equal(r.crossings, 0);
 	assert.deepEqual(r.wireThruPin, []);
 	assert.equal(r.collinear, 0);
+	assert.equal(r.endpointShort, 0);
 });
