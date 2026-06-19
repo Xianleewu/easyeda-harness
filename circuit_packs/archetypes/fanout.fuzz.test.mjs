@@ -48,7 +48,10 @@ function genConfig(rnd, idx) {
 	};
 	mkSide(-(bw + 10)); mkSide(bw + 10);            // 脚在体边外
 	if (!pins.length) return genConfig(rnd, idx);
-	const part = { designator: `J${idx}`, pins, localBox: { minX: -bw, minY: -bh, maxX: bw, maxY: bh } };
+	// 真实器件:脚在栅、体轮廓常在半单位(非对称封装)。半数配置给体边加 .5,验证 escX snap 修复——
+	// 体的半单位不得泄漏到标签/线位(无 snap 时下面的 5 栅断言必失败,故这是真回归测试)。
+	const boxOff = pick(0, 1) ? 0.5 : 0;
+	const part = { designator: `J${idx}`, pins, localBox: { minX: -bw - boxOff, minY: -bh, maxX: bw + boxOff, maxY: bh } };
 	const anchor = { x: pick(80, 200) * 10, y: pick(80, 200) * 10 };
 	return { part, anchor, pinNets };
 }
