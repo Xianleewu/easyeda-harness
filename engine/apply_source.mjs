@@ -68,6 +68,7 @@ export function buildSource(src, r, idByDes) {
 	const placeBy = new Map(r.placements.map(p => [p.designator, p]));
 	const synthWires = concatNamedPaths(r.model.wires);
 	const dirty = new Set();   // 只重序列化被改的记录;未改的保留原 raw(否则细微格式差异致 setDocumentSource 整体回退)。
+	const expectedLines = [];  // 记录写入的每条 LINE 段 [groupId,sx,sy,ex,ey](源 y 已取负),供投递后直接核对线落地。
 
 	// 1) 移器件:COMPONENT 记录 id → 设合成位(y 取负)。记录实际命中的 id,供预检漏匹配。
 	const idSet = new Set([...idByDes.entries()].filter(([d]) => placeBy.has(d)).map(([, id]) => id));
@@ -104,6 +105,7 @@ export function buildSource(src, r, idByDes) {
 		// 改/加/删 LINE:复用现有 LINE 记录改坐标,多则加,少则删。
 		for (let s = 0; s < segCount; s++) {
 			const [sx, sy] = pts[s], [ex, ey] = pts[s + 1];
+			expectedLines.push([groupIds[i], sx, sy, ex, ey]);
 			if (s < g.lineRecs.length) {
 				const lr = g.lineRecs[s];
 				lr.data.startX = sx; lr.data.startY = sy; lr.data.endX = ex; lr.data.endY = ey;
@@ -134,6 +136,7 @@ export function buildSource(src, r, idByDes) {
 		const pts = []; for (let k = 0; k + 1 < w.line.length; k += 2) pts.push([w.line[k], -w.line[k + 1]]);
 		for (let s = 0; s < pts.length - 1; s++) {
 			const [sx, sy] = pts[s], [ex, ey] = pts[s + 1];
+			expectedLines.push([gid, sx, sy, ex, ey]);
 			const nl = emit({ type: 'LINE', ticket: 900500 + hexCtr, id: hexId() },
 				{ fillColor: null, fillStyle: null, strokeColor: null, strokeStyle: null, strokeWidth: null, startX: sx, startY: sy, endX: ex, endY: ey, lineGroup: gid });
 			const anchor = g.lineRecs[g.lineRecs.length - 1] || g.wireRec;
@@ -156,13 +159,13 @@ export function buildSource(src, r, idByDes) {
 		else out.push(rec.raw);                                                     // 未改的保留原 raw(关键)
 		for (const nl of (addAfter.get(rec.i) || [])) out.push(nl);
 	}
-	return { newSrc: out.join('\n'), delivered: cap, synthWireCount: synthWires.length, groupCount: groupIds.length, packed, droppedOverflow, missingDes };
+	return { newSrc: out.join('\n'), delivered: cap, synthWireCount: synthWires.length, groupCount: groupIds.length, packed, droppedOverflow, missingDes, expectedLines };
 }
 
 // 投递一次:取源 → 变换 → setDocumentSource → 自检。返回是否生效。
 async function deliverOnce(r, idByDes) {
 	const { result: src } = await executeCode('return await eda.sys_FileManager.getDocumentSource();', { timeoutMs: 60000 });
-	const { newSrc, delivered, synthWireCount, groupCount, packed, droppedOverflow, missingDes } = buildSource(src, r, idByDes);
+	const { newSrc, delivered, synthWireCount, groupCount, packed, droppedOverflow, missingDes, expectedLines } = buildSource(src, r, idByDes);
 	console.log(`源式投递:合成线=${synthWireCount} 现有组=${groupCount} 投递=${delivered}+并组${packed}（封顶 min,溢出同网并组）`);
 	// 预检:live 文档器件 id 与 live_clean 项目不一致 → fail-loud,别投出半套垃圾。
 	if (missingDes.length) {
@@ -172,20 +175,37 @@ async function deliverOnce(r, idByDes) {
 	}
 	if (droppedOverflow.length) console.warn(`⚠ ${droppedOverflow.length} 条溢出线无同网组可并、未投递(${[...new Set(droppedOverflow)].slice(0, 6).join(',')})——该网这些脚会断,需扩槽或调封顶顺序。`);
 	await executeCode(`await eda.sys_FileManager.setDocumentSource(${JSON.stringify(newSrc)}); return { ok: true };`, { timeoutMs: 90000 });
-	// 自检:回读源,深度验证**所有**被投器件都移到了合成位(setDocumentSource 是非确定性的——
-	// ok 却静默回退,且可能**部分**生效;只查首件会把半套投递误判为成功)。任一件未到位即判回退。
+	// 自检:回读源,深度验证(setDocumentSource 是非确定性的——ok 却静默回退,且可能**部分**生效)。
+	// ① 所有被投器件都到合成位;② 所有写入的 LINE 段都在对应组——**线落地是直接核对、非靠器件推断**
+	// (自洽=电气正确是北极星,getNetlist 又被平台封,故对电气内容做直接验证)。任一未达即判回退、触发重试。
 	const { result: back } = await executeCode('return await eda.sys_FileManager.getDocumentSource();', { timeoutMs: 60000 });
-	const byId = new Map(parseSource(back)
-		.filter(x => x.head?.type === 'COMPONENT').map(x => [x.head.id, x.data]));
+	const parsed = parseSource(back);
+	const byId = new Map(parsed.filter(x => x.head?.type === 'COMPONENT').map(x => [x.head.id, x.data]));
 	let landed = 0; const stray = [];
 	for (const pl of r.placements) {
 		const rec = byId.get(idByDes.get(pl.designator));
 		if (rec && Math.abs(rec.x - pl.x) < 1 && Math.abs(rec.y - (-pl.y)) < 1) landed++;
 		else stray.push(pl.designator);
 	}
-	const applied = landed === r.placements.length;
-	if (applied) console.log(`✓ 投递生效(${landed}/${r.placements.length} 件全到合成位)`);
-	else console.warn(`✗ 投递部分回退:仅 ${landed}/${r.placements.length} 件到位,未到位 ${stray.slice(0, 6).join(',')}…`);
+	// 线落地直接核对:把 live LINE 段按「组|坐标」入集(含反向段,EDA 可能反存端点),核对每条预期段都在。
+	const liveLines = new Set();
+	const key = (g, a, b, c, d) => `${g}|${Math.round(a)}|${Math.round(b)}|${Math.round(c)}|${Math.round(d)}`;
+	for (const x of parsed) {
+		if (x.head?.type !== 'LINE') continue;
+		const d = x.data;
+		liveLines.add(key(d.lineGroup, d.startX, d.startY, d.endX, d.endY));
+		liveLines.add(key(d.lineGroup, d.endX, d.endY, d.startX, d.startY));
+	}
+	let wlanded = 0; const wstray = new Set();
+	for (const [g, sx, sy, ex, ey] of expectedLines) {
+		if (liveLines.has(key(g, sx, sy, ex, ey))) wlanded++; else wstray.add(g);
+	}
+	const compOk = landed === r.placements.length;
+	const wireOk = wlanded === expectedLines.length;
+	const applied = compOk && wireOk;
+	if (applied) console.log(`✓ 投递生效(器件 ${landed}/${r.placements.length} + 线段 ${wlanded}/${expectedLines.length} 全落地)`);
+	else console.warn(`✗ 投递部分回退:器件 ${landed}/${r.placements.length}(缺 ${stray.slice(0, 4).join(',')})`
+		+ ` · 线段 ${wlanded}/${expectedLines.length}(缺组 ${[...wstray].slice(0, 4).join(',')})`);
 	return applied;
 }
 
