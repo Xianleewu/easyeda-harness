@@ -82,6 +82,18 @@ function labelBox(f) {
 	return f.kind === 'sig' ? sigBBox(f) : (f.bbox || flagBBox({ ...f, rotation: f.rotation ?? f.rot ?? 0 }));
 }
 
+// 并查集:按共享端点把导线聚成连通簇(同一网的命名 stub + 无名逃逸链落同簇)。
+// 用于 L4 豁免"标签压到自身网布线":标签文字回压到自己的逃逸段不是缺陷(同网、是该标签自己的引线),
+// L4 只应防【异网导线】穿过标签文字造成的归属歧义/视觉杂乱。
+function wireClusters(S) {
+	const key = (x, y) => `${Math.round(x)},${Math.round(y)}`;
+	const parent = new Map();
+	const add = k => { if (!parent.has(k)) parent.set(k, k); return k; };
+	const find = k => { let r = k; while (parent.get(r) !== r) r = parent.get(r); while (parent.get(k) !== r) { const n = parent.get(k); parent.set(k, r); k = n; } return r; };
+	for (const s of S) { const a = add(key(s.a[0], s.a[1])), b = add(key(s.b[0], s.b[1])); parent.set(find(a), find(b)); }
+	return { rootOf: (x, y) => (parent.has(key(x, y)) ? find(key(x, y)) : null) };
+}
+
 export function labelQC(model, opts = {}) {
 	const findings = [];
 	const flags = model.netflags || [];
@@ -152,11 +164,16 @@ export function labelQC(model, opts = {}) {
 		}
 	}
 
+	const clusters = wireClusters(S);
 	for (const f of flags) {
 		const bb = labelBox(f);
+		const ownRoot = clusters.rootOf(f.textX ?? f.x, f.textY ?? f.y);   // 标签锚点所在连通簇 = 自身网布线
 		for (const s of S) {
 			if (!segCutsRectInterior(s, bb)) continue;
 			if (labelOwnEndpointContact(f, s)) continue;
+			// 豁免:压在标签下的是该标签【自己的网/无名逃逸链】(同簇 + 同网或无名)——非异网穿标,不算 L4。
+			if (ownRoot && (s.net === f.net || !s.net)
+				&& (clusters.rootOf(s.a[0], s.a[1]) === ownRoot || clusters.rootOf(s.b[0], s.b[1]) === ownRoot)) continue;
 			findings.push({ rule: 'L4-wire-thru-label', severity: 'hard', category: 'overlap',
 				msg: `wire net=${s.net} passes through label [${f.net}]`, where: { net: f.net, seg: [...s.a, ...s.b] } });
 		}
