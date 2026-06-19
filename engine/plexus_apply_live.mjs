@@ -7,6 +7,8 @@ import { extractLogical } from './schematic_extract.mjs';
 import { inferRoles } from './role_infer.mjs';
 import { synthesizeContract } from './design_contract.mjs';
 import { planLayout } from './plexus_planner.mjs';
+import { elkLayout } from './elk_layout.mjs';
+import { wireConnectivity } from './wire_connectivity.mjs';
 import { withLocalPins } from './transform.mjs';
 import { geomQC } from './geom_qc.mjs';
 import { labelQC } from './label_qc.mjs';
@@ -136,10 +138,28 @@ async function apply() {
 	const logical = extractLogical(local);
 	const contract = synthesizeContract(inferRoles(logical), logical);
 	const byDes = new Map((local.components || []).map(c => [c.designator, withLocalPins(c)]));
-	const r = planLayout({ contract, byDes, logical });
+	// PLEXUS_LAYOUT=elk:用 elkjs 自动布局(紧凑+真实连线,商用可读),scale=false 保符号原尺寸→脚接得上。
+	const useElk = (process.env.PLEXUS_LAYOUT || '').toLowerCase() === 'elk';
+	let r;
+	if (useElk) {
+		const m = await elkLayout({ snapshot: local, logical, byDes, scale: false });
+		r = { placements: m.placements, model: { components: m.components, wires: m.wires, netflags: m.netflags } };
+	} else {
+		r = planLayout({ contract, byDes, logical });
+	}
 	const g = geomQC(r.model);
-	const hard = g.overlaps.length + g.wireThruComp.length + g.crossings + labelQC(r.model).filter(f => f.severity === 'hard').length + synthesisFaithfulness({ logical, contract, model: r.model }).length;
-	if (hard) { console.error(`fail-closed:合成 ${hard} 处硬伤,中止`); process.exit(1); }
+	const geomHard = g.overlaps.length + g.wireThruComp.length + g.wireThruPin.length + g.crossings;
+	if (useElk) {
+		// ELK:门只 fail-closed【电气】(几何短路/穿件/穿脚 + 连通断);标签叠压(cosmetic)、faith(契约式,
+		// 对扁平 ELK 模型不适用)仅告警不阻断——「门是必要非充分,先看渲染图」。
+		const connHard = wireConnectivity({ model: r.model, logical }).filter(f => f.severity === 'hard').length;
+		if (geomHard + connHard) { console.error(`fail-closed:ELK 布局 ${geomHard} 几何短路 + ${connHard} 连通断,中止`); process.exit(1); }
+		const lh = labelQC(r.model).filter(f => f.severity === 'hard').length;
+		console.log(`   ELK 布局:几何全净、连通完整;标签叠压 ${lh}(cosmetic,先看渲染图)`);
+	} else {
+		const hard = geomHard + g.crossings + labelQC(r.model).filter(f => f.severity === 'hard').length + synthesisFaithfulness({ logical, contract, model: r.model }).length;
+		if (hard) { console.error(`fail-closed:合成 ${hard} 处硬伤,中止`); process.exit(1); }
+	}
 	const placeBy = new Map(r.placements.map(p => [p.designator, p]));
 	const idBy = new Map(comps.map(c => [c.designator, c.id]));
 

@@ -42,7 +42,7 @@ function pinRoles(logical) {
 }
 
 // 构建 ELK 图:节点 = 件体 + 各侧 label/符号留白;端口 FIXED_POS 落件体边;signal 多脚网→edge(仅指导分层)。
-function buildGraph(snapshot, logical, byDes, roles) {
+function buildGraph(snapshot, logical, byDes, roles, scale = true) {
 	const children = [];
 	const meta = new Map();   // designator → {lb, pad, compW, compH}
 	for (const c of snapshot.components) {
@@ -55,8 +55,9 @@ function buildGraph(snapshot, logical, byDes, roles) {
 		for (const p of (wc.pins || [])) { const r = roles.get(portId(c.designator, p.num)); if (r && (r.role === 'label' || r.role === 'wire')) lps[classifyEdge(p.local, lb0)].push(p.local); }
 		const minGap = (arr, ax) => { const vs = arr.map(l => l[ax]).sort((a, b) => a - b); let m = Infinity; for (let i = 1; i < vs.length; i++) m = Math.min(m, vs[i] - vs[i - 1]); return m; };
 		const gy = Math.min(minGap(lps.left, 1), minGap(lps.right, 1)), gx = Math.min(minGap(lps.top, 0), minGap(lps.bottom, 0));
-		const sy = (Number.isFinite(gy) && gy > 0 && gy < ROW) ? ROW / gy : 1;
-		const sx = (Number.isFinite(gx) && gx > 0 && gx < ROW) ? ROW / gx : 1;
+		// scale=false(live 交付):件不缩放,保 EDA 固定符号尺寸,脚位与实际 EDA 脚一致(否则线接不上)。
+		const sy = (scale && Number.isFinite(gy) && gy > 0 && gy < ROW) ? ROW / gy : 1;
+		const sx = (scale && Number.isFinite(gx) && gx > 0 && gx < ROW) ? ROW / gx : 1;
 		const cxL = (lb0.minX + lb0.maxX) / 2, cyL = (lb0.minY + lb0.maxY) / 2;
 		const scLocal = l => [(l[0] - cxL) * sx + cxL, (l[1] - cyL) * sy + cyL];
 		const lb = { minX: (lb0.minX - cxL) * sx + cxL, maxX: (lb0.maxX - cxL) * sx + cxL, minY: (lb0.minY - cyL) * sy + cyL, maxY: (lb0.maxY - cyL) * sy + cyL };
@@ -95,9 +96,9 @@ function buildGraph(snapshot, logical, byDes, roles) {
 	return { graph: { id: 'root', layoutOptions: { ...DEFAULT_OPTS }, children, edges }, meta };
 }
 
-export async function elkLayout({ snapshot, logical, byDes, elk = new ELK(), layoutOptions = {} }) {
+export async function elkLayout({ snapshot, logical, byDes, elk = new ELK(), layoutOptions = {}, scale = true }) {
 	const roles = pinRoles(logical);
-	const { graph, meta } = buildGraph(snapshot, logical, byDes, roles);
+	const { graph, meta } = buildGraph(snapshot, logical, byDes, roles, scale);
 	Object.assign(graph.layoutOptions, layoutOptions);
 	const res = await elk.layout(graph);
 
@@ -169,7 +170,16 @@ export async function elkLayout({ snapshot, logical, byDes, elk = new ELK(), lay
 		}
 	}
 
-	return { components: comps, wires, netflags };
+	// placements(供 live 交付 buildSource):件原点 = 某脚绝对位 − 该脚原始本地位(scale=false 时脚位即真实)。
+	const placements = comps.map(c => {
+		const wc = byDes.get(c.designator);
+		const p0 = (c.pins || [])[0];
+		const wp0 = p0 && (wc.pins || []).find(p => String(p.num) === String(p0.num));
+		const x = wp0 ? p0.x - wp0.local[0] : (c.bbox.minX + c.bbox.maxX) / 2;
+		const y = wp0 ? p0.y - wp0.local[1] : (c.bbox.minY + c.bbox.maxY) / 2;
+		return { designator: c.designator, x, y, rot: 0, mirror: false };
+	});
+	return { components: comps, wires, netflags, placements };
 }
 
 // CLI:node engine/elk_layout.mjs [snapshot.json] [out.png] — 合成并渲染,打印质量指标。

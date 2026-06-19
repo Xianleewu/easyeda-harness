@@ -15,6 +15,7 @@ import { extractLogical } from './schematic_extract.mjs';
 import { inferRoles } from './role_infer.mjs';
 import { synthesizeContract } from './design_contract.mjs';
 import { planLayout } from './plexus_planner.mjs';
+import { elkLayout } from './elk_layout.mjs';
 import { withLocalPins } from './transform.mjs';
 import { geomQC } from './geom_qc.mjs';
 import { labelQC } from './label_qc.mjs';
@@ -40,13 +41,19 @@ let hexCtr = 0x100000;
 const hexId = () => ('a1b2' + (hexCtr++).toString(16).padStart(12, '0')).slice(0, 16);
 
 // 合成模型(本地快照)。
-function synth() {
+async function synth() {
 	const snap = JSON.parse(readFileSync(APPLY_MODEL, 'utf8').replace(/^﻿/, ''));
 	const logical = extractLogical(snap);
 	const contract = synthesizeContract(inferRoles(logical), logical);
 	const byDes = new Map((snap.components || []).map(c => [c.designator, withLocalPins(c)]));
-	const r = planLayout({ contract, byDes, logical });
 	const idByDes = new Map((snap.components || []).map(c => [c.designator, c.id]));
+	// PLEXUS_LAYOUT=elk:用 elkjs 自动布局(紧凑+真实连线,商用可读),scale=false 保符号原尺寸→脚位接得上。
+	if ((process.env.PLEXUS_LAYOUT || '').toLowerCase() === 'elk') {
+		const m = await elkLayout({ snapshot: snap, logical, byDes, scale: false });
+		const r = { placements: m.placements, model: { components: m.components, wires: m.wires, netflags: m.netflags } };
+		return { r, idByDes, logical, contract };
+	}
+	const r = planLayout({ contract, byDes, logical });
 	return { r, idByDes, logical, contract };
 }
 
@@ -215,7 +222,7 @@ export async function deliverOnce(r, idByDes) {
 }
 
 export async function applySource({ robust = false, maxTries = 3 } = {}) {
-	const { r, idByDes, logical, contract } = synth();
+	const { r, idByDes, logical, contract } = await synth();
 	// 投递前质量门报告:镜像 synthesize 全硬门。源式投递原子加载、不像 create 拒短路线 → 缺陷会被
 	// 静默投到 live;故投递前显式报告全门 + fail-closed。**关键:忠实/连通在「投递态线集」上评估**
 	// ——封顶取决于现有组数,溢出若丢命名线会断网;合成全集 connHard=0 会假绿。故先读一次源定投递态。
