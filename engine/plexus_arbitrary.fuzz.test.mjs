@@ -1,7 +1,8 @@
 // 「任意图」属性测试(种子化 fuzz):随机多样板 = 随机混合 [大IC/中IC/连接器/无源链/多件簇/单电容],
 // 随机脚数/网密度/尺寸,跨模块用真实命名标签网。断言全链(extract→infer→contract→plan)对任意多样
 // 输入都 ① 全部模块落地(无 render-error 跳过)② 全门干净(geom 含短路家族 + label + faith + conn)。
-// 守护北极星「任意原理图美观自洽」:守护 planner/multipart 顶对齐、单件 support 端点、support 信号端点四修。
+// 守护北极星「任意原理图美观自洽」:覆盖 planner/multipart 顶对齐、单件/信号端点、localBox 包络伸出脚、
+// L7 竖直无网名、L4 自有布线豁免等修(引脚随机伸出体框,逼出 localBox/堆叠/标签逃逸类回归)。
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { extractLogical } from './schematic_extract.mjs';
@@ -23,29 +24,30 @@ const flag = (net, sym, x, y) => ({ net, symbol: sym, x, y });
 function genArbitrary(rnd, idx) {
 	const pick = (lo, hi) => lo + Math.floor(rnd() * (hi - lo + 1));
 	const comps = [], wires = [], flags = []; let wi = 0; const gx = 300, gy = 300; const allPins = [];
-	const nBlocks = pick(3, 8);
+	const nBlocks = pick(3, 10);
 	for (let b = 0; b < nBlocks; b++) {
-		const kind = pick(0, 5); const x = gx + (b % 4) * 600, y = gy + Math.floor(b / 4) * 700;
+		const kind = pick(0, 5); const x = gx + (b % 4) * 650, y = gy + Math.floor(b / 4) * 800;
+		const over = pick(0, 40);   // 引脚伸出体框幅度(EasyEDA 符号常见;守护 localBox 包络/堆叠/标签逃逸)
 		if (kind === 0 || kind === 1) {
 			const np = kind === 0 ? pick(20, 50) : pick(8, 18); const half = Math.max(1, np >> 1);
-			const pins = []; for (let i = 0; i < np; i++) pins.push(P(i + 1, i < np / 2 ? x - 40 : x + 40, y + np * 5 - (i % half) * 20));
+			const pins = []; for (let i = 0; i < np; i++) pins.push(P(i + 1, i < np / 2 ? x - 40 - over : x + 40 + over, y + np * 5 - (i % half) * 20));
 			const U = comp(`U${idx}_${b}`, x, y, pins, 40, np * 5 + 10); comps.push(U); pins.forEach(p => allPins.push(p));
 		} else if (kind === 2) {
-			const np = pick(2, 8); const pins = []; for (let i = 0; i < np; i++) pins.push(P(i + 1, x - 30, y + 30 - i * 20));
+			const np = pick(2, 8); const pins = []; for (let i = 0; i < np; i++) pins.push(P(i + 1, x - 30 - over, y + 30 - i * 20));
 			const J = comp(`J${idx}_${b}`, x, y, pins, 15, np * 12); comps.push(J); pins.forEach(p => allPins.push(p));
 		} else if (kind === 3) {
 			const n = pick(2, 4); let prevPin = null;
-			for (let k = 0; k < n; k++) { const yy = y - k * 60; const R = comp(`R${idx}_${b}_${k}`, x, yy, [P(1, x, yy + 15), P(2, x, yy - 15)], 8, 12); comps.push(R);
+			for (let k = 0; k < n; k++) { const yy = y - k * 60; const R = comp(`R${idx}_${b}_${k}`, x, yy, [P(1, x, yy + 15 + over), P(2, x, yy - 15 - over)], 8, 12); comps.push(R);
 				if (prevPin) wires.push({ id: 'w' + (wi++), net: `MID${idx}_${b}_${k}`, line: [prevPin.x, prevPin.y, R.pins[0].x, R.pins[0].y] }); prevPin = R.pins[1]; }
-			flags.push(flag('VCC', 'power', x, y + 15)); flags.push(flag('GND', 'ground', x, y - (n - 1) * 60 - 15));
+			flags.push(flag('VCC', 'power', x, y + 15 + over)); flags.push(flag('GND', 'ground', x, y - (n - 1) * 60 - 15 - over));
 		} else if (kind === 4) {
-			const np = pick(3, 5); const parts = [];
-			for (let k = 0; k < 2; k++) { const yy = y - k * 100; const pins = []; for (let i = 0; i < np; i++) pins.push(P(i + 1, i < np / 2 ? x - 25 : x + 25, yy + 20 - i * 15));
+			const np = pick(3, 5); const parts = []; const nstack = pick(2, 4);
+			for (let k = 0; k < nstack; k++) { const yy = y - k * 110; const pins = []; for (let i = 0; i < np; i++) pins.push(P(i + 1, i < np / 2 ? x - 25 - over : x + 25 + over, yy + 20 - i * 15));
 				const Q = comp(`Q${idx}_${b}_${k}`, x, yy, pins, 25, 40); comps.push(Q); parts.push(Q); pins.forEach(p => allPins.push(p)); }
-			wires.push({ id: 'w' + (wi++), net: `INT${idx}_${b}`, line: [parts[0].pins[0].x, parts[0].pins[0].y, parts[1].pins[0].x, parts[1].pins[0].y] });
+			for (let k = 0; k + 1 < parts.length; k++) wires.push({ id: 'w' + (wi++), net: `INT${idx}_${b}_${k}`, line: [parts[k].pins[0].x, parts[k].pins[0].y, parts[k + 1].pins[0].x, parts[k + 1].pins[0].y] });
 		} else {
-			const C = comp(`C${idx}_${b}`, x, y, [P(1, x, y + 12), P(2, x, y - 12)], 8, 12); comps.push(C);
-			flags.push(flag('GND', 'ground', x, y - 12)); allPins.push(C.pins[0]);
+			const C = comp(`C${idx}_${b}`, x, y, [P(1, x, y + 12 + over), P(2, x, y - 12 - over)], 8, 12); comps.push(C);
+			flags.push(flag('GND', 'ground', x, y - 12 - over)); allPins.push(C.pins[0]);
 		}
 	}
 	const nNets = pick(2, Math.min(10, Math.max(2, allPins.length >> 1)));
@@ -66,10 +68,10 @@ function synth(snap) {
 	return { logical, contract, r };
 }
 
-test('任意图 fuzz:60 随机多样板 — 全模块落地 + 全门干净(美观自洽)', () => {
+test('任意图 fuzz:100 随机多样板(含伸出脚) — 全模块落地 + 全门干净(美观自洽)', () => {
 	const rnd = lcg(0xA4B17);
 	let checked = 0;
-	for (let t = 0; t < 60; t++) {
+	for (let t = 0; t < 100; t++) {
 		const snap = genArbitrary(rnd, t);
 		const { logical, contract, r } = synth(snap);
 		const ctx = `t#${t} mods=${contract.modules.length}`;
@@ -87,7 +89,7 @@ test('任意图 fuzz:60 随机多样板 — 全模块落地 + 全门干净(美�
 		assert.equal(wireConnectivity({ model: r.model, logical }).filter(f => f.severity === 'hard').length, 0, `${ctx} connHard`);
 		checked++;
 	}
-	assert.equal(checked, 60);
+	assert.equal(checked, 100);
 });
 
 test('任意图 fuzz:确定性(同种子两次装配模型深相等)', () => {
