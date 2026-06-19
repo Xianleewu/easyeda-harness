@@ -23,6 +23,8 @@ import { wireConnectivity } from './wire_connectivity.mjs';
 import { executeCode } from './bridge_client.mjs';
 
 const ROOT = (process.env.EASYEDA_WORKDIR || process.cwd()).replace(/\\/g, '/');
+// 被投板的捕获快照:可配置(服务「任意原理图」——捕获任意板→指 EASYEDA_APPLY_MODEL→合成投递),默认 live_clean.json。
+const APPLY_MODEL = process.env.EASYEDA_APPLY_MODEL || `${ROOT}/live_clean.json`;
 
 // 解析源为记录数组(保序)。每行 `{head}||{data}|`。
 export function parseSource(src) {
@@ -39,7 +41,7 @@ const hexId = () => ('a1b2' + (hexCtr++).toString(16).padStart(12, '0')).slice(0
 
 // 合成模型(本地快照)。
 function synth() {
-	const snap = JSON.parse(readFileSync(`${ROOT}/live_clean.json`, 'utf8').replace(/^﻿/, ''));
+	const snap = JSON.parse(readFileSync(APPLY_MODEL, 'utf8').replace(/^﻿/, ''));
 	const logical = extractLogical(snap);
 	const contract = synthesizeContract(inferRoles(logical), logical);
 	const byDes = new Map((snap.components || []).map(c => [c.designator, withLocalPins(c)]));
@@ -173,7 +175,7 @@ async function deliverOnce(r, idByDes) {
 	// 预检:live 文档器件 id 与 live_clean 项目不一致 → fail-loud,别投出半套垃圾。
 	if (missingDes.length) {
 		console.error(`✗ 预检失败:${missingDes.length} 个器件 id 在 live 文档中找不到(${missingDes.slice(0, 6).join(',')}…)`
-			+ '——live 文档与 live_clean.json 不是同一项目?请确认已打开对应工程。中止本次投递。');
+			+ `——live 文档与被投快照(${APPLY_MODEL})不是同一项目?请确认已打开对应工程。中止本次投递。`);
 		return false;
 	}
 	// (溢出丢线的分类警告由 applySource 在投递态质量门处统一报告,这里不重复。)
