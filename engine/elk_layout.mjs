@@ -75,7 +75,7 @@ function buildGraph(snapshot, logical, byDes, roles, scale = true) {
 		// 底/顶密集竖排标签:脚≥4 且最终 pitch<20 → 2 行深错排,需额外留一行深(竖排标签长 ≈ labelLen)。
 		for (const _side of ['top', 'bottom']) {
 			const _arr = lps[_side];
-			if (_arr.length < 4 || minGap(_arr, 0) * sx >= 20) continue;
+			if (_arr.length < 2 || minGap(_arr, 0) * sx >= 20) continue;
 			let _maxLen = 0;
 			for (const _p of (wc.pins || [])) { const _r = roles.get(portId(c.designator, _p.num)); if (_r && classifyEdge(_p.local, lb0) === _side && (_r.role === 'label' || _r.role === 'wire')) _maxLen = Math.max(_maxLen, labelLen(_r.net)); }
 			need[_side] = (need[_side] || LABEL_PAD) + _maxLen + 16;
@@ -176,7 +176,7 @@ export async function elkLayout({ snapshot, logical, byDes, elk = new ELK(), lay
 				groups.get(k).push({ id, net: roles.get(id).net, x: p.x });
 			}
 			for (const arr of groups.values()) {
-				if (arr.length < 4) continue;
+				if (arr.length < 2) continue;
 				arr.sort((a, b) => a.x - b.x);
 				let minPitch = Infinity;
 				for (let i = 1; i < arr.length; i++) minPitch = Math.min(minPitch, Math.abs(arr[i].x - arr[i - 1].x));
@@ -212,7 +212,17 @@ export async function elkLayout({ snapshot, logical, byDes, elk = new ELK(), lay
 		const y = wp0 ? p0.y - wp0.local[1] : (c.bbox.minY + c.bbox.maxY) / 2;
 		return { designator: c.designator, x, y, rot: 0, mirror: false };
 	});
-	return { components: comps, wires, netflags, placements };
+	// 去重:同网同位的网标/符号叠放(多脚逃逸到同点 / snap 撞点)→ 保留一个。
+	// 电气等价(各脚的桩仍汇于该点、经同点/同名连通),消 L3 同网同位叠压。
+	const _seen = new Set();
+	const _flags = [];
+	for (const nf of netflags) {
+		const k = nf.net + '|' + nf.x + '|' + nf.y;
+		if (_seen.has(k)) continue;
+		_seen.add(k);
+		_flags.push(nf);
+	}
+	return { components: comps, wires, netflags: _flags, placements };
 }
 
 // CLI:node engine/elk_layout.mjs [snapshot.json] [out.png] — 合成并渲染,打印质量指标。
