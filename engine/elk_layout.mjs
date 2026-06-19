@@ -133,8 +133,11 @@ export async function elkLayout({ snapshot, logical, byDes, elk = new ELK(), lay
 		for (let i = 1; i < ids.length; i++) segs.push({ net: n.name, pinA: a0, pinB: pinAbs.get(ids[i]) });
 	}
 	const routed = routeNets(segs.map(s => ({ a: escape(s.pinA), b: escape(s.pinB), net: s.net })), obstacles, { wireClearance: 2 });
+	// 布线失败的网 → 整网回退【按名标签】(保电气完整:同名标签 EDA 连通)。任一段失败则全网回退,避免半连。
+	const failedNets = new Set();
+	routed.forEach((r, i) => { if (!r.path) failedNets.add(segs[i].net); });
 	routed.forEach((r, i) => {
-		if (!r.path) return;
+		if (!r.path || failedNets.has(segs[i].net)) return;
 		const s = segs[i];
 		const line = []; for (const [x, y] of [[s.pinA.x, s.pinA.y], ...r.path, [s.pinB.x, s.pinB.y]]) line.push(x, y);
 		wires.push({ net: r.net, line });
@@ -143,10 +146,12 @@ export async function elkLayout({ snapshot, logical, byDes, elk = new ELK(), lay
 	// 单脚 signal → 列对齐标签;power/ground → 符号(均朝外逃逸,落 pad 内)
 	for (const [id, p] of pinAbs) {
 		const r = roles.get(id); if (!r) continue;
+		// 布线失败的多脚网 → 该网各脚回退成标签(按名连通)。
+		const role = (r.role === 'wire' && failedNets.has(r.net)) ? 'label' : r.role;
 		const [ex, ey] = escape(p, LABEL_GAP);
-		if (r.role === 'gnd') { netflags.push({ kind: 'gnd', net: r.net, x: ex, y: ey, rot: 0 }); wires.push({ net: r.net, line: [p.x, p.y, ex, ey] }); }
-		else if (r.role === 'power') { netflags.push({ kind: 'power', net: r.net, x: ex, y: ey, rot: 0 }); wires.push({ net: r.net, line: [p.x, p.y, ex, ey] }); }
-		else if (r.role === 'label') {
+		if (role === 'gnd') { netflags.push({ kind: 'gnd', net: r.net, x: ex, y: ey, rot: 0 }); wires.push({ net: r.net, line: [p.x, p.y, ex, ey] }); }
+		else if (role === 'power') { netflags.push({ kind: 'power', net: r.net, x: ex, y: ey, rot: 0 }); wires.push({ net: r.net, line: [p.x, p.y, ex, ey] }); }
+		else if (role === 'label') {
 			// 左右脚→水平标签(文字朝外);上下脚→竖排标签(rot 90/270,窄框,密集横向不叠压)。
 			// 上下脚标签逃逸距加大到 48(>总线深~20),让竖排标签落在总线之外,避总线穿标(L4)。
 			if (p.side === 'left') { wires.push({ net: r.net, line: [p.x, p.y, ex, ey] }); netflags.push({ kind: 'sig', net: r.net, x: ex, y: ey, textX: ex, textY: ey, rot: 180, alignMode: 8 }); }

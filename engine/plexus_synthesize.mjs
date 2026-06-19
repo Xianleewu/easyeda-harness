@@ -6,6 +6,7 @@ import { extractLogical } from './schematic_extract.mjs';
 import { inferRoles } from './role_infer.mjs';
 import { synthesizeContract } from './design_contract.mjs';
 import { planLayout } from './plexus_planner.mjs';
+import { elkLayout } from './elk_layout.mjs';
 import { withLocalPins } from './transform.mjs';
 import { geomQC } from './geom_qc.mjs';
 import { labelQC } from './label_qc.mjs';
@@ -16,7 +17,7 @@ const ROOT = (process.env.EASYEDA_WORKDIR || process.cwd()).replace(/\\/g, '/');
 const LIVE = process.env.EASYEDA_LIVE_MODEL || `${ROOT}/live.json`;
 const REPORT = process.env.PLEXUS_SYNTHESIZE_REPORT || `${ROOT}/plexus_synthesize_report.json`;
 
-export function runPlexusSynthesize() {
+export async function runPlexusSynthesize() {
 	if (!existsSync(LIVE)) {
 		return { ok: false, error: `快照缺失：${LIVE}（先跑 plexus live:save / audit 拉快照）` };
 	}
@@ -25,7 +26,11 @@ export function runPlexusSynthesize() {
 	const roles = inferRoles(logical);
 	const contract = synthesizeContract(roles, logical);
 	const byDes = new Map((snap.components || []).map(c => [c.designator, withLocalPins(c)]));
-	const r = planLayout({ contract, byDes, logical });
+	// PLEXUS_LAYOUT=elk → 用 elkjs 自动布局(紧凑+真实连线+商用可读),否则旧列布局。
+	const useElk = (process.env.PLEXUS_LAYOUT || '').toLowerCase() === 'elk';
+	const r = useElk
+		? { model: await elkLayout({ snapshot: snap, logical, byDes }), placed: contract.modules, skipped: [] }
+		: planLayout({ contract, byDes, logical });
 	const g = geomQC(r.model);
 	const g5 = geomQC(r.model, { grid: 5 });   // 真实件多在 5-栅:grid=5 的 offgrid 反映合成几何真实清白度
 	const labelHard = labelQC(r.model).filter(f => f.severity === 'hard').length;
@@ -55,7 +60,7 @@ export function runPlexusSynthesize() {
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
-	const out = runPlexusSynthesize();
+	const out = await runPlexusSynthesize();
 	if (!out.ok) { console.error(out.error); process.exit(2); }
 	// 硬判:重叠/线穿件/线压外部脚/异网交叉/共线异网短路/异网端点短路/标签硬伤/跨模块连通丢失/导线连通断为 0 才过门(offgrid 暂列软)。
 	const hard = out.geom.overlaps + out.geom.wireThruComp + out.geom.wireThruPin + out.geom.crossings + out.geom.collinear + out.geom.endpointShort + out.geom.endpointOnWire + out.labelHard + out.faithHard + out.connHard;
