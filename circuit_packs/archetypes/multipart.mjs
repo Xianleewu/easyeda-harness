@@ -43,7 +43,9 @@ export function multipartArchetype(spec = {}) {
 	const lastIdx = ordered.length - 1;
 	ordered.forEach((comp, pi) => {
 		const lb = comp.localBox || { minX: -5, minY: -5, maxX: 5, maxY: 5 };
-		const px = anchor.x, py = cursorY;
+		// 顶对齐:件顶(py+lb.maxY)= cursorY,不管锚在件内何处(连接器等锚非顶、向上延伸大的件,
+		// 若按 py=cursorY 放会向上压到上一件)。任意异构件堆叠都防住重叠(任意图)。
+		const px = anchor.x, py = snap10(cursorY - lb.maxY);
 		place[comp.designator] = { x: px, y: py, rot: 0, mirror: false };
 		stackBottom = Math.min(stackBottom, py + lb.minY);
 		const partPins = [];
@@ -63,7 +65,7 @@ export function multipartArchetype(spec = {}) {
 		}
 		// 每件脚对自件世界体 fail-closed 检查(内部脚无正交逃逸 → 抛错让 planner 跳过)。
 		assertEscapable(partPins, { minX: px + lb.minX, minY: py + lb.minY, maxX: px + lb.maxX, maxY: py + lb.maxY }, comp.designator);
-		cursorY = snap10(py - (lb.maxY - lb.minY) - PART_GAP);   // 下一件落在本件真实底部之下
+		cursorY = snap10(py + lb.minY - PART_GAP);   // 下一件顶 = 本件真实底 − gap
 	});
 	// 限界②修:不同宽件的同侧脚 world x 各异、喂给假设同 x 的 routeSide 会交叉。把各侧脚水平延伸
 	// 到公共边 x(窄件补 stub 到最外件边缘),使喂入 routeSide 的同侧脚同 x。分层件不同 y、且同件
