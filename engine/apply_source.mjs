@@ -9,7 +9,7 @@
 //    **正解 = `--robust`**:投递后自检(回读源验证首器件移位),回退则 `--undo` 重建源+重试(有界 3 次)。
 //    可靠用法:`node engine/apply_source.mjs --robust`。还原:`plexus_apply_live.mjs --undo`。
 //    实测成果:画布 1232×909→3076×2291(紧凑 1.34=美观)、extract floating 41 ≤ 原图 42 = 完全等价。
-import { readFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { extractLogical } from './schematic_extract.mjs';
 import { inferRoles } from './role_infer.mjs';
@@ -211,7 +211,7 @@ async function deliverOnce(r, idByDes) {
 	if (applied) console.log(`✓ 投递生效(器件 ${landed}/${r.placements.length} + 线段 ${wlanded}/${expectedLines.length} 全落地)`);
 	else console.warn(`✗ 投递部分回退:器件 ${landed}/${r.placements.length}(缺 ${stray.slice(0, 4).join(',')})`
 		+ ` · 线段 ${wlanded}/${expectedLines.length}(缺组 ${[...wstray].slice(0, 4).join(',')})`);
-	return applied;
+	return { ok: applied, landed, total: r.placements.length, wlanded, wtotal: expectedLines.length };
 }
 
 export async function applySource({ robust = false, maxTries = 3 } = {}) {
@@ -234,6 +234,10 @@ export async function applySource({ robust = false, maxTries = 3 } = {}) {
 	const faith = synthesisFaithfulness({ logical, contract, model: deliveredModel }).length;
 	const conn = wireConnectivity({ model: deliveredModel, logical }).filter(f => f.severity === 'hard').length;
 	const defects = g.overlaps.length + g.wireThruComp.length + g.wireThruPin.length + g.crossings + g.collinear + g.endpointShort + g.endpointOnWire + lh + faith + conn;
+	const gate = { overlaps: g.overlaps.length, wireThruComp: g.wireThruComp.length, wireThruPin: g.wireThruPin.length, crossings: g.crossings, collinear: g.collinear, endpointShort: g.endpointShort, endpointOnWire: g.endpointOnWire, labelHard: lh, faithHard: faith, connHard: conn };
+	// 持久投递证据(与项目证据驱动模式一致):落盘门状态 + 投递结果,供事后核验/会话交接。
+	const REPORT = process.env.APPLY_SOURCE_REPORT || `${ROOT}/apply_source_report.json`;
+	const writeReport = (extra) => { try { writeFileSync(REPORT, JSON.stringify({ generatedAt: new Date().toISOString(), model: APPLY_MODEL, gate, defects, droppedNamed, droppedOverflow: dropN, ...extra }, null, 2), 'utf8'); } catch { /* 报告落盘失败不阻断投递 */ } };
 	console.log(`投递态质量门:overlaps=${g.overlaps.length} wireThruComp=${g.wireThruComp.length} wireThruPin=${g.wireThruPin.length} crossings=${g.crossings} collinear=${g.collinear} endpointShort=${g.endpointShort} endpointOnWire=${g.endpointOnWire} labelHard=${lh} faithHard=${faith} connHard=${conn}（忠实/连通基于投递态线集）`);
 	if (dropN) {
 		// 区分:命名线丢弃=真断网(该网脚会断);无名线丢弃=逃逸残段,连通门已证冗余(只是不渲染该几何)。
@@ -247,27 +251,33 @@ export async function applySource({ robust = false, maxTries = 3 } = {}) {
 		// fail-closed:默认拒投有硬伤的布局(源式投递不像 create 拒短路线,会静默投入)。--force 沙盒强投。
 		if (!process.argv.includes('--force')) {
 			console.error(`✗ 拒绝投递 ${defects} 处硬伤的布局(与 synthesize 门一致 fail-closed)。先修合成,或加 --force 沙盒强投。`);
+			writeReport({ success: false, refused: true });
 			process.exitCode = 1;
 			return;
 		}
 	}
 	if (!robust) {
-		if (!(await deliverOnce(r, idByDes))) {
+		const res = await deliverOnce(r, idByDes);
+		if (!res.ok) {
 			console.error('✗ 投递静默回退——源已被归一化,先 `node engine/plexus_apply_live.mjs --undo` 重建自然源再重试(或加 --robust 自愈)。');
 			process.exitCode = 1;
 		}
+		writeReport({ success: res.ok, delivery: res, tries: 1 });
 		return;
 	}
 	// 自愈:回退则 `--undo`(create 重建自然源)后重试,守 post-check、有界 maxTries(应对 setDocumentSource 非确定性)。
 	const UNDO = `${ROOT}/engine/plexus_apply_live.mjs`;
+	let last = null;
 	for (let t = 1; t <= maxTries; t++) {
-		if (await deliverOnce(r, idByDes)) { console.log(`✓ robust:第 ${t} 次成功`); return; }
+		last = await deliverOnce(r, idByDes);
+		if (last.ok) { console.log(`✓ robust:第 ${t} 次成功`); writeReport({ success: true, delivery: last, tries: t }); return; }
 		if (t < maxTries) {
 			console.log(`  robust:第 ${t} 次回退,--undo 重建自然源后重试…`);
 			try { execFileSync('node', [UNDO, '--undo'], { stdio: 'ignore' }); } catch (e) { console.error('  undo 失败:', e.message.slice(0, 60)); }
 		}
 	}
 	console.error(`✗ robust:${maxTries} 次均回退——EDA setDocumentSource 持续拒绝,请人工检查 bridge/文档状态。`);
+	writeReport({ success: false, delivery: last, tries: maxTries });
 	process.exitCode = 1;
 }
 
