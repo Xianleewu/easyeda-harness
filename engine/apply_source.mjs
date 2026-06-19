@@ -18,6 +18,8 @@ import { planLayout } from './plexus_planner.mjs';
 import { withLocalPins } from './transform.mjs';
 import { geomQC } from './geom_qc.mjs';
 import { labelQC } from './label_qc.mjs';
+import { synthesisFaithfulness } from './synthesis_faithfulness.mjs';
+import { wireConnectivity } from './wire_connectivity.mjs';
 import { executeCode } from './bridge_client.mjs';
 
 const ROOT = (process.env.EASYEDA_WORKDIR || process.cwd()).replace(/\\/g, '/');
@@ -43,7 +45,7 @@ function synth() {
 	const byDes = new Map((snap.components || []).map(c => [c.designator, withLocalPins(c)]));
 	const r = planLayout({ contract, byDes, logical });
 	const idByDes = new Map((snap.components || []).map(c => [c.designator, c.id]));
-	return { r, idByDes };
+	return { r, idByDes, logical, contract };
 }
 
 // concatNamedPaths:整条 pin→label 路径拼一条命名折线(与 create 路径一致的几何)。
@@ -181,14 +183,16 @@ async function deliverOnce(r, idByDes) {
 }
 
 export async function applySource({ robust = false, maxTries = 3 } = {}) {
-	const { r, idByDes } = synth();
-	// 投递前合成质量门报告:surfaces 被投布局的几何/标签缺陷(源式投递原子加载、不像 create 拒短路线
-	// → 缺陷会被静默投到 live;故显式报告,fail-loud 哲学一致)。
+	const { r, idByDes, logical, contract } = synth();
+	// 投递前质量门报告:镜像 synthesize 全硬门(几何 + 标签 + 忠实度 + 连通)。源式投递原子加载、不像
+	// create 拒短路线 → 缺陷会被静默投到 live;故投递前显式报告全门,fail-loud 哲学一致。
 	const g = geomQC(r.model);
 	const lh = labelQC(r.model).filter(f => f.severity === 'hard').length;
-	const defects = g.overlaps.length + g.wireThruComp.length + g.wireThruPin.length + g.crossings + lh;
-	console.log(`合成质量门:overlaps=${g.overlaps.length} wireThruComp=${g.wireThruComp.length} wireThruPin=${g.wireThruPin.length} crossings=${g.crossings} labelHard=${lh}`);
-	if (defects) console.warn(`⚠ 被投合成布局含 ${defects} 处几何缺陷(如 wireThruPin=穿外部脚=潜在短路)——源式投递会原样投入,非干净布局。`
+	const faith = synthesisFaithfulness({ logical, contract, model: r.model }).length;
+	const conn = wireConnectivity({ model: r.model, logical }).filter(f => f.severity === 'hard').length;
+	const defects = g.overlaps.length + g.wireThruComp.length + g.wireThruPin.length + g.crossings + lh + faith + conn;
+	console.log(`合成质量门:overlaps=${g.overlaps.length} wireThruComp=${g.wireThruComp.length} wireThruPin=${g.wireThruPin.length} crossings=${g.crossings} labelHard=${lh} faithHard=${faith} connHard=${conn}`);
+	if (defects) console.warn(`⚠ 被投合成布局含 ${defects} 处硬伤(几何短路 / 跨模块标签缺失 / 连通断)——源式投递会原样投入,非干净布局。`
 		+ (g.wireThruPin.length ? ` wireThruPin: ${g.wireThruPin.slice(0, 4).join(' ')}` : ''));
 	if (!robust) {
 		if (!(await deliverOnce(r, idByDes))) {
