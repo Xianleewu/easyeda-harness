@@ -9,17 +9,18 @@ const labelLen = name => Math.max(40, String(name).length * 6 + 18);
 
 // sig 标签列 x:右向文字(alignMode8)反向左生长、左向(6)右生长,宽名会压回器件体(L2/L6)。
 // 按标签宽外推 escX,确保文字框清开体边 ≥LABEL_KEEP(同 densefanout 的宽名处理),让宽名也能渲染。
-// escX 朝「远离体」方向 snap 到 5 栅(器件原生栅):消除不对称体 minX/maxX 的半单位泄漏到标签位,
-// 让合成标签/线全落 5 栅(与脚一致),snap 方向保证净空不减(左向下取、右向上取)。
-const q5floor = x => Math.floor(x / 5) * 5;
-const q5ceil = x => Math.ceil(x / 5) * 5;
+// escX 朝「远离体」方向 snap 到 10 栅:既消除不对称体 minX/maxX 的半单位泄漏到标签位,又让 fanout
+// 标签与 densefanout 标签(同用 10 栅)在共列时对齐,避免 L1-align 列内 5 栅 spread。snap 方向保证
+// 净空不减(左向下取、右向上取)。10 栅⊂5 栅,合成几何仍全落 5 栅(与脚一致)。
+const q10floor = x => Math.floor(x / 10) * 10;
+const q10ceil = x => Math.ceil(x / 10) * 10;
 function sigEscX(world, side, name, body) {
 	if (side === 'right') {
 		const need = body ? body.maxX + LABEL_KEEP + labelLen(name) : -Infinity;
-		return q5ceil(Math.max(world[0] + 30, need));
+		return q10ceil(Math.max(world[0] + 30, need));
 	}
 	const need = body ? body.minX - LABEL_KEEP - labelLen(name) : Infinity;
-	return q5floor(Math.min(world[0] - 30, need));
+	return q10floor(Math.min(world[0] - 30, need));
 }
 
 export function fanoutArchetype(spec = {}) {

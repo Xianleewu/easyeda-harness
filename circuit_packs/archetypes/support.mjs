@@ -76,7 +76,7 @@ export function supportArchetype(spec = {}) {
 		// 信号端点:无源件脚在中心 x、水平逃逸会穿体,故先竖直逃逸到体上方,再顶部水平标签(单电容/滤波等)。
 		const e = [top[0], top[1] + 30];
 		frags.push({ wires: [wire(nets.top.name, [top, e])], flags: [] });
-		frags.push(labelStub(nets.top.name, e, { side: 'right', escX: e[0] + 30 }));
+		frags.push(labelStub(nets.top.name, e, { side: 'right', escX: q10(e[0] + 30) }));
 	}
 
 	const bot = pin[parts[parts.length - 1].designator].p1;
@@ -85,7 +85,7 @@ export function supportArchetype(spec = {}) {
 	else if (nets.bottom && nets.bottom.class === 'signal') {
 		const e = [bot[0], bot[1] - 30];
 		frags.push({ wires: [wire(nets.bottom.name, [bot, e])], flags: [] });
-		frags.push(labelStub(nets.bottom.name, e, { side: 'right', escX: e[0] + 30 }));
+		frags.push(labelStub(nets.bottom.name, e, { side: 'right', escX: q10(e[0] + 30) }));
 	}
 
 	const merged = mergeParts(...frags);
