@@ -75,3 +75,19 @@ test('报告:delivered=cap=2、synthWireCount=3、groupCount=2', () => {
 	assert.equal(synthWireCount, 3);
 	assert.equal(groupCount, 2);
 });
+
+test('守卫 missingDes:器件 id 不在源中 → 列出漏匹配(防错项目投半套)', () => {
+	const { missingDes } = buildSource(SRC, r, new Map([['U1', 'NOT_IN_SOURCE']]));
+	assert.deepEqual(missingDes, ['U1']);
+});
+
+test('守卫 droppedOverflow:溢出线无同网组 → 显式记录(防静默断脚)', () => {
+	const r2 = { placements: r.placements, model: { wires: [
+		{ net: 'GND', line: [0, 0, 10, 0] },
+		{ net: 'SIG', line: [40, 0, 50, 0] },
+		{ net: 'UNIQUE', line: [60, 0, 70, 0] },   // 溢出且无同网组 → 应记入 droppedOverflow
+	] } };
+	const { droppedOverflow, packed } = buildSource(SRC, r2, idByDes);
+	assert.deepEqual(droppedOverflow, ['UNIQUE']);
+	assert.equal(packed, 0);
+});

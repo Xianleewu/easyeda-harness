@@ -64,15 +64,18 @@ export function buildSource(src, r, idByDes) {
 	const synthWires = concatNamedPaths(r.model.wires);
 	const dirty = new Set();   // 只重序列化被改的记录;未改的保留原 raw(否则细微格式差异致 setDocumentSource 整体回退)。
 
-	// 1) 移器件:COMPONENT 记录 id → 设合成位(y 取负)。
+	// 1) 移器件:COMPONENT 记录 id → 设合成位(y 取负)。记录实际命中的 id,供预检漏匹配。
 	const idSet = new Set([...idByDes.entries()].filter(([d]) => placeBy.has(d)).map(([, id]) => id));
 	const idToDes = new Map([...idByDes.entries()].map(([d, id]) => [id, d]));
+	const movedIds = new Set();
 	for (const rec of recs) {
 		if (rec.head?.type !== 'COMPONENT' || !idSet.has(rec.head.id)) continue;
 		const pl = placeBy.get(idToDes.get(rec.head.id));
 		rec.data.x = pl.x; rec.data.y = -pl.y; rec.data.rotation = pl.rot || 0; rec.data.isMirror = !!pl.mirror;
-		dirty.add(rec);
+		dirty.add(rec); movedIds.add(rec.head.id);
 	}
+	// 漏匹配的器件(live 文档与 live_clean 项目不一致 → id 对不上):全部该移而未命中的。
+	const missingDes = [...placeBy.keys()].filter(d => { const id = idByDes.get(d); return !id || !movedIds.has(id); });
 
 	// 2) 现有 WIRE 组索引:wireId → {wireRec, lineRecs[], nameAttr}。
 	const groups = new Map();
@@ -118,9 +121,10 @@ export function buildSource(src, r, idByDes) {
 	//     不占新槽)。实测溢出 4 条全是电源/地(GND/+5V/VCC_3V3),都有同网组可并 → 达 floating 42。
 	const netToGroup = new Map();
 	for (let i = 0; i < cap; i++) { const n = synthWires[i].net; if (n && !netToGroup.has(n)) netToGroup.set(n, groupIds[i]); }
-	let packed = 0;
+	let packed = 0; const droppedOverflow = [];
 	for (let i = cap; i < synthWires.length; i++) {
-		const w = synthWires[i]; const gid = netToGroup.get(w.net); if (!gid) continue;
+		const w = synthWires[i]; const gid = netToGroup.get(w.net);
+		if (!gid) { droppedOverflow.push(w.net || '(无名)'); continue; }   // 无同网组可并 → 静默丢会断脚,显式记录
 		const g = groups.get(gid);
 		const pts = []; for (let k = 0; k + 1 < w.line.length; k += 2) pts.push([w.line[k], -w.line[k + 1]]);
 		for (let s = 0; s < pts.length - 1; s++) {
@@ -147,14 +151,21 @@ export function buildSource(src, r, idByDes) {
 		else out.push(rec.raw);                                                     // 未改的保留原 raw(关键)
 		for (const nl of (addAfter.get(rec.i) || [])) out.push(nl);
 	}
-	return { newSrc: out.join('\n'), delivered: cap, synthWireCount: synthWires.length, groupCount: groupIds.length };
+	return { newSrc: out.join('\n'), delivered: cap, synthWireCount: synthWires.length, groupCount: groupIds.length, packed, droppedOverflow, missingDes };
 }
 
 // 投递一次:取源 → 变换 → setDocumentSource → 自检。返回是否生效。
 async function deliverOnce(r, idByDes) {
 	const { result: src } = await executeCode('return await eda.sys_FileManager.getDocumentSource();', { timeoutMs: 60000 });
-	const { newSrc, delivered, synthWireCount, groupCount } = buildSource(src, r, idByDes);
-	console.log(`源式投递:合成线=${synthWireCount} 现有组=${groupCount} 投递=${delivered}（封顶 min,溢出同网并组）`);
+	const { newSrc, delivered, synthWireCount, groupCount, packed, droppedOverflow, missingDes } = buildSource(src, r, idByDes);
+	console.log(`源式投递:合成线=${synthWireCount} 现有组=${groupCount} 投递=${delivered}+并组${packed}（封顶 min,溢出同网并组）`);
+	// 预检:live 文档器件 id 与 live_clean 项目不一致 → fail-loud,别投出半套垃圾。
+	if (missingDes.length) {
+		console.error(`✗ 预检失败:${missingDes.length} 个器件 id 在 live 文档中找不到(${missingDes.slice(0, 6).join(',')}…)`
+			+ '——live 文档与 live_clean.json 不是同一项目?请确认已打开对应工程。中止本次投递。');
+		return false;
+	}
+	if (droppedOverflow.length) console.warn(`⚠ ${droppedOverflow.length} 条溢出线无同网组可并、未投递(${[...new Set(droppedOverflow)].slice(0, 6).join(',')})——该网这些脚会断,需扩槽或调封顶顺序。`);
 	await executeCode(`await eda.sys_FileManager.setDocumentSource(${JSON.stringify(newSrc)}); return { ok: true };`, { timeoutMs: 90000 });
 	// 自检:回读源,验证首个器件确实移到了合成位(setDocumentSource 在归一化源上会 ok 却静默回退)。
 	const firstPl = r.placements[0];
