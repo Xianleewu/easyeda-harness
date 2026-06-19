@@ -172,13 +172,20 @@ async function deliverOnce(r, idByDes) {
 	}
 	if (droppedOverflow.length) console.warn(`⚠ ${droppedOverflow.length} 条溢出线无同网组可并、未投递(${[...new Set(droppedOverflow)].slice(0, 6).join(',')})——该网这些脚会断,需扩槽或调封顶顺序。`);
 	await executeCode(`await eda.sys_FileManager.setDocumentSource(${JSON.stringify(newSrc)}); return { ok: true };`, { timeoutMs: 90000 });
-	// 自检:回读源,验证首个器件确实移到了合成位(setDocumentSource 在归一化源上会 ok 却静默回退)。
-	const firstPl = r.placements[0];
-	const firstId = idByDes.get(firstPl.designator);
+	// 自检:回读源,深度验证**所有**被投器件都移到了合成位(setDocumentSource 是非确定性的——
+	// ok 却静默回退,且可能**部分**生效;只查首件会把半套投递误判为成功)。任一件未到位即判回退。
 	const { result: back } = await executeCode('return await eda.sys_FileManager.getDocumentSource();', { timeoutMs: 60000 });
-	const rec = parseSource(back).find(x => x.head?.type === 'COMPONENT' && x.head.id === firstId);
-	const applied = rec && Math.abs(rec.data.x - firstPl.x) < 1 && Math.abs(rec.data.y - (-firstPl.y)) < 1;
-	if (applied) console.log(`✓ 投递生效(${firstPl.designator} 已到合成位 [${firstPl.x},${-firstPl.y}])`);
+	const byId = new Map(parseSource(back)
+		.filter(x => x.head?.type === 'COMPONENT').map(x => [x.head.id, x.data]));
+	let landed = 0; const stray = [];
+	for (const pl of r.placements) {
+		const rec = byId.get(idByDes.get(pl.designator));
+		if (rec && Math.abs(rec.x - pl.x) < 1 && Math.abs(rec.y - (-pl.y)) < 1) landed++;
+		else stray.push(pl.designator);
+	}
+	const applied = landed === r.placements.length;
+	if (applied) console.log(`✓ 投递生效(${landed}/${r.placements.length} 件全到合成位)`);
+	else console.warn(`✗ 投递部分回退:仅 ${landed}/${r.placements.length} 件到位,未到位 ${stray.slice(0, 6).join(',')}…`);
 	return applied;
 }
 
