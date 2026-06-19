@@ -155,12 +155,14 @@ export function wireLabelQC(model) {
 	const sigs = sigFlags(model.netflags);
 	const visibleNets = new Set(sigs.map(f => f.net).filter(Boolean));
 
-	// L7 汇流竖直带网名（同 x 列另有水平命名段 → EDA 竖排网名）
+	// L7 汇流竖直带网名（同名水平段【真接】到该竖直段 → EDA 竖排网名）。必须是水平段的端点落在竖直段
+	// 的 x 列【且在其 y 跨度内】(真 T/端接,同一布线),才算"竖直带网名"。仅共 x 列但 y 不相接(跨模块同名
+	// 电源/地引线与另一模块的水平 sig stub 恰好同 x、相距远)不是该缺陷——避免跨列同名网误报。
 	for (const s of S) {
 		if (!visibleNets.has(s.net) || !isSignalNet(s.net) || !s.vert || s.len < 8) continue;
-		const colX = s.a[0];
-		const paired = S.some(t => t.net === s.net && t.horiz
-			&& (Math.abs(t.a[0] - colX) < EPS || Math.abs(t.b[0] - colX) < EPS));
+		const vx = s.a[0], vy0 = Math.min(s.a[1], s.b[1]), vy1 = Math.max(s.a[1], s.b[1]);
+		const onVert = (x, y) => Math.abs(x - vx) < EPS && y >= vy0 - EPS && y <= vy1 + EPS;
+		const paired = S.some(t => t.net === s.net && t.horiz && (onVert(t.a[0], t.a[1]) || onVert(t.b[0], t.b[1])));
 		if (!paired) continue;
 		findings.push({ rule: 'L7-net-vertical', severity: 'hard', category: 'wiring',
 			msg: `信号网 [${s.net}] 汇流竖直段带网名 len=${Math.round(s.len)}（应改为无网名竖直+水平 stub）`,

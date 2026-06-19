@@ -74,8 +74,9 @@ export function supportArchetype(spec = {}) {
 	else if (nets.top && nets.top.class === 'ground') frags.push(gndStub(top, { dir: 'up', len: 30, net: nets.top.name }));
 	else if (nets.top && nets.top.class === 'signal') {
 		// 信号端点:无源件脚在中心 x、水平逃逸会穿体,故先竖直逃逸到体上方,再顶部水平标签(单电容/滤波等)。
+		// 竖直段必【无网名】(net=''):带网名的竖直段会让 EDA 竖排网名(L7),网名只落水平 labelStub。
 		const e = [top[0], top[1] + 30];
-		frags.push({ wires: [wire(nets.top.name, [top, e])], flags: [] });
+		frags.push({ wires: [wire('', [top, e])], flags: [] });
 		frags.push(labelStub(nets.top.name, e, { side: 'right', escX: q10(e[0] + 30) }));
 	}
 
@@ -83,8 +84,9 @@ export function supportArchetype(spec = {}) {
 	if (nets.bottom && nets.bottom.class === 'ground') frags.push(gndStub(bot, { dir: 'down', len: 30, net: nets.bottom.name }));
 	else if (nets.bottom && nets.bottom.class === 'power') frags.push(powerStub(nets.bottom.name, bot, { dir: 'down', len: 50 }));
 	else if (nets.bottom && nets.bottom.class === 'signal') {
+		// 同上:竖直逃逸段无网名,网名只落水平 labelStub(避免 L7 竖排网名)。
 		const e = [bot[0], bot[1] - 30];
-		frags.push({ wires: [wire(nets.bottom.name, [bot, e])], flags: [] });
+		frags.push({ wires: [wire('', [bot, e])], flags: [] });
 		frags.push(labelStub(nets.bottom.name, e, { side: 'right', escX: q10(e[0] + 30) }));
 	}
 
