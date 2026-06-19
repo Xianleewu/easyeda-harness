@@ -1,5 +1,5 @@
 // fanout 属性测试(种子化 fuzz):随机多脚连接器(同侧异 y、变长名、混合网类),
-// 断言 geomQC overlaps/wireThruComp/crossings/offgrid=0、labelQC hard=0 + 确定性。
+// 断言 geomQC overlaps/wireThruComp/wireThruPin/crossings/offgrid=0、labelQC hard=0 + 确定性。
 // 守护 fanout 在其域(连接器/枢纽:脚在体边、同侧 ≥10 栅间距)内的鲁棒性。
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -65,6 +65,7 @@ test('fanout 属性:300 随机连接器 — 出图者全门 0,过密者 fail-clo
 		const g = geomQC(model);
 		const ctx = `cfg#${i} pins=${part.pins.length}`;
 		assert.equal(g.crossings, 0, `${ctx} crossings ${g.crossEx.join(' ')}`);
+		assert.equal(g.wireThruPin.length, 0, `${ctx} wireThruPin ${g.wireThruPin.join(' ')}`);
 		assert.equal(g.wireThruComp.length, 0, `${ctx} wireThruComp ${g.wireThruComp.join(' ')}`);
 		assert.equal(g.overlaps.length, 0, `${ctx} overlaps ${g.overlaps.join(' ')}`);
 		assert.equal(g.offgrid, 0, `${ctx} offgrid ${g.offEx.join(' ')}`);
