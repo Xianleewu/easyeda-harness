@@ -139,7 +139,9 @@ export async function elkLayout({ snapshot, logical, byDes, elk = new ELK(), lay
 	const routed = routeNets(segs.map(s => ({ a: escape(s.pinA), b: escape(s.pinB), net: s.net })), obstacles, { wireClearance: 2 });
 	// 布线失败【或导线过长(跨图)】的网 → 整网回退【按名标签】(商用:远程信号用标签而非长线;
 	// 长线还会横穿其他标签=L4)。保电气完整(同名标签 EDA 连通)。任一段触发则全网回退,避免半连。
-	const MAX_WIRE = 560;
+	// 导线长上限:>此值的网回退标签。ELK_MAX_WIRE=0 → 全多脚网转标签(live 投递用:EDA 必合并相接
+	// 路由线成乱序折线,改全网标=全短桩,无相接路由线=无乱)。PNG 渲染默认 560(留本地真实连线)。
+	const MAX_WIRE = process.env.ELK_MAX_WIRE != null ? Number(process.env.ELK_MAX_WIRE) : 560;
 	const failedNets = new Set();
 	routed.forEach((r, i) => {
 		if (!r.path) { failedNets.add(segs[i].net); return; }
