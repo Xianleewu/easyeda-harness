@@ -67,7 +67,9 @@ export function routeSide(sidePins, side) {
 // 上/下边引脚:竖直逃逸(vdir -1 下 / +1 上)的阶梯,水平走到侧标签列(hside left/right,
 // 复用 alignMode 6/8 侧标签,不触标签门旋转问题)。平面性:近标签侧者最浅,深者更靠外侧
 // → 深线的竖直段不被浅线水平段挡、浅线竖直段不挡深线水平段(已推演无交叉)。
-export function routeEdge(pins, vdir, hside, clearY) {
+// edgeRef(可选):标签列外推的 x 基准下/上限。默认从引脚 x 算;multipart 朝内边脚的引脚在中心 x,
+// 须传"栈最宽边 x"使标签越过整栈体外(否则标签落在堆叠件 x 阴影内 → L6 keepout)。densefanout 不传 → 行为不变。
+export function routeEdge(pins, vdir, hside, clearY, edgeRef) {
 	const frags = [];
 	if (!pins.length) return frags;
 	const hdir = hside === 'right' ? 1 : -1;
@@ -79,7 +81,8 @@ export function routeEdge(pins, vdir, hside, clearY) {
 	const rowY = clearY != null ? (vdir < 0 ? Math.min(pinRow, clearY) : Math.max(pinRow, clearY)) : pinRow;
 	const labelLen = name => Math.max(40, String(name).length * 6 + 18);
 	const maxLen = Math.max(...sorted.map(p => labelLen(p.net.name)));
-	const edgeX = hdir > 0 ? Math.max(...pins.map(p => p.world[0])) : Math.min(...pins.map(p => p.world[0]));
+	let edgeX = hdir > 0 ? Math.max(...pins.map(p => p.world[0])) : Math.min(...pins.map(p => p.world[0]));
+	if (Number.isFinite(edgeRef)) edgeX = hdir > 0 ? Math.max(edgeX, edgeRef) : Math.min(edgeX, edgeRef);   // 标签越过整栈最宽边
 	const labelX = snap10(edgeX + hdir * (maxLen + LABEL_GAP));   // snap 最终 labelX(非仅 edgeX)→ 与 routeSide 同 10-栅,L1 列对齐
 	const preX = labelX - hdir * STUB;
 	for (let i = 0; i < sorted.length; i++) {
@@ -146,10 +149,14 @@ export function densefanoutArchetype(spec = {}) {
 	const splitSide = arr => [arr.filter(p => p.world[0] < anchor.x), arr.filter(p => p.world[0] >= anchor.x)];
 	const [bL, bR] = splitSide(bottom);
 	const [tL, tR] = splitSide(top);
+	// 顶/底边脚的引脚常在中心 x、落体内;标签列须以体边(含伸出脚的 localBox)为基准外推,否则
+	// labelX 从中心算 → 标签落在宽体 x 阴影内(L6 keepout,尤其脚伸出体框时)。
+	const bodyMaxX = lb ? anchor.x + lb.maxX : undefined;
+	const bodyMinX = lb ? anchor.x + lb.minX : undefined;
 	const frags = [
 		...sideFrags,
-		...routeEdge(bL, -1, 'left', floorY), ...routeEdge(bR, -1, 'right', floorY),
-		...routeEdge(tL, 1, 'left', ceilY), ...routeEdge(tR, 1, 'right', ceilY),
+		...routeEdge(bL, -1, 'left', floorY, bodyMinX), ...routeEdge(bR, -1, 'right', floorY, bodyMaxX),
+		...routeEdge(tL, 1, 'left', ceilY, bodyMinX), ...routeEdge(tR, 1, 'right', ceilY, bodyMaxX),
 	];
 	const merged = mergeParts(...frags);
 	return { place, wires: merged.wires, flags: merged.flags, noConnects: [], region: regionOf(pts, 20) };

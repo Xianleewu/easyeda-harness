@@ -53,6 +53,7 @@ export function multipartArchetype(spec = {}) {
 	const left = [], right = [], botPins = [], topPins = [], inTop = [], inBot = [], pts = [];
 	let cursorY = anchor.y;
 	let stackBottom = anchor.y;
+	let stackMaxX = -Infinity, stackMinX = Infinity;   // 整栈最宽左右边(朝内边脚标签须越过它,避 L6)
 	const lastIdx = ordered.length - 1;
 	ordered.forEach((comp, pi) => {
 		const lb = comp.localBox || { minX: -5, minY: -5, maxX: 5, maxY: 5 };
@@ -61,6 +62,8 @@ export function multipartArchetype(spec = {}) {
 		const px = anchor.x, py = snap10(cursorY - lb.maxY);
 		place[comp.designator] = { x: px, y: py, rot: 0, mirror: false };
 		stackBottom = Math.min(stackBottom, py + lb.minY);
+		stackMaxX = Math.max(stackMaxX, px + lb.maxX);
+		stackMinX = Math.min(stackMinX, px + lb.minX);
 		const partPins = [];
 		for (const p of (comp.pins || [])) {
 			const world = toWorld(p.local, [px, py], 0, false);
@@ -122,12 +125,12 @@ export function multipartArchetype(spec = {}) {
 		return [...m.values()];
 	};
 	const inFrags = [];
-	for (const g of groupBySide(inBot)) inFrags.push(...routeEdge(g.list, -1, g.side, null));
-	for (const g of groupBySide(inTop)) inFrags.push(...routeEdge(g.list, 1, g.side, null));
+	for (const g of groupBySide(inBot)) inFrags.push(...routeEdge(g.list, -1, g.side, null, g.side === 'right' ? stackMaxX : stackMinX));
+	for (const g of groupBySide(inTop)) inFrags.push(...routeEdge(g.list, 1, g.side, null, g.side === 'right' ? stackMaxX : stackMinX));
 	const frags = [
 		...sideFrags,
-		...routeEdge(bL, -1, 'left', floorY), ...routeEdge(bR, -1, 'right', floorY),
-		...routeEdge(tL, 1, 'left', ceilY), ...routeEdge(tR, 1, 'right', ceilY),
+		...routeEdge(bL, -1, 'left', floorY, stackMinX), ...routeEdge(bR, -1, 'right', floorY, stackMaxX),
+		...routeEdge(tL, 1, 'left', ceilY, stackMinX), ...routeEdge(tR, 1, 'right', ceilY, stackMaxX),
 		...inFrags,
 	];
 	const merged = mergeParts(...frags);
