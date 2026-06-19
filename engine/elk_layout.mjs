@@ -72,6 +72,14 @@ function buildGraph(snapshot, logical, byDes, roles, scale = true) {
 			const len = (r.role === 'label' || r.role === 'wire') ? labelLen(r.net) + LABEL_GAP + 20 : 50;
 			need[side] = Math.max(need[side], Math.max(LABEL_PAD, len));
 		}
+		// 底/顶密集竖排标签:脚≥4 且最终 pitch<20 → 2 行深错排,需额外留一行深(竖排标签长 ≈ labelLen)。
+		for (const _side of ['top', 'bottom']) {
+			const _arr = lps[_side];
+			if (_arr.length < 4 || minGap(_arr, 0) * sx >= 20) continue;
+			let _maxLen = 0;
+			for (const _p of (wc.pins || [])) { const _r = roles.get(portId(c.designator, _p.num)); if (_r && classifyEdge(_p.local, lb0) === _side && (_r.role === 'label' || _r.role === 'wire')) _maxLen = Math.max(_maxLen, labelLen(_r.net)); }
+			need[_side] = (need[_side] || LABEL_PAD) + _maxLen + 16;
+		}
 		const pad = {
 			left: need.left || EDGE_PAD, right: need.right || EDGE_PAD,
 			top: need.top || EDGE_PAD, bottom: need.bottom || EDGE_PAD,
@@ -155,6 +163,29 @@ export async function elkLayout({ snapshot, logical, byDes, elk = new ELK(), lay
 		wires.push({ net: r.net, line });
 	});
 
+		// 底/顶密集竖排标签 → 2 行深错排:同件同侧(top/bottom)label 脚按 x 序交替分两行深度,
+		// 把 10-pitch 横擦降为每行 20-pitch、相邻脚落不同 Y 带不擦。深桩各在独立 x、不交叉(几何安全)。
+		const labelRole2 = id => { const r = roles.get(id); if (!r) return null; return (r.role === 'wire' && failedNets.has(r.net)) ? 'label' : r.role; };
+		const rowByPin = new Map();
+		{
+			const groups = new Map();
+			for (const [id, p] of pinAbs) {
+				if ((p.side !== 'top' && p.side !== 'bottom') || labelRole2(id) !== 'label') continue;
+				const k = p.des + '|' + p.side;
+				if (!groups.has(k)) groups.set(k, []);
+				groups.get(k).push({ id, net: roles.get(id).net, x: p.x });
+			}
+			for (const arr of groups.values()) {
+				if (arr.length < 4) continue;
+				arr.sort((a, b) => a.x - b.x);
+				let minPitch = Infinity;
+				for (let i = 1; i < arr.length; i++) minPitch = Math.min(minPitch, Math.abs(arr[i].x - arr[i - 1].x));
+				if (minPitch >= 20) continue;
+				const step = Math.max(...arr.filter((_, i) => i % 2 === 0).map(o => labelLen(o.net))) + 16;
+				arr.forEach((o, i) => rowByPin.set(o.id, { row: i % 2, step }));
+			}
+		}
+
 	// 单脚 signal → 列对齐标签;power/ground → 符号(均朝外逃逸,落 pad 内)
 	for (const [id, p] of pinAbs) {
 		const r = roles.get(id); if (!r) continue;
@@ -168,7 +199,7 @@ export async function elkLayout({ snapshot, logical, byDes, elk = new ELK(), lay
 			// 上下脚标签逃逸距加大到 48(>总线深~20),让竖排标签落在总线之外,避总线穿标(L4)。
 			if (p.side === 'left') { wires.push({ net: r.net, line: [p.x, p.y, ex, ey] }); netflags.push({ kind: 'sig', net: r.net, x: ex, y: ey, textX: ex, textY: ey, rot: 180, alignMode: 8 }); }
 			else if (p.side === 'right') { wires.push({ net: r.net, line: [p.x, p.y, ex, ey] }); netflags.push({ kind: 'sig', net: r.net, x: ex, y: ey, textX: ex, textY: ey, rot: 0, alignMode: 6 }); }
-			else { const [tx, ty] = escape(p, 48); wires.push({ net: r.net, line: [p.x, p.y, tx, ty] }); netflags.push({ kind: 'sig', net: r.net, x: tx, y: ty, textX: tx, textY: ty, rot: p.side === 'top' ? 270 : 90, alignMode: 2 }); }
+			else { const rb = rowByPin.get(id); const [tx, ty] = escape(p, 48 + (rb ? rb.row * rb.step : 0)); wires.push({ net: r.net, line: [p.x, p.y, tx, ty] }); netflags.push({ kind: 'sig', net: r.net, x: tx, y: ty, textX: tx, textY: ty, rot: p.side === 'top' ? 270 : 90, alignMode: 2 }); }
 		}
 	}
 
