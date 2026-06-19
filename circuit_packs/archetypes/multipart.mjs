@@ -36,8 +36,21 @@ export function multipartArchetype(spec = {}) {
 		return r;
 	};
 	const ordered = parts.map((c, i) => [c, i]).sort((a, b) => (edgeRank(a[0]) - edgeRank(b[0])) || (a[1] - b[1])).map(x => x[0]);
+	// 预分类各件【有网】顶/底边脚数(用于可变 gap):非栈端件的朝内顶/底边脚须进相邻层间间隙竖直逃逸,
+	// 间隙须按朝内边脚数加宽(否则阶梯压到邻件)。无朝内边脚的件(常见,含真实板/左右脚 IC)gap 不变 → 行为不变。
+	const ROW = 20;   // 镜像 densefanout ROW_PITCH(routeEdge 阶梯行距)
+	const edgeCount = ordered.map(comp => {
+		const lb = comp.localBox || { minX: -5, minY: -5, maxX: 5, maxY: 5 };
+		let t = 0, b = 0;
+		for (const p of (comp.pins || [])) {
+			if (!pinNets[`${comp.designator}.${p.num}`]) continue;
+			const ce = classifyEdge(p.local, lb);
+			if (ce === 'top') t++; else if (ce === 'bottom') b++;
+		}
+		return { t, b };
+	});
 	const place = {};
-	const left = [], right = [], botPins = [], topPins = [], pts = [];
+	const left = [], right = [], botPins = [], topPins = [], inTop = [], inBot = [], pts = [];
 	let cursorY = anchor.y;
 	let stackBottom = anchor.y;
 	const lastIdx = ordered.length - 1;
@@ -56,16 +69,19 @@ export function multipartArchetype(spec = {}) {
 			if (!net) continue;
 			const e = { num: `${comp.designator}.${p.num}`, world, net };
 			partPins.push(e);
-			// 底/顶边引脚水平逃逸会横穿同排邻脚(wireThruPin)。仅栈底件底边可向下逃逸(下无件)、
-			// 栈顶件顶边可向上逃逸(上无件);中层件边脚向下/上会穿邻件,故仍走 routeSide(左/右)。
+			// 底/顶边引脚水平逃逸会横穿同排邻脚(wireThruPin)。栈底件底边/栈顶件顶边向外逃逸(外侧无件);
+			// 中层件的朝内顶/底边脚走 inTop/inBot → 进相邻层间间隙竖直阶梯逃逸(routeEdge),不再误塞 routeSide。
 			const edge = classifyEdge(p.local, lb);
-			if (edge === 'bottom' && pi === lastIdx) botPins.push(e);
-			else if (edge === 'top' && pi === 0) topPins.push(e);
+			if (edge === 'bottom') { if (pi === lastIdx) botPins.push(e); else inBot.push({ ...e, pi }); }
+			else if (edge === 'top') { if (pi === 0) topPins.push(e); else inTop.push({ ...e, pi }); }
 			else (p.local[0] >= 0 ? right : left).push(e);
 		}
 		// 每件脚对自件世界体 fail-closed 检查(内部脚无正交逃逸 → 抛错让 planner 跳过)。
 		assertEscapable(partPins, { minX: px + lb.minX, minY: py + lb.minY, maxX: px + lb.maxX, maxY: py + lb.maxY }, comp.designator);
-		cursorY = snap10(py + lb.minY - PART_GAP);   // 下一件顶 = 本件真实底 − gap
+		// 间隙加宽:本件朝内底边脚(pi<lastIdx)向下 + 下件朝内顶边脚向上,都进本层间间隙阶梯逃逸,
+		// 各占 count×ROW;无朝内边脚则 gapExtra=0(gap 不变,行为同旧)。
+		const gapExtra = pi < lastIdx ? (edgeCount[pi].b + edgeCount[pi + 1].t) * ROW : 0;
+		cursorY = snap10(py + lb.minY - PART_GAP - gapExtra);   // 下一件顶 = 本件真实底 − gap(可变)
 	});
 	// 限界②修:不同宽件的同侧脚 world x 各异、喂给假设同 x 的 routeSide 会交叉。把各侧脚水平延伸
 	// 到公共边 x(窄件补 stub 到最外件边缘),使喂入 routeSide 的同侧脚同 x。分层件不同 y、且同件
@@ -93,10 +109,26 @@ export function multipartArchetype(spec = {}) {
 	const splitSide = arr => [arr.filter(p => p.world[0] < anchor.x), arr.filter(p => p.world[0] >= anchor.x)];
 	const [bL, bR] = splitSide(botPins);
 	const [tL, tR] = splitSide(topPins);
+	// 朝内边脚:逐件按侧分组,routeEdge 进相邻层间间隙(底边向下 vdir=-1、顶边向上 +1;clearY=null →
+	// 从脚排起阶梯,gap 已加宽容纳,竖直逃逸避开同排脚 → 消 wireThruPin)。
+	const groupBySide = arr => {
+		const m = new Map();
+		for (const e of arr) {
+			const side = e.world[0] >= anchor.x ? 'right' : 'left';
+			const k = `${e.pi}|${side}`;
+			if (!m.has(k)) m.set(k, { side, list: [] });
+			m.get(k).list.push(e);
+		}
+		return [...m.values()];
+	};
+	const inFrags = [];
+	for (const g of groupBySide(inBot)) inFrags.push(...routeEdge(g.list, -1, g.side, null));
+	for (const g of groupBySide(inTop)) inFrags.push(...routeEdge(g.list, 1, g.side, null));
 	const frags = [
 		...sideFrags,
 		...routeEdge(bL, -1, 'left', floorY), ...routeEdge(bR, -1, 'right', floorY),
 		...routeEdge(tL, 1, 'left', ceilY), ...routeEdge(tR, 1, 'right', ceilY),
+		...inFrags,
 	];
 	const merged = mergeParts(...frags);
 	return { place, wires: merged.wires, flags: merged.flags, noConnects: [], region: regionOf(pts, 20) };
