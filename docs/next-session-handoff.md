@@ -47,6 +47,24 @@ Do not describe the project as reliably producing polished schematics for arbitr
 
 These commits are important because they move the project away from "run rules after chaos" and toward "block generation until the project has a reviewable block/pin/layout/label contract."
 
+### Plexus synthesis + source-based live delivery (later milestone)
+
+- `e7db6d3 Migrate gsd->plexus naming + land quality/audit support modules`
+- `131bb0e Official gated apply uses source-based delivery (apply_source_run writer)`
+- `06fb798 apply_source_run honors --window-id (multi-window parity)`
+
+`engine/plexus_synthesize.mjs` synthesizes a gate-clean layout (geomQC incl.
+collinear / endpoint / T-junction shorts, labelQC, synthesisFaithfulness,
+wireConnectivity all hard=0) from an extracted board. `engine/apply_source.mjs`
+delivers it live via `eda.sys_FileManager.setDocumentSource` (atomic source
+load) — this BYPASSES the legacy per-wire `sch_PrimitiveWire.create` path, which
+loses 30-50 wires to EDA's non-deterministic merge. The official `apply --gated`
+bundled writer now runs `engine/apply_source_run.mjs`, so the `full_model.json`
+the gates validate IS the model written back (geomQC fail-closed safety net +
+deep component+segment verification + --undo self-heal + auth gate). Note:
+`getNetlist` is platform-blocked (server-side hang); geometric floating-net
+reconstruction (`floating 41 <= original 42`) is the electrical-equivalence proxy.
+
 ## Must-Read Files
 
 - `AGENTS.md`: primary operating contract for agents.
