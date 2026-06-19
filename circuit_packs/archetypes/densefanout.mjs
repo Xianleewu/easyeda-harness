@@ -80,7 +80,7 @@ export function routeEdge(pins, vdir, hside, clearY) {
 	const labelLen = name => Math.max(40, String(name).length * 6 + 18);
 	const maxLen = Math.max(...sorted.map(p => labelLen(p.net.name)));
 	const edgeX = hdir > 0 ? Math.max(...pins.map(p => p.world[0])) : Math.min(...pins.map(p => p.world[0]));
-	const labelX = snap10(edgeX) + hdir * (maxLen + LABEL_GAP);
+	const labelX = snap10(edgeX + hdir * (maxLen + LABEL_GAP));   // snap 最终 labelX(非仅 edgeX)→ 与 routeSide 同 10-栅,L1 列对齐
 	const preX = labelX - hdir * STUB;
 	for (let i = 0; i < sorted.length; i++) {
 		const [px, py] = sorted[i].world;
