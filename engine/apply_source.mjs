@@ -16,6 +16,8 @@ import { inferRoles } from './role_infer.mjs';
 import { synthesizeContract } from './design_contract.mjs';
 import { planLayout } from './plexus_planner.mjs';
 import { withLocalPins } from './transform.mjs';
+import { geomQC } from './geom_qc.mjs';
+import { labelQC } from './label_qc.mjs';
 import { executeCode } from './bridge_client.mjs';
 
 const ROOT = (process.env.EASYEDA_WORKDIR || process.cwd()).replace(/\\/g, '/');
@@ -180,6 +182,14 @@ async function deliverOnce(r, idByDes) {
 
 export async function applySource({ robust = false, maxTries = 3 } = {}) {
 	const { r, idByDes } = synth();
+	// 投递前合成质量门报告:surfaces 被投布局的几何/标签缺陷(源式投递原子加载、不像 create 拒短路线
+	// → 缺陷会被静默投到 live;故显式报告,fail-loud 哲学一致)。
+	const g = geomQC(r.model);
+	const lh = labelQC(r.model).filter(f => f.severity === 'hard').length;
+	const defects = g.overlaps.length + g.wireThruComp.length + g.wireThruPin.length + g.crossings + lh;
+	console.log(`合成质量门:overlaps=${g.overlaps.length} wireThruComp=${g.wireThruComp.length} wireThruPin=${g.wireThruPin.length} crossings=${g.crossings} labelHard=${lh}`);
+	if (defects) console.warn(`⚠ 被投合成布局含 ${defects} 处几何缺陷(如 wireThruPin=穿外部脚=潜在短路)——源式投递会原样投入,非干净布局。`
+		+ (g.wireThruPin.length ? ` wireThruPin: ${g.wireThruPin.slice(0, 4).join(' ')}` : ''));
 	if (!robust) {
 		if (!(await deliverOnce(r, idByDes))) {
 			console.error('✗ 投递静默回退——源已被归一化,先 `node engine/plexus_apply_live.mjs --undo` 重建自然源再重试(或加 --robust 自愈)。');
