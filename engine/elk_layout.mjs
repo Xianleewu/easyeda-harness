@@ -47,11 +47,23 @@ function buildGraph(snapshot, logical, byDes, roles) {
 	const meta = new Map();   // designator → {lb, pad, compW, compH}
 	for (const c of snapshot.components) {
 		const wc = byDes.get(c.designator);
-		const lb = wc.localBox;
+		const lb0 = wc.localBox;
+		// 件缩放:使【带标签脚】同侧间距 ≥ ROW(容标签框,免叠压)。商用做法:IC 按脚标签拉高/拉宽。
+		const ROW = 30;
+		const lps = { left: [], right: [], top: [], bottom: [] };
+		for (const p of (wc.pins || [])) { const r = roles.get(portId(c.designator, p.num)); if (r && r.role === 'label') lps[classifyEdge(p.local, lb0)].push(p.local); }
+		const minGap = (arr, ax) => { const vs = arr.map(l => l[ax]).sort((a, b) => a - b); let m = Infinity; for (let i = 1; i < vs.length; i++) m = Math.min(m, vs[i] - vs[i - 1]); return m; };
+		const gy = Math.min(minGap(lps.left, 1), minGap(lps.right, 1)), gx = Math.min(minGap(lps.top, 0), minGap(lps.bottom, 0));
+		const sy = (Number.isFinite(gy) && gy > 0 && gy < ROW) ? ROW / gy : 1;
+		const sx = (Number.isFinite(gx) && gx > 0 && gx < ROW) ? ROW / gx : 1;
+		const cxL = (lb0.minX + lb0.maxX) / 2, cyL = (lb0.minY + lb0.maxY) / 2;
+		const scLocal = l => [(l[0] - cxL) * sx + cxL, (l[1] - cyL) * sy + cyL];
+		const lb = { minX: (lb0.minX - cxL) * sx + cxL, maxX: (lb0.maxX - cxL) * sx + cxL, minY: (lb0.minY - cyL) * sy + cyL, maxY: (lb0.maxY - cyL) * sy + cyL };
+		const pinsLocal = (wc.pins || []).map(p => ({ num: p.num, local: scLocal(p.local) }));
 		const compW = Math.max(20, lb.maxX - lb.minX), compH = Math.max(20, lb.maxY - lb.minY);
-		// 各侧是否有标签/符号脚 + 该侧最长标签
+		// 各侧是否有标签/符号脚 + 该侧最长标签(用缩放后 pinsLocal/lb,口径一致)
 		const need = { left: 0, right: 0, top: 0, bottom: 0 };
-		for (const p of (wc.pins || [])) {
+		for (const p of pinsLocal) {
 			const r = roles.get(portId(c.designator, p.num)); if (!r || r.role === 'wire') continue;
 			const side = classifyEdge(p.local, lb);
 			const len = r.role === 'label' ? labelLen(r.net) + LABEL_GAP + 20 : 50;
@@ -63,9 +75,9 @@ function buildGraph(snapshot, logical, byDes, roles) {
 		};
 		const W = compW + pad.left + pad.right, H = compH + pad.top + pad.bottom;
 		const ports = [];
-		for (const p of (wc.pins || [])) {
+		for (const p of pinsLocal) {
 			ports.push({ id: portId(c.designator, p.num),
-				x: (p.local[0] - lb.minX) + pad.left,            // 件体在 pad 内偏移
+				x: (p.local[0] - lb.minX) + pad.left,            // 件体在 pad 内偏移(缩放后)
 				y: (lb.maxY - p.local[1]) + pad.top });          // y 下翻
 		}
 		children.push({ id: c.designator, width: W, height: H, ports, layoutOptions: { 'elk.portConstraints': 'FIXED_POS' } });
