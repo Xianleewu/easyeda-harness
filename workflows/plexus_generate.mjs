@@ -1,7 +1,7 @@
 import { spawnSync } from 'node:child_process';
 import { existsSync, readFileSync, writeFileSync, statSync } from 'node:fs';
 import { basename, dirname, resolve } from 'node:path';
-import { buildGsdPlan } from './gsd_plan.mjs';
+import { buildPlexusPlan } from './plexus_plan.mjs';
 import { buildDesignBrief } from './design_brief.mjs';
 import { acquireRunLock } from './run_lock.mjs';
 
@@ -42,7 +42,7 @@ export function generateContext(root, specPath = 'project_spec.json') {
 }
 
 function hard(rule, msg, where = {}) {
-	return { rule, severity: 'hard', category: 'gsd-plan', msg, where };
+	return { rule, severity: 'hard', category: 'plexus-plan', msg, where };
 }
 
 function readOptionalJson(root, path, label, findings) {
@@ -68,16 +68,16 @@ export function buildGeneratePlan(root, specPath = 'project_spec.json') {
 	const libraryManifest = readOptionalJson(root, context.libraryManifestPath, 'approved_library_manifest', inputFindings);
 	const partLibSnapshot = readOptionalJson(root, context.partLibPath, 'project_library_snapshot', inputFindings);
 	const model = existsSync(context.modelPath) ? readJson(root, context.modelPath) : null;
-	return buildGsdPlan({ spec, contract, netlist, assembly, libraryManifest, partLibSnapshot, model, specPath, assemblyPath: context.assemblyPath, partLibPath: context.partLibPath, modelPath: context.modelPath, inputFindings });
+	return buildPlexusPlan({ spec, contract, netlist, assembly, libraryManifest, partLibSnapshot, model, specPath, assemblyPath: context.assemblyPath, partLibPath: context.partLibPath, modelPath: context.modelPath, inputFindings });
 }
 
-export function runGsdGenerate({ root, specPath = 'project_spec.json', command = ['engine/pipeline.mjs'], draft = false } = {}) {
+export function runPlexusGenerate({ root, specPath = 'project_spec.json', command = ['engine/pipeline.mjs'], draft = false } = {}) {
 	const started = Date.now();
 	const lock = acquireRunLock(root);
 	const context = generateContext(root, specPath);
 	try {
 		const plan = buildGeneratePlan(root, specPath);
-		writeFileSync(`${root}/gsd_plan_report.json`, JSON.stringify(plan, null, 2), 'utf8');
+		writeFileSync(`${root}/plexus_plan_report.json`, JSON.stringify(plan, null, 2), 'utf8');
 		if (!plan.pass) {
 			const report = {
 				generatedAt: new Date().toISOString(),
@@ -89,7 +89,7 @@ export function runGsdGenerate({ root, specPath = 'project_spec.json', command =
 				findings: plan.findings,
 				durationMs: Date.now() - started,
 			};
-			writeFileSync(`${root}/gsd_generate_report.json`, JSON.stringify(report, null, 2), 'utf8');
+			writeFileSync(`${root}/plexus_generate_report.json`, JSON.stringify(report, null, 2), 'utf8');
 			return { report, status: 1 };
 		}
 		const designBrief = buildDesignBrief(root, specPath);
@@ -110,7 +110,7 @@ export function runGsdGenerate({ root, specPath = 'project_spec.json', command =
 				findings: designBrief.findings,
 				durationMs: Date.now() - started,
 			};
-			writeFileSync(`${root}/gsd_generate_report.json`, JSON.stringify(report, null, 2), 'utf8');
+			writeFileSync(`${root}/plexus_generate_report.json`, JSON.stringify(report, null, 2), 'utf8');
 			return { report, status: 1 };
 		}
 
@@ -168,13 +168,13 @@ export function runGsdGenerate({ root, specPath = 'project_spec.json', command =
 			findings: pass ? [] : [{
 				rule: 'GG1-generate-pass',
 				severity: 'hard',
-				category: 'gsd-generate',
-				msg: 'deterministic generation must pass after a passing GSD plan',
+				category: 'plexus-generate',
+				msg: 'deterministic generation must pass after a passing Plexus plan',
 				where: { status: child.status, reportPass: reportJson?.pass ?? null, fullModelExists: generated.fullModel.exists, layoutEvidenceOk },
 			}],
 			durationMs: Date.now() - started,
 		};
-		writeFileSync(`${root}/gsd_generate_report.json`, JSON.stringify(report, null, 2), 'utf8');
+		writeFileSync(`${root}/plexus_generate_report.json`, JSON.stringify(report, null, 2), 'utf8');
 		return { report, status: pass ? 0 : 1 };
 	} finally {
 		lock.release();

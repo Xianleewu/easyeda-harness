@@ -103,7 +103,7 @@ export function buildCellManifestTemplate(packId, spec = null) {
 				noLocalWireCrossings: true,
 				noWiresThroughComponentBodies: true,
 				noVisibleObjectOverlaps: true,
-				checkedBy: ['gsd:plan cell-builder dry-run', 'contract:geometry', 'contract:geometry:live'],
+				checkedBy: ['plexus:plan cell-builder dry-run', 'contract:geometry', 'contract:geometry:live'],
 			},
 			labelContract: {
 				visibleSignalLabelsMustUseRealNetflags: true,

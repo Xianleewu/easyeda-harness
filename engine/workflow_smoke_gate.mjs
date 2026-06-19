@@ -1,9 +1,9 @@
 import { spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { buildGsdPlan } from '../workflows/gsd_plan.mjs';
-import { runGsdGenerate } from '../workflows/gsd_generate.mjs';
-import { writeScaffold } from '../workflows/gsd_scaffold.mjs';
+import { buildPlexusPlan } from '../workflows/plexus_plan.mjs';
+import { runPlexusGenerate } from '../workflows/plexus_generate.mjs';
+import { writeScaffold } from '../workflows/plexus_scaffold.mjs';
 import { buildDesignBrief, writeDesignBrief } from '../workflows/design_brief.mjs';
 import { buildMinimalSpec, syncPackRegistry, writePackScaffold } from '../workflows/pack_scaffold.mjs';
 import { validateLibraryContract } from '../contracts/library_contract.mjs';
@@ -113,7 +113,7 @@ function buildPlanForFiles({ spec, contract, netlist, assembly, libraryManifest,
 	const model = existsSync(modelPath) ? readJson(modelPath) : null;
 	const partLibPath = `${ROOT}/snap2.json`;
 	const partLibSnapshot = existsSync(partLibPath) ? readJson(partLibPath) : null;
-	return buildGsdPlan({ spec, contract, netlist, assembly, libraryManifest, partLibSnapshot, model, specPath, assemblyPath, partLibPath });
+	return buildPlexusPlan({ spec, contract, netlist, assembly, libraryManifest, partLibSnapshot, model, specPath, assemblyPath, partLibPath });
 }
 
 const findings = [];
@@ -191,7 +191,7 @@ try {
 		specPath: 'project_spec.json',
 	});
 	checks.rootPlan = { pass: rootPlan.pass, severity: rootPlan.severity };
-	assertFinding(findings, rootPlan.pass === true, 'WS1-root-plan-pass', 'root GSD plan must pass before workflow smoke can be trusted', {
+	assertFinding(findings, rootPlan.pass === true, 'WS1-root-plan-pass', 'root Plexus plan must pass before workflow smoke can be trusted', {
 		severity: rootPlan.severity,
 		firstFinding: rootPlan.findings?.[0] || null,
 	});
@@ -256,7 +256,7 @@ try {
 		rules: (mismatchPlan.findings || []).map(f => f.rule),
 	};
 	for (const rule of ['GP1-project-id-contract', 'GP2-project-id-netlist', 'GP3-project-id-assembly']) {
-		assertFinding(findings, hasRule(mismatchPlan, rule), `WS2-${rule}`, 'projectId mismatch must be rejected by GSD plan', {
+		assertFinding(findings, hasRule(mismatchPlan, rule), `WS2-${rule}`, 'projectId mismatch must be rejected by Plexus plan', {
 			expectedRule: rule,
 			observedRules: checks.projectMismatchRejected.rules,
 		});
@@ -288,7 +288,7 @@ try {
 		rules: (routeSideMismatchPlan.findings || []).map(f => f.rule),
 		firstFinding: routeSideMismatchPlan.findings?.find(f => f.rule === 'GP67-interface-route-preserves-spec') || null,
 	};
-	assertFinding(findings, checks.interfaceRouteSidePreservesSpec.pass, 'WS84-interface-route-side-preserves-spec', 'GSD plan must reject assembly interface routes that silently drop or alter fromSide/toSide declared in project_spec.json', checks.interfaceRouteSidePreservesSpec);
+	assertFinding(findings, checks.interfaceRouteSidePreservesSpec.pass, 'WS84-interface-route-side-preserves-spec', 'Plexus plan must reject assembly interface routes that silently drop or alter fromSide/toSide declared in project_spec.json', checks.interfaceRouteSidePreservesSpec);
 
 	const duplicatePartContract = clone(contract);
 	if (duplicatePartContract.modules?.[0] && duplicatePartContract.modules?.[1]) {
@@ -308,7 +308,7 @@ try {
 		rules: (duplicatePartPlan.findings || []).map(f => f.rule),
 		firstFinding: duplicatePartPlan.findings?.[0] || null,
 	};
-	assertFinding(findings, checks.contractPartsOwnedOnce.pass, 'WS35-contract-required-parts-owned-once', 'GSD plan must reject project contracts that assign the same physical designator to more than one module', {
+	assertFinding(findings, checks.contractPartsOwnedOnce.pass, 'WS35-contract-required-parts-owned-once', 'Plexus plan must reject project contracts that assign the same physical designator to more than one module', {
 		observedRules: checks.contractPartsOwnedOnce.rules,
 		firstFinding: checks.contractPartsOwnedOnce.firstFinding,
 	});
@@ -327,7 +327,7 @@ try {
 		pass: !noColumnsPlan.pass && hasRule(noColumnsPlan, 'GP12-layout-policy-present'),
 		rules: (noColumnsPlan.findings || []).map(f => f.rule),
 	};
-	assertFinding(findings, checks.layoutColumnsRequired.pass, 'WS3-layout-columns-required', 'GSD plan must reject layout policies that do not declare ordered columns', {
+	assertFinding(findings, checks.layoutColumnsRequired.pass, 'WS3-layout-columns-required', 'Plexus plan must reject layout policies that do not declare ordered columns', {
 		observedRules: checks.layoutColumnsRequired.rules,
 	});
 
@@ -347,7 +347,7 @@ try {
 		pass: !missingColumnCoveragePlan.pass && hasRule(missingColumnCoveragePlan, 'GP23-layout-column-covers-modules'),
 		rules: (missingColumnCoveragePlan.findings || []).map(f => f.rule),
 	};
-	assertFinding(findings, checks.layoutColumnsCoverModules.pass, 'WS33-layout-columns-cover-modules', 'GSD plan must reject layout policies whose columns do not cover every assembly module before generation', {
+	assertFinding(findings, checks.layoutColumnsCoverModules.pass, 'WS33-layout-columns-cover-modules', 'Plexus plan must reject layout policies whose columns do not cover every assembly module before generation', {
 		observedRules: checks.layoutColumnsCoverModules.rules,
 	});
 
@@ -366,7 +366,7 @@ try {
 		rules: (reversedColumnsPlan.findings || []).map(f => f.rule),
 		firstFinding: reversedColumnsPlan.findings?.[0] || null,
 	};
-	assertFinding(findings, checks.layoutColumnsFollowAnchorOrder.pass, 'WS34-layout-columns-follow-anchor-order', 'GSD plan must reject layout policies whose declared reading-flow columns contradict module anchor X order', {
+	assertFinding(findings, checks.layoutColumnsFollowAnchorOrder.pass, 'WS34-layout-columns-follow-anchor-order', 'Plexus plan must reject layout policies whose declared reading-flow columns contradict module anchor X order', {
 		observedRules: checks.layoutColumnsFollowAnchorOrder.rules,
 		firstFinding: checks.layoutColumnsFollowAnchorOrder.firstFinding,
 	});
@@ -397,7 +397,7 @@ try {
 		rules: (narrowColumnsPlan.findings || []).map(f => f.rule),
 		firstFinding: narrowColumnsPlan.findings?.[0] || null,
 	};
-	assertFinding(findings, checks.layoutColumnsNeedReadableGap.pass, 'WS55-layout-columns-need-readable-gap', 'GSD plan must reject layout policies whose adjacent declared columns are too close to read as separate module blocks', {
+	assertFinding(findings, checks.layoutColumnsNeedReadableGap.pass, 'WS55-layout-columns-need-readable-gap', 'Plexus plan must reject layout policies whose adjacent declared columns are too close to read as separate module blocks', {
 		observedRules: checks.layoutColumnsNeedReadableGap.rules,
 		firstFinding: checks.layoutColumnsNeedReadableGap.firstFinding,
 	});
@@ -417,7 +417,7 @@ try {
 		rules: (noModuleRegionsPlan.findings || []).map(f => f.rule),
 		firstFinding: noModuleRegionsPlan.findings?.find(f => f.rule === 'GP47-module-regions-declared') || null,
 	};
-	assertFinding(findings, checks.moduleRegionsRequired.pass, 'WS74-module-regions-required-before-generation', 'GSD plan must reject projects without layoutPolicy.moduleRegions before generation', checks.moduleRegionsRequired);
+	assertFinding(findings, checks.moduleRegionsRequired.pass, 'WS74-module-regions-required-before-generation', 'Plexus plan must reject projects without layoutPolicy.moduleRegions before generation', checks.moduleRegionsRequired);
 
 	const overlappingModuleRegionsAssembly = clone(assembly);
 	overlappingModuleRegionsAssembly.layoutPolicy.moduleRegions = (overlappingModuleRegionsAssembly.layoutPolicy.moduleRegions || []).map(region => {
@@ -539,7 +539,7 @@ try {
 		rules: (missingInterfaceRoutesPlan.findings || []).map(f => f.rule),
 		firstFinding: missingInterfaceRoutesPlan.findings?.find(f => f.rule === 'GP27-interface-routes-declared') || null,
 	};
-	assertFinding(findings, checks.interfaceRoutesRequired.pass, 'WS59-interface-routes-required-before-generation', 'GSD plan must reject projects whose contract interfaces have no layoutPolicy.interfaceRoutes before generation', checks.interfaceRoutesRequired);
+	assertFinding(findings, checks.interfaceRoutesRequired.pass, 'WS59-interface-routes-required-before-generation', 'Plexus plan must reject projects whose contract interfaces have no layoutPolicy.interfaceRoutes before generation', checks.interfaceRoutesRequired);
 
 	const missingRouteLayoutFindings = validateLayoutContract(
 		missingInterfaceRoutesAssembly,
@@ -580,7 +580,7 @@ try {
 		rules: (noLabelColumnsPlan.findings || []).map(f => f.rule),
 		firstFinding: noLabelColumnsPlan.findings?.find(f => f.rule === 'GP35-label-columns-declared') || null,
 	};
-	assertFinding(findings, checks.labelColumnsRequiredForGroupedRoutes.pass, 'WS65-label-columns-required-for-grouped-routes', 'GSD plan must reject grouped-net-label routes without layoutPolicy.labelColumns before generation', checks.labelColumnsRequiredForGroupedRoutes);
+	assertFinding(findings, checks.labelColumnsRequiredForGroupedRoutes.pass, 'WS65-label-columns-required-for-grouped-routes', 'Plexus plan must reject grouped-net-label routes without layoutPolicy.labelColumns before generation', checks.labelColumnsRequiredForGroupedRoutes);
 
 	const incompleteLabelColumnsAssembly = clone(assembly);
 	incompleteLabelColumnsAssembly.layoutPolicy.labelColumns = (incompleteLabelColumnsAssembly.layoutPolicy.labelColumns || [])
@@ -1149,8 +1149,8 @@ try {
 	const passReport = projectId => ({ generatedAt: new Date().toISOString(), pass: true, projectId, severity: { hard: 0, soft: 0, info: 0 }, findings: [] });
 	for (const [name, data] of Object.entries({
 		workflow_smoke_report: passReport(finalLiveSpec.projectId),
-		gsd_plan_report: { ...passReport(finalLiveSpec.projectId), spec: 'project_spec.json' },
-		gsd_generate_report: { ...passReport(finalLiveSpec.projectId), spec: 'project_spec.json' },
+		plexus_plan_report: { ...passReport(finalLiveSpec.projectId), spec: 'project_spec.json' },
+		plexus_generate_report: { ...passReport(finalLiveSpec.projectId), spec: 'project_spec.json' },
 		next_actions: { ...passReport(finalLiveSpec.projectId), actions: [] },
 		repair_actions: { ...passReport(finalLiveSpec.projectId), actions: [] },
 		action_schema_report: passReport(finalLiveSpec.projectId),
@@ -1366,7 +1366,7 @@ try {
 		pass: !noDrawingRulesPlan.pass && hasRule(noDrawingRulesPlan, 'PC27-module-drawing-rules'),
 		rules: (noDrawingRulesPlan.findings || []).map(f => f.rule),
 	};
-	assertFinding(findings, checks.moduleDrawingRulesRequired.pass, 'WS16-module-drawing-rules-required', 'GSD plan must reject modules that do not declare reusable drawing rule contracts before generation', {
+	assertFinding(findings, checks.moduleDrawingRulesRequired.pass, 'WS16-module-drawing-rules-required', 'Plexus plan must reject modules that do not declare reusable drawing rule contracts before generation', {
 		observedRules: checks.moduleDrawingRulesRequired.rules,
 	});
 
@@ -1384,7 +1384,7 @@ try {
 		pass: !noRuleProfilePlan.pass && hasRule(noRuleProfilePlan, 'PC29-rule-profile-present'),
 		rules: (noRuleProfilePlan.findings || []).map(f => f.rule),
 	};
-	assertFinding(findings, checks.ruleProfileRequired.pass, 'WS61-rule-profile-required', 'GSD plan must reject contracts that do not declare executable qualityPolicy.ruleProfile budgets before generation', {
+	assertFinding(findings, checks.ruleProfileRequired.pass, 'WS61-rule-profile-required', 'Plexus plan must reject contracts that do not declare executable qualityPolicy.ruleProfile budgets before generation', {
 		observedRules: checks.ruleProfileRequired.rules,
 	});
 
@@ -1403,7 +1403,7 @@ try {
 		rules: (badRuleProfilePlan.findings || []).map(f => f.rule),
 		firstFinding: badRuleProfilePlan.findings?.find(f => f.rule === 'PC30-rule-profile-value') || null,
 	};
-	assertFinding(findings, checks.ruleProfileValuesRequired.pass, 'WS62-rule-profile-values-required', 'GSD plan must reject contracts whose qualityPolicy.ruleProfile drifts from executable harness budgets', {
+	assertFinding(findings, checks.ruleProfileValuesRequired.pass, 'WS62-rule-profile-values-required', 'Plexus plan must reject contracts whose qualityPolicy.ruleProfile drifts from executable harness budgets', {
 		observedRules: checks.ruleProfileValuesRequired.rules,
 		firstFinding: checks.ruleProfileValuesRequired.firstFinding,
 	});
@@ -1426,7 +1426,7 @@ try {
 		findings,
 		checks.planRejectsMissingCellBuilder.pass,
 		'WS22-plan-rejects-missing-cell-builder',
-		'GSD plan must reject assembly cells that are not declared in the active manifest or not implemented by the selected circuit pack before generation runs',
+		'Plexus plan must reject assembly cells that are not declared in the active manifest or not implemented by the selected circuit pack before generation runs',
 		{
 			observedRules: checks.planRejectsMissingCellBuilder.rules,
 		},
@@ -1435,7 +1435,7 @@ try {
 	writeFileSync(BAD_SPEC, JSON.stringify(badSpec, null, 2) + '\n', 'utf8');
 	const fullModelPath = `${ROOT}/full_model.json`;
 	const beforeFullModelMtime = fileMtimeMs(fullModelPath);
-	const badGenerate = runGsdGenerate({
+	const badGenerate = runPlexusGenerate({
 		root: ROOT,
 		specPath: '_tmp_workflow_smoke/bad_project_spec.json',
 		command: ['engine/pipeline_fast.mjs'],
@@ -1447,11 +1447,11 @@ try {
 		stage: badGenerate.report?.stage || null,
 		fullModelMtimeUnchanged: beforeFullModelMtime === afterFullModelMtime,
 	};
-	assertFinding(findings, badGenerate.status !== 0 && badGenerate.report?.stage === 'plan', 'WS3-generate-plan-gated', 'GSD generate must stop at plan stage for invalid specs', {
+	assertFinding(findings, badGenerate.status !== 0 && badGenerate.report?.stage === 'plan', 'WS3-generate-plan-gated', 'Plexus generate must stop at plan stage for invalid specs', {
 		status: badGenerate.status,
 		stage: badGenerate.report?.stage || null,
 	});
-	assertFinding(findings, beforeFullModelMtime === afterFullModelMtime, 'WS4-generate-no-side-effect-on-bad-plan', 'GSD generate must not rewrite full_model.json when plan fails', {
+	assertFinding(findings, beforeFullModelMtime === afterFullModelMtime, 'WS4-generate-no-side-effect-on-bad-plan', 'Plexus generate must not rewrite full_model.json when plan fails', {
 		beforeFullModelMtime,
 		afterFullModelMtime,
 	});
@@ -1469,7 +1469,7 @@ try {
 	writeFileSync(`${briefBlockedDir}/project_library_snapshot.json`, JSON.stringify(readJson(`${ROOT}/snap2.json`), null, 2) + '\n', 'utf8');
 	writeFileSync(`${briefBlockedDir}/project_assembly.json`, JSON.stringify(assembly, null, 2) + '\n', 'utf8');
 	const beforeBriefBlockedMtime = fileMtimeMs(fullModelPath);
-	const briefBlockedGenerate = runGsdGenerate({
+	const briefBlockedGenerate = runPlexusGenerate({
 		root: ROOT,
 		specPath: '_tmp_workflow_smoke/brief_blocked_generate/project_spec.json',
 		command: ['engine/pipeline_fast.mjs'],
@@ -1489,7 +1489,7 @@ try {
 			&& checks.generateRequiresStrictDesignBrief.rules.includes('DB6-pin-map-complete')
 			&& beforeBriefBlockedMtime === afterBriefBlockedMtime,
 		'WS88-generate-requires-strict-design-brief',
-		'GSD generate must stop before deterministic generation when strict design-brief readiness fails even if the plan can be built',
+		'Plexus generate must stop before deterministic generation when strict design-brief readiness fails even if the plan can be built',
 		checks.generateRequiresStrictDesignBrief,
 	);
 
@@ -1586,7 +1586,7 @@ try {
 		'project_assembly.json',
 		'approved_library_manifest.json',
 		'project_library_snapshot.json',
-		'gsd_scaffold_report.json',
+		'plexus_scaffold_report.json',
 	];
 	const missingScaffoldFiles = scaffoldFiles.filter(name => !existsSync(`${SCAFFOLD_DIR}/${name}`));
 	const scaffoldSpec = readJson(`${SCAFFOLD_DIR}/project_spec.json`);
@@ -1595,7 +1595,7 @@ try {
 	const scaffoldAssembly = readJson(`${SCAFFOLD_DIR}/project_assembly.json`);
 	const scaffoldLibrary = readJson(`${SCAFFOLD_DIR}/approved_library_manifest.json`);
 	const scaffoldLibrarySnapshot = readJson(`${SCAFFOLD_DIR}/project_library_snapshot.json`);
-	const scaffoldPlan = buildGsdPlan({
+	const scaffoldPlan = buildPlexusPlan({
 		spec: scaffoldSpec,
 		contract: scaffoldContract,
 		netlist: scaffoldNetlist,
@@ -1618,10 +1618,10 @@ try {
 		sideRoute: scaffoldSideIface ? (scaffoldAssembly.layoutPolicy?.interfaceRoutes || []).find(route => route.net === scaffoldSideIface.net && route.from === scaffoldSideIface.from && route.to === scaffoldSideIface.to) || null : null,
 		rules: (scaffoldPlan.findings || []).map(f => f.rule),
 	};
-	assertFinding(findings, missingScaffoldFiles.length === 0, 'WS6-scaffold-files-present', 'GSD scaffold must emit all editable project contract files', {
+	assertFinding(findings, missingScaffoldFiles.length === 0, 'WS6-scaffold-files-present', 'Plexus scaffold must emit all editable project contract files', {
 		missingScaffoldFiles,
 	});
-	assertFinding(findings, scaffoldReport.readyForGenerate === false, 'WS7-scaffold-not-ready', 'GSD scaffold must be explicitly not ready for generation until filled by an agent', {
+	assertFinding(findings, scaffoldReport.readyForGenerate === false, 'WS7-scaffold-not-ready', 'Plexus scaffold must be explicitly not ready for generation until filled by an agent', {
 		readyForGenerate: scaffoldReport.readyForGenerate,
 	});
 	assertFinding(findings, scaffoldPlan.pass === false, 'WS8-scaffold-plan-fails', 'fresh scaffold must fail plan until required parts, pins, library bindings, and cells are filled', {
@@ -1691,7 +1691,7 @@ try {
 			&& (scaffoldAssembly.layoutPolicy?.labelColumns || []).some(col => col.module === scaffoldSideIface.to && col.routeEnd === 'to' && col.side === scaffoldSideIface.toSide && col.nets.includes(scaffoldSideIface.net))
 		),
 		'WS85-scaffold-preserves-interface-label-sides',
-		'GSD scaffold must preserve project_spec interface fromSide/toSide into layoutPolicy.interfaceRoutes and generated label columns',
+		'Plexus scaffold must preserve project_spec interface fromSide/toSide into layoutPolicy.interfaceRoutes and generated label columns',
 		checks.scaffold,
 	);
 
@@ -1809,7 +1809,7 @@ try {
 	const unknownDrawingRuleManifest = clone(genericManifest);
 	unknownDrawingRuleManifest.requiredQualityRules = ['orthogonal-wiring', 'real-net-labels', 'pretty-but-not-executable'];
 	unknownDrawingRuleManifest.cells[0].qualityRules = ['orthogonal-wiring', 'real-net-labels', 'pretty-but-not-executable'];
-	const unknownDrawingRulePlan = buildGsdPlan({
+	const unknownDrawingRulePlan = buildPlexusPlan({
 		spec: {
 			schemaVersion: 1,
 			projectId: genericContract.projectId,
@@ -2031,14 +2031,14 @@ export const pack = { id: '${badBuilderPackId}', fallbackAnchors, cellBuilders, 
 		parts: { U99: { Symbol: 'S', Device: 'D', Footprint: 'F', name: 'U99', value: 'IC', addIntoBom: true, addIntoPcb: true } },
 	}, null, 2) + '\n', 'utf8');
 	writeFileSync(`${badBuilderDir}/project_library_snapshot.json`, JSON.stringify({ project: badBuilderSpec.projectId, components: [{ designator: 'U99', x: 0, y: 0, rotation: 0, mirror: false, bbox: { minX: -5, minY: -5, maxX: 5, maxY: 5 }, pins: [] }] }, null, 2) + '\n', 'utf8');
-	const badBuilderPlanCli = spawnSync(process.execPath, ['bin/easyeda-gsd.mjs', 'plan', '_tmp_workflow_smoke/bad_builder/project_spec.json'], {
+	const badBuilderPlanCli = spawnSync(process.execPath, ['bin/easyeda-plexus.mjs', 'plan', '_tmp_workflow_smoke/bad_builder/project_spec.json'], {
 		cwd: ROOT,
 		stdio: 'pipe',
 		shell: false,
 		env: { ...process.env, EASYEDA_GSD_LOCK_TOKEN: LOCK.token },
 		encoding: 'utf8',
 	});
-	const badBuilderPlan = existsSync(`${ROOT}/gsd_plan_report.json`) ? readJson(`${ROOT}/gsd_plan_report.json`) : null;
+	const badBuilderPlan = existsSync(`${ROOT}/plexus_plan_report.json`) ? readJson(`${ROOT}/plexus_plan_report.json`) : null;
 	checks.badBuilderDryRunRejected = {
 		status: badBuilderPlanCli.status,
 		pass: badBuilderPlan?.pass ?? null,
@@ -2055,7 +2055,7 @@ export const pack = { id: '${badBuilderPackId}', fallbackAnchors, cellBuilders, 
 			&& hasRule(badBuilderPlan, 'CB10-flag-shape')
 			&& hasRule(badBuilderPlan, 'CB13-output-nets-declared'),
 		'WS48-cell-builder-output-contract',
-		'GSD plan must dry-run implemented cell builders and reject non-orthogonal wires, crossings, wires through bodies, fake labels, or undeclared output nets before generation',
+		'Plexus plan must dry-run implemented cell builders and reject non-orthogonal wires, crossings, wires through bodies, fake labels, or undeclared output nets before generation',
 		checks.badBuilderDryRunRejected,
 	);
 	assertFinding(
@@ -2068,7 +2068,7 @@ export const pack = { id: '${badBuilderPackId}', fallbackAnchors, cellBuilders, 
 
 	const customSpec = buildMinimalSpec(CUSTOM_PACK);
 	const customDir = `${TMP_DIR}/custom_project`;
-	const customInit = spawnSync(process.execPath, ['bin/easyeda-gsd.mjs', 'init', '--pack', CUSTOM_PACK, '--out', '_tmp_workflow_smoke/custom_project'], {
+	const customInit = spawnSync(process.execPath, ['bin/easyeda-plexus.mjs', 'init', '--pack', CUSTOM_PACK, '--out', '_tmp_workflow_smoke/custom_project'], {
 		cwd: ROOT,
 		stdio: 'pipe',
 		shell: false,
@@ -2081,9 +2081,9 @@ export const pack = { id: '${badBuilderPackId}', fallbackAnchors, cellBuilders, 
 		try { return JSON.parse(match[0]); } catch { return null; }
 	})();
 	const customPackManifest = readJson(`${CUSTOM_PACK_DIR}/cell_manifest.json`);
-	const customScaffold = existsSync(`${customDir}/gsd_scaffold_report.json`) ? readJson(`${customDir}/gsd_scaffold_report.json`) : null;
+	const customScaffold = existsSync(`${customDir}/plexus_scaffold_report.json`) ? readJson(`${customDir}/plexus_scaffold_report.json`) : null;
 	const customAssembly = readJson(`${customDir}/project_assembly.json`);
-	const customPlan = buildGsdPlan({
+	const customPlan = buildPlexusPlan({
 		spec: readJson(`${customDir}/project_spec.json`),
 		contract: readJson(`${customDir}/project_contract.json`),
 		netlist: readJson(`${customDir}/project_netlist.json`),
@@ -2109,14 +2109,14 @@ export const pack = { id: '${badBuilderPackId}', fallbackAnchors, cellBuilders, 
 		cellsHavePortLayout: (customPackManifest.cells || []).every(cell => cell.id && (cell.ports || []).length && cell.portLayout && (cell.ports || []).every(port => cell.portLayout[port])),
 		assemblyUsesGeneratedCells: (customAssembly.modules || []).every(mod => mod.cell && mod.registryModule),
 	};
-	const customPlanCli = spawnSync(process.execPath, ['bin/easyeda-gsd.mjs', 'plan', '_tmp_workflow_smoke/custom_project/project_spec.json'], {
+	const customPlanCli = spawnSync(process.execPath, ['bin/easyeda-plexus.mjs', 'plan', '_tmp_workflow_smoke/custom_project/project_spec.json'], {
 		cwd: ROOT,
 		stdio: 'pipe',
 		shell: false,
 		env: { ...process.env, EASYEDA_GSD_LOCK_TOKEN: LOCK.token },
 		encoding: 'utf8',
 	});
-	const customPlanCliReport = existsSync(`${ROOT}/gsd_plan_report.json`) ? readJson(`${ROOT}/gsd_plan_report.json`) : null;
+	const customPlanCliReport = existsSync(`${ROOT}/plexus_plan_report.json`) ? readJson(`${ROOT}/plexus_plan_report.json`) : null;
 	checks.customPackCliPlan = {
 		status: customPlanCli.status,
 		pass: customPlanCliReport?.pass ?? null,
@@ -2124,7 +2124,7 @@ export const pack = { id: '${badBuilderPackId}', fallbackAnchors, cellBuilders, 
 		modelEvidence: customPlanCliReport?.modelEvidence || null,
 	};
 	const applyContextReportPath = `${TMP_DIR}/apply_context_report.json`;
-	const customApplyContext = spawnSync(process.execPath, ['bin/easyeda-gsd.mjs', 'apply', '--gated', '--context-only', '_tmp_workflow_smoke/custom_project/project_spec.json'], {
+	const customApplyContext = spawnSync(process.execPath, ['bin/easyeda-plexus.mjs', 'apply', '--gated', '--context-only', '_tmp_workflow_smoke/custom_project/project_spec.json'], {
 		cwd: ROOT,
 		stdio: 'pipe',
 		shell: false,
@@ -2236,7 +2236,7 @@ export const pack = { id: '${NO_WRITER_PACK}', fallbackAnchors, cellBuilders, no
 	writeFileSync(`${noWriterDir}/approved_library_manifest.json`, JSON.stringify({ purpose: 'No writer smoke library.', parts: { U99: { Symbol: 'S', Device: 'D', Footprint: 'F', name: 'U99', value: 'IC', addIntoBom: true, addIntoPcb: true } } }, null, 2) + '\n', 'utf8');
 	writeFileSync(`${noWriterDir}/project_library_snapshot.json`, JSON.stringify({ project: noWriterSpec.projectId, components: [{ designator: 'U99', x: 0, y: 0, rotation: 0, mirror: false, bbox: { minX: -5, minY: -5, maxX: 5, maxY: 5 }, pins: [] }] }, null, 2) + '\n', 'utf8');
 	const noWriterApplyReportPath = `${TMP_DIR}/no_writer_apply_report.json`;
-	const noWriterApply = spawnSync(process.execPath, ['bin/easyeda-gsd.mjs', 'apply', '--gated', '_tmp_workflow_smoke/no_writer_project/project_spec.json'], {
+	const noWriterApply = spawnSync(process.execPath, ['bin/easyeda-plexus.mjs', 'apply', '--gated', '_tmp_workflow_smoke/no_writer_project/project_spec.json'], {
 		cwd: ROOT,
 		stdio: 'pipe',
 		shell: false,
@@ -2343,7 +2343,7 @@ export const pack = { id: '${NO_WRITER_PACK}', fallbackAnchors, cellBuilders, no
 			'no-unnecessary-net-ports',
 		];
 	}
-	const missingPartSnapshotPlan = buildGsdPlan({
+	const missingPartSnapshotPlan = buildPlexusPlan({
 		spec: {
 			schemaVersion: 1,
 			projectId: genericContract.projectId,
@@ -2378,7 +2378,7 @@ export const pack = { id: '${NO_WRITER_PACK}', fallbackAnchors, cellBuilders, no
 		findings,
 		hasRule(missingPartSnapshotPlan, 'GP18-part-lib-required-part'),
 		'WS30-part-library-snapshot-covers-required-parts',
-		'GSD plan must reject projects whose active library snapshot does not contain every contract requiredPart used for deterministic generation',
+		'Plexus plan must reject projects whose active library snapshot does not contain every contract requiredPart used for deterministic generation',
 		checks.partLibrarySnapshotRequiredParts,
 	);
 
@@ -2390,7 +2390,7 @@ export const pack = { id: '${NO_WRITER_PACK}', fallbackAnchors, cellBuilders, no
 			requiredNets: ['SENSE_OUT', 'SYS_3V3', 'GND'],
 		}],
 	};
-	const missingPortBindingPlan = buildGsdPlan({
+	const missingPortBindingPlan = buildPlexusPlan({
 		spec: {
 			schemaVersion: 1,
 			projectId: genericContract.projectId,
@@ -2432,21 +2432,21 @@ export const pack = { id: '${NO_WRITER_PACK}', fallbackAnchors, cellBuilders, no
 		findings,
 		hasRule(missingPortBindingPlan, 'GP19-cell-port-bound'),
 		'WS32-cell-ports-bound-to-assembly-nets',
-		'GSD plan must reject deterministic cell manifests whose declared electrical ports are not bound to concrete assembly nets before generation',
+		'Plexus plan must reject deterministic cell manifests whose declared electrical ports are not bound to concrete assembly nets before generation',
 		checks.cellPortsBoundToAssemblyNets,
 	);
 
 	const orphanSpecDir = `${TMP_DIR}/orphan_spec`;
 	mkdirSync(orphanSpecDir, { recursive: true });
 	writeFileSync(`${orphanSpecDir}/project_spec.json`, JSON.stringify(customSpec, null, 2) + '\n', 'utf8');
-	const orphanPlanCli = spawnSync(process.execPath, ['bin/easyeda-gsd.mjs', 'plan', '_tmp_workflow_smoke/orphan_spec/project_spec.json'], {
+	const orphanPlanCli = spawnSync(process.execPath, ['bin/easyeda-plexus.mjs', 'plan', '_tmp_workflow_smoke/orphan_spec/project_spec.json'], {
 		cwd: ROOT,
 		stdio: 'pipe',
 		shell: false,
 		env: { ...process.env, EASYEDA_GSD_LOCK_TOKEN: LOCK.token },
 		encoding: 'utf8',
 	});
-	const orphanPlanReport = existsSync(`${ROOT}/gsd_plan_report.json`) ? readJson(`${ROOT}/gsd_plan_report.json`) : null;
+	const orphanPlanReport = existsSync(`${ROOT}/plexus_plan_report.json`) ? readJson(`${ROOT}/plexus_plan_report.json`) : null;
 	checks.externalSpecRequiresCompanions = {
 		status: orphanPlanCli.status,
 		pass: orphanPlanReport?.pass ?? null,
@@ -2515,7 +2515,7 @@ export const pack = { id: '${NO_WRITER_PACK}', fallbackAnchors, cellBuilders, no
 		modules: [{ id: 'sensor_frontend', title: 'Sensor Frontend', requiredNets: ['SENSE_OUT', 'GND'] }],
 		interfaces: [],
 	};
-	const relativeManifestPlan = buildGsdPlan({
+	const relativeManifestPlan = buildPlexusPlan({
 		spec: genericSpecForRelativeManifest,
 		contract: relativeManifestContract,
 		netlist: { schemaVersion: 1, projectId: genericContract.projectId, nets: [{ name: 'SENSE_OUT', requiredPins: [] }, { name: 'GND', requiredPins: [] }] },
@@ -2632,7 +2632,7 @@ export const pack = { id: '${NO_WRITER_PACK}', fallbackAnchors, cellBuilders, no
 			{ rule: 'CM16-port-layout', severity: 'hard', msg: 'cell port layout missing in custom pack', where: { cell: 'sensorCell' } },
 		],
 	}, null, 2), 'utf8');
-	writeFileSync(`${repairContextDir}/gsd_plan_report.json`, JSON.stringify({
+	writeFileSync(`${repairContextDir}/plexus_plan_report.json`, JSON.stringify({
 		generatedAt: new Date().toISOString(),
 		pass: false,
 		spec: '_tmp_workflow_smoke/custom_project/project_spec.json',
@@ -2716,12 +2716,12 @@ export const pack = { id: '${NO_WRITER_PACK}', fallbackAnchors, cellBuilders, no
 		customRepairActions.status !== 0
 			&& customRepairCommands.length > 0
 			&& customRepairCommands.every(cmd => [
-				'node bin/easyeda-gsd.mjs plan _tmp_workflow_smoke/custom_project/project_spec.json',
-				'node bin/easyeda-gsd.mjs accept _tmp_workflow_smoke/custom_project/project_spec.json',
-				'node bin/easyeda-gsd.mjs apply --gated --context-only _tmp_workflow_smoke/custom_project/project_spec.json',
+				'node bin/easyeda-plexus.mjs plan _tmp_workflow_smoke/custom_project/project_spec.json',
+				'node bin/easyeda-plexus.mjs accept _tmp_workflow_smoke/custom_project/project_spec.json',
+				'node bin/easyeda-plexus.mjs apply --gated --context-only _tmp_workflow_smoke/custom_project/project_spec.json',
 			].includes(cmd)),
 		'WS20-repair-actions-context-bound',
-		'repair actions for an external spec must rerun the context-aware GSD entrypoint instead of bare npm scripts that fall back to the root project',
+		'repair actions for an external spec must rerun the context-aware Plexus entrypoint instead of bare npm scripts that fall back to the root project',
 		{
 			status: customRepairActions.status,
 			stdout: customRepairActions.stdout,
@@ -2807,13 +2807,13 @@ export const pack = { id: '${NO_WRITER_PACK}', fallbackAnchors, cellBuilders, no
 		checks.customNextActionsPackTargets,
 	);
 
-	const restoreGenerate = runGsdGenerate({ root: ROOT, specPath: 'project_spec.json', command: ['engine/pipeline_fast.mjs'], draft: true });
+	const restoreGenerate = runPlexusGenerate({ root: ROOT, specPath: 'project_spec.json', command: ['engine/pipeline_fast.mjs'], draft: true });
 	checks.restoreGenerate = {
 		pass: restoreGenerate.status === 0,
 		stage: restoreGenerate.report?.stage || null,
 		assemblyPath: restoreGenerate.report?.generationContext?.assemblyPath || null,
 	};
-	assertFinding(findings, restoreGenerate.status === 0, 'WS10-restore-generate-pass', 'workflow smoke must restore normal GSD generate reports after negative checks', {
+	assertFinding(findings, restoreGenerate.status === 0, 'WS10-restore-generate-pass', 'workflow smoke must restore normal Plexus generate reports after negative checks', {
 		status: restoreGenerate.status,
 		stage: restoreGenerate.report?.stage || null,
 		firstFinding: restoreGenerate.report?.findings?.[0] || null,
@@ -2822,18 +2822,18 @@ export const pack = { id: '${NO_WRITER_PACK}', fallbackAnchors, cellBuilders, no
 		findings,
 		restoreGenerate.report?.generationContext?.assemblyPath === `${ROOT}/project_assembly.json`,
 		'WS14-generate-context-bound',
-		'GSD generate must record and pass the active project assembly path into deterministic generation',
+		'Plexus generate must record and pass the active project assembly path into deterministic generation',
 		checks.restoreGenerate,
 	);
 
-	const fullGenerate = spawnSync(process.execPath, ['bin/easyeda-gsd.mjs', 'generate', 'project_spec.json'], {
+	const fullGenerate = spawnSync(process.execPath, ['bin/easyeda-plexus.mjs', 'generate', 'project_spec.json'], {
 		cwd: ROOT,
 		stdio: 'pipe',
 		shell: false,
 		env: { ...process.env, EASYEDA_GSD_LOCK_TOKEN: LOCK.token },
 		encoding: 'utf8',
 	});
-	const fullGenerateReport = existsSync(`${ROOT}/gsd_generate_report.json`) ? readJson(`${ROOT}/gsd_generate_report.json`) : null;
+	const fullGenerateReport = existsSync(`${ROOT}/plexus_generate_report.json`) ? readJson(`${ROOT}/plexus_generate_report.json`) : null;
 	checks.fullGenerateLayoutEvidence = {
 		status: fullGenerate.status,
 		pass: fullGenerateReport?.pass ?? null,
@@ -2848,7 +2848,7 @@ export const pack = { id: '${NO_WRITER_PACK}', fallbackAnchors, cellBuilders, no
 			&& fullGenerateReport?.draft === false
 			&& fullGenerateReport?.template?.layoutPlanner === true,
 		'WS23-public-generate-runs-layout-search',
-		'public easyeda-gsd generate must produce full layout-search evidence by default; fast generation must be explicit draft mode',
+		'public easyeda-plexus generate must produce full layout-search evidence by default; fast generation must be explicit draft mode',
 		{
 			status: fullGenerate.status,
 			stdout: fullGenerate.stdout?.slice(0, 500),
@@ -2857,7 +2857,7 @@ export const pack = { id: '${NO_WRITER_PACK}', fallbackAnchors, cellBuilders, no
 		},
 	);
 
-	const blockedConcurrent = spawnSync(process.execPath, ['bin/easyeda-gsd.mjs', 'plan', 'project_spec.json'], {
+	const blockedConcurrent = spawnSync(process.execPath, ['bin/easyeda-plexus.mjs', 'plan', 'project_spec.json'], {
 		cwd: ROOT,
 		stdio: 'pipe',
 		shell: false,
@@ -2873,7 +2873,7 @@ export const pack = { id: '${NO_WRITER_PACK}', fallbackAnchors, cellBuilders, no
 		findings,
 		blockedConcurrent.status !== 0 && /already running/.test(blockedConcurrent.stderr || ''),
 		'WS15-stateful-run-lock',
-		'stateful GSD commands must not run concurrently because they share report artifacts and temporary workflow directories',
+		'stateful Plexus commands must not run concurrently because they share report artifacts and temporary workflow directories',
 		checks.concurrentStatefulCommandBlocked,
 	);
 

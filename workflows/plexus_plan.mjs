@@ -13,7 +13,7 @@ import { HARNESS_RULES } from '../harness/rule_registry.mjs';
 const LABEL_POWER_NETS = new Set(['GND', 'SYS_5V', 'SYS_3V3', 'VIN_12_19V', 'VOUT_SW', 'VBUS']);
 
 function hard(findings, rule, msg, where = {}) {
-	findings.push({ rule, severity: 'hard', category: 'gsd-plan', msg, where });
+	findings.push({ rule, severity: 'hard', category: 'plexus-plan', msg, where });
 }
 
 function setOf(items) {
@@ -129,7 +129,7 @@ function validateStaticLayoutPolicy(assembly) {
 		'PL43-module-region-covers-modules': 'GP56-module-region-covers-modules',
 		'PL44-module-region-gap': 'GP57-module-region-gap',
 	};
-	for (const finding of validateModuleRegions(assembly, 'gsd-plan')) {
+	for (const finding of validateModuleRegions(assembly, 'plexus-plan')) {
 		findings.push({ ...finding, rule: moduleRegionRules[finding.rule] || finding.rule.replace(/^PL/, 'GP') });
 	}
 	return findings;
@@ -146,7 +146,7 @@ function validateStaticInterfaceRoutes(contract, assembly) {
 		'PL29-interface-route-direction': 'GP34-interface-route-direction',
 		'PL55-interface-route-label-side': 'GP66-interface-route-label-side',
 	};
-	return validateInterfaceRoutes(contract, assembly, 'gsd-plan').map(f => ({ ...f, rule: ruleMap[f.rule] || f.rule.replace(/^PL/, 'GP') }));
+	return validateInterfaceRoutes(contract, assembly, 'plexus-plan').map(f => ({ ...f, rule: ruleMap[f.rule] || f.rule.replace(/^PL/, 'GP') }));
 }
 
 function validateStaticLabelColumns(contract, assembly) {
@@ -181,7 +181,7 @@ function validateStaticLabelColumns(contract, assembly) {
 		'PL53-label-column-route-end': 'GP64-label-column-route-end',
 		'PL54-label-column-budget-unique': 'GP65-label-column-budget-unique',
 	};
-	for (const finding of validateLabelColumnContracts(assembly, 'gsd-plan')) {
+	for (const finding of validateLabelColumnContracts(assembly, 'plexus-plan')) {
 		findings.push({ ...finding, rule: labelColumnRuleMap[finding.rule] || finding.rule.replace(/^PL/, 'GP') });
 	}
 	for (const route of groupedRoutes) {
@@ -200,7 +200,7 @@ function validateStaticLabelColumns(contract, assembly) {
 		'PL32-label-column-covers-route-to': 'GP45-label-column-covers-route-to',
 		'PL33-label-column-covers-interface': 'GP46-label-column-covers-interface',
 	};
-	for (const finding of validateGroupedRouteLabelColumns(contract, assembly, 'gsd-plan')) {
+	for (const finding of validateGroupedRouteLabelColumns(contract, assembly, 'plexus-plan')) {
 		findings.push({ ...finding, rule: routeColumnRules[finding.rule] || finding.rule.replace(/^PL/, 'GP') });
 	}
 	return findings;
@@ -376,7 +376,7 @@ function validateExecutableCells(assembly, pack, assemblyPath = '', partLibSnaps
 	if (partLibSnapshot) {
 		const normalized = pack.normalizeLibrarySnapshot ? pack.normalizeLibrarySnapshot(JSON.parse(JSON.stringify(partLibSnapshot))) : partLibSnapshot;
 		const byDes = new Map(cellArray(normalized?.components).map(c => [c.designator, withLocalPins(c)]));
-		findings.push(...validateCellBuilderDryRun({ assembly, manifest, pack, byDes }).map(f => ({ ...f, category: 'gsd-plan' })));
+		findings.push(...validateCellBuilderDryRun({ assembly, manifest, pack, byDes }).map(f => ({ ...f, category: 'plexus-plan' })));
 	}
 	return findings;
 }
@@ -433,7 +433,7 @@ function validatePartLibrarySnapshot(contract, partLibSnapshot, partLibPath = ''
 	return findings;
 }
 
-export function buildGsdPlan({ spec, contract, netlist, assembly, libraryManifest = null, partLibSnapshot = null, model = null, specPath = 'project_spec.json', assemblyPath = '', partLibPath = '', modelPath = '', inputFindings = [] }) {
+export function buildPlexusPlan({ spec, contract, netlist, assembly, libraryManifest = null, partLibSnapshot = null, model = null, specPath = 'project_spec.json', assemblyPath = '', partLibPath = '', modelPath = '', inputFindings = [] }) {
 	const findings = [...asArray(inputFindings)];
 	const expectedProjectId = spec?.projectId || contract?.projectId || assembly?.projectId || null;
 	const modelEvidence = model ? {
@@ -453,7 +453,7 @@ export function buildGsdPlan({ spec, contract, netlist, assembly, libraryManifes
 		modelEvidence.expectedProjectId = expectedProjectId;
 	}
 	findings.push(...validateSpecSchema(spec));
-	if (contract) findings.push(...validateModuleContract(contract).map(f => ({ ...f, category: 'gsd-plan' })));
+	if (contract) findings.push(...validateModuleContract(contract).map(f => ({ ...f, category: 'plexus-plan' })));
 	else hard(findings, 'GP0-contract-present', 'project_contract.json is required for planning');
 	if (!netlist) hard(findings, 'GP0-netlist-present', 'project_netlist.json is required for planning');
 	if (!assembly) hard(findings, 'GP0-assembly-present', 'project_assembly.json is required for planning');
@@ -493,10 +493,10 @@ export function buildGsdPlan({ spec, contract, netlist, assembly, libraryManifes
 		modelEvidence,
 		modules: asArray(spec?.modules).map(mod => mod.id),
 		interfaces: asArray(spec?.interfaces).length,
-		requiredLocalGate: 'node bin/easyeda-gsd.mjs accept',
-		requiredFinalGate: `node bin/easyeda-gsd.mjs live-check ${specPath} && node bin/easyeda-gsd.mjs deliver ${specPath}`,
-		requiredDeliveryGate: `node bin/easyeda-gsd.mjs deliver ${specPath}`,
-		finalApply: `node bin/easyeda-gsd.mjs apply --gated ${specPath}`,
+		requiredLocalGate: 'node bin/easyeda-plexus.mjs accept',
+		requiredFinalGate: `node bin/easyeda-plexus.mjs live-check ${specPath} && node bin/easyeda-plexus.mjs deliver ${specPath}`,
+		requiredDeliveryGate: `node bin/easyeda-plexus.mjs deliver ${specPath}`,
+		finalApply: `node bin/easyeda-plexus.mjs apply --gated ${specPath}`,
 		severity: { hard: findings.length, soft: 0, info: 0 },
 		findings,
 	};

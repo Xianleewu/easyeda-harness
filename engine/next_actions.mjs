@@ -60,8 +60,8 @@ function resolvePackPlaceholder(value) {
 const acceptance = readJson('acceptance_report.json');
 const agentInstructions = readJson('agent_instruction_report.json');
 const workflowSmoke = readJson('workflow_smoke_report.json');
-const gsdPlan = readJson('gsd_plan_report.json');
-const gsdGenerate = readJson('gsd_generate_report.json');
+const gsdPlan = readJson('plexus_plan_report.json');
+const gsdGenerate = readJson('plexus_generate_report.json');
 const specSchema = readJson('spec_schema_report.json');
 const spec = readJson('project_spec_report.json');
 const contract = readJson('project_contract_report.json');
@@ -109,7 +109,7 @@ const checks = {
 		circuitPack: gsdPlan?.circuitPack || null,
 		modules: gsdPlan?.modules || null,
 		firstFinding: gsdPlan?.findings?.[0] || null,
-		evidence: 'gsd_plan_report.json',
+		evidence: 'plexus_plan_report.json',
 	},
 	gsdGenerate: {
 		status: status(gsdGenerate?.pass),
@@ -117,7 +117,7 @@ const checks = {
 		projectId: gsdGenerate?.projectId || null,
 		circuitPack: gsdGenerate?.circuitPack || null,
 		firstFinding: gsdGenerate?.findings?.[0] || null,
-		evidence: 'gsd_generate_report.json',
+		evidence: 'plexus_generate_report.json',
 	},
 	specSchema: {
 		status: status(specSchema?.pass),
@@ -359,7 +359,7 @@ if (checks.workflowSmoke.status !== 'pass') {
 	pushAction(actions, {
 		area: 'workflow-smoke',
 		action: 'Fix reusable workflow smoke checks before claiming the harness works for other projects. Bad specs must be rejected, scaffold must not be generation-ready, missing library bindings must fail, and invalid generate must not rewrite full_model.json.',
-		evidence: ['workflow_smoke_report.json', 'engine/workflow_smoke_gate.mjs', 'workflows/gsd_plan.mjs', 'workflows/gsd_generate.mjs', 'workflows/gsd_scaffold.mjs', 'contracts/library_contract.mjs'],
+		evidence: ['workflow_smoke_report.json', 'engine/workflow_smoke_gate.mjs', 'workflows/plexus_plan.mjs', 'workflows/plexus_generate.mjs', 'workflows/plexus_scaffold.mjs', 'contracts/library_contract.mjs'],
 		observed: checks.workflowSmoke.firstFinding || checks.workflowSmoke,
 	});
 }
@@ -369,88 +369,88 @@ if (checks.gsdPlan.status !== 'pass') {
 		pushAction(actions, {
 			area: 'drawing-rule-bindings',
 			action: 'Bind every project drawingRules and manifest qualityRules entry to executable harness rules before generation; prose-only drawing rules must fail closed.',
-			evidence: ['gsd_plan_report.json', 'contracts/drawing_rule_registry.mjs', 'harness/rule_registry.mjs', 'project_contract.json', 'circuit_packs/<pack>/cell_manifest.json'],
+			evidence: ['plexus_plan_report.json', 'contracts/drawing_rule_registry.mjs', 'harness/rule_registry.mjs', 'project_contract.json', 'circuit_packs/<pack>/cell_manifest.json'],
 			observed: finding,
 			editFiles: ['contracts/drawing_rule_registry.mjs', 'harness/rule_registry.mjs', 'project_contract.json', 'circuit_packs/<pack>/cell_manifest.json'],
-			nextCommand: 'node bin/easyeda-gsd.mjs plan project_spec.json',
+			nextCommand: 'node bin/easyeda-plexus.mjs plan project_spec.json',
 		});
 	} else if (ruleMatches(finding, /^GP6-contract-parts$|^PC12/)) {
 		pushAction(actions, {
 			area: 'module-contract-bootstrap',
 			action: 'Fill the module contract from the user intent before drawing. Each module needs concrete requiredParts, requiredNets, drawingRules, visualEvidence, and matching structured netlist endpoints.',
-			evidence: ['gsd_plan_report.json', 'project_spec.json', 'project_contract.json', 'project_netlist.json'],
+			evidence: ['plexus_plan_report.json', 'project_spec.json', 'project_contract.json', 'project_netlist.json'],
 			observed: finding,
 			editFiles: ['project_spec.json', 'project_contract.json', 'project_netlist.json'],
-			nextCommand: 'node bin/easyeda-gsd.mjs plan project_spec.json',
+			nextCommand: 'node bin/easyeda-plexus.mjs plan project_spec.json',
 		});
 	} else if (ruleMatches(finding, /^GP8|^GP1[5-7]/)) {
 		pushAction(actions, {
 			area: 'cell-builder-bootstrap',
 			action: 'Map the contract module to an executable deterministic cell. project_assembly.json must declare cell, refs, anchor, netArgs/nets, and the active pack must declare and implement that cell.',
-			evidence: ['gsd_plan_report.json', 'project_assembly.json', 'circuit_packs/<pack>/cell_manifest.json', 'circuit_packs/<pack>/pack.mjs'],
+			evidence: ['plexus_plan_report.json', 'project_assembly.json', 'circuit_packs/<pack>/cell_manifest.json', 'circuit_packs/<pack>/pack.mjs'],
 			observed: finding,
 			editFiles: ['project_assembly.json', 'circuit_packs/<pack>/cell_manifest.json', 'circuit_packs/<pack>/pack.mjs'],
-			nextCommand: 'node bin/easyeda-gsd.mjs plan project_spec.json',
+			nextCommand: 'node bin/easyeda-plexus.mjs plan project_spec.json',
 		});
 	} else if (ruleMatches(finding, /^CM1[6-9]|^CM20|^CB1[4-8]/)) {
 		pushAction(actions, {
 			area: 'cell-port-layout',
 			action: 'Make port label placement executable. cell_manifest.json portLayout must define each port side/kind/label and the builder must emit real netflags with alignMode=6 on left ports or alignMode=8 on right ports.',
-			evidence: ['gsd_plan_report.json', 'cell_manifest_report.json', 'circuit_packs/<pack>/cell_manifest.json', 'circuit_packs/<pack>/pack.mjs'],
+			evidence: ['plexus_plan_report.json', 'cell_manifest_report.json', 'circuit_packs/<pack>/cell_manifest.json', 'circuit_packs/<pack>/pack.mjs'],
 			observed: finding,
 			editFiles: ['circuit_packs/<pack>/cell_manifest.json', 'circuit_packs/<pack>/pack.mjs', 'project_assembly.json'],
-			nextCommand: 'node bin/easyeda-gsd.mjs plan project_spec.json',
+			nextCommand: 'node bin/easyeda-plexus.mjs plan project_spec.json',
 		});
 	} else if (ruleMatches(finding, /^PC29|^PC30|^GP-PC29|^GP-PC30/)) {
 		pushAction(actions, {
 			area: 'quality-rule-profile',
 			action: 'Declare qualityPolicy.ruleProfile from the executable harness budgets before generation: module gap, wire intrusions, component/text clearance, named-stub length, wire-name origins, fake-text-net ban, and NET PORT policy.',
-			evidence: ['gsd_plan_report.json', 'project_contract.json', 'harness/config.mjs'],
+			evidence: ['plexus_plan_report.json', 'project_contract.json', 'harness/config.mjs'],
 			observed: finding,
 			editFiles: ['project_contract.json', 'contracts/module_contract.mjs', 'harness/config.mjs'],
-			nextCommand: 'node bin/easyeda-gsd.mjs plan project_spec.json',
+			nextCommand: 'node bin/easyeda-plexus.mjs plan project_spec.json',
 		});
 	} else if (ruleMatches(finding, /^GP4[4-6]|^GP6[3-5]/)) {
 		pushAction(actions, {
 			area: 'interface-label-columns',
 			action: 'Declare module-side layoutPolicy.labelColumns for each visible signal label and grouped-net-label interface. Every column needs module, routeEnd, side, x, tolerance, and allowed nets; duplicate module-side net budgets are forbidden.',
-			evidence: ['gsd_plan_report.json', 'project_assembly.json', 'docs/schematic-design-rules.md'],
+			evidence: ['plexus_plan_report.json', 'project_assembly.json', 'docs/schematic-design-rules.md'],
 			observed: finding,
 			editFiles: ['project_assembly.json'],
-			nextCommand: 'node bin/easyeda-gsd.mjs plan project_spec.json',
+			nextCommand: 'node bin/easyeda-plexus.mjs plan project_spec.json',
 		});
 	} else if (ruleMatches(finding, /^GP4[7-9]|^GP5[0-7]/)) {
 		pushAction(actions, {
 			area: 'module-region-contract',
 			action: 'Declare layoutPolicy.moduleRegions before generation. Every assembly module needs one anchor-relative readable rectangle with module, anchor, column, dx/dy, width, height, and enough gap from other module regions.',
-			evidence: ['gsd_plan_report.json', 'project_assembly.json', 'docs/schematic-design-rules.md'],
+			evidence: ['plexus_plan_report.json', 'project_assembly.json', 'docs/schematic-design-rules.md'],
 			observed: finding,
 			editFiles: ['project_assembly.json'],
-			nextCommand: 'node bin/easyeda-gsd.mjs plan project_spec.json',
+			nextCommand: 'node bin/easyeda-plexus.mjs plan project_spec.json',
 		});
 	} else if (ruleMatches(finding, /^GP2[7-9]|^GP3[0-4]|^GP4[3-6]/)) {
 		pushAction(actions, {
 			area: 'interface-routing-contract',
 			action: 'Declare layoutPolicy.interfaceRoutes before generation. Every project_contract interface needs net/from/to, strategy visible-continuity or grouped-net-label, a readable channel, and direction.',
-			evidence: ['gsd_plan_report.json', 'project_contract.json', 'project_assembly.json'],
+			evidence: ['plexus_plan_report.json', 'project_contract.json', 'project_assembly.json'],
 			observed: finding,
 			editFiles: ['project_assembly.json', 'project_contract.json'],
-			nextCommand: 'node bin/easyeda-gsd.mjs plan project_spec.json',
+			nextCommand: 'node bin/easyeda-plexus.mjs plan project_spec.json',
 		});
 	} else if (ruleMatches(finding, /^CB/)) {
 		pushAction(actions, {
 			area: 'cell-builder-output',
 			action: 'Fix deterministic cell builder output before generation: builders must return real place/wires/flags arrays, orthogonal wires, declared output nets, and no fake text labels.',
-			evidence: ['gsd_plan_report.json', 'circuit_packs/<pack>/pack.mjs', 'circuit_packs/<pack>/cell_manifest.json', 'project_assembly.json'],
+			evidence: ['plexus_plan_report.json', 'circuit_packs/<pack>/pack.mjs', 'circuit_packs/<pack>/cell_manifest.json', 'project_assembly.json'],
 			observed: finding,
 			editFiles: ['circuit_packs/<pack>/pack.mjs', 'circuit_packs/<pack>/cell_manifest.json', 'project_assembly.json', 'project_contract.json'],
-			nextCommand: 'node bin/easyeda-gsd.mjs plan project_spec.json',
+			nextCommand: 'node bin/easyeda-plexus.mjs plan project_spec.json',
 		});
 	} else {
 		pushAction(actions, {
-			area: 'gsd-plan',
-			action: 'Fix spec-to-contract realization before generation. gsd_plan_report.json must prove project_spec.json is covered by project_contract.json, project_netlist.json, project_assembly.json, and a registered circuit pack.',
-			evidence: ['project_spec.json', 'project_contract.json', 'project_netlist.json', 'project_assembly.json', 'gsd_plan_report.json'],
+			area: 'plexus-plan',
+			action: 'Fix spec-to-contract realization before generation. plexus_plan_report.json must prove project_spec.json is covered by project_contract.json, project_netlist.json, project_assembly.json, and a registered circuit pack.',
+			evidence: ['project_spec.json', 'project_contract.json', 'project_netlist.json', 'project_assembly.json', 'plexus_plan_report.json'],
 			observed: finding || checks.gsdPlan,
 		});
 	}
@@ -460,10 +460,10 @@ if (checks.gsdPlan.status !== 'pass') {
 		pushAction(actions, {
 			area: 'cell-builder-bootstrap',
 			action: 'Map the contract module to an executable deterministic cell. project_assembly.json must declare cell, refs, anchor, netArgs/nets, and the active pack must declare and implement that cell.',
-			evidence: ['gsd_plan_report.json', 'project_assembly.json', 'circuit_packs/<pack>/cell_manifest.json', 'circuit_packs/<pack>/pack.mjs'],
+			evidence: ['plexus_plan_report.json', 'project_assembly.json', 'circuit_packs/<pack>/cell_manifest.json', 'circuit_packs/<pack>/pack.mjs'],
 			observed: cellBootstrapFinding,
 			editFiles: ['project_assembly.json', 'circuit_packs/<pack>/cell_manifest.json', 'circuit_packs/<pack>/pack.mjs'],
-			nextCommand: 'node bin/easyeda-gsd.mjs plan project_spec.json',
+			nextCommand: 'node bin/easyeda-plexus.mjs plan project_spec.json',
 		});
 	}
 	const portLayoutFinding = planFindings.find(f => ruleMatches(f, /^CM1[6-9]|^CM20|^CB1[4-8]/));
@@ -471,10 +471,10 @@ if (checks.gsdPlan.status !== 'pass') {
 		pushAction(actions, {
 			area: 'cell-port-layout',
 			action: 'Make port label placement executable. cell_manifest.json portLayout must define each port side/kind/label and the builder must emit real netflags with alignMode=6 on left ports or alignMode=8 on right ports.',
-			evidence: ['gsd_plan_report.json', 'cell_manifest_report.json', 'circuit_packs/<pack>/cell_manifest.json', 'circuit_packs/<pack>/pack.mjs'],
+			evidence: ['plexus_plan_report.json', 'cell_manifest_report.json', 'circuit_packs/<pack>/cell_manifest.json', 'circuit_packs/<pack>/pack.mjs'],
 			observed: portLayoutFinding,
 			editFiles: ['circuit_packs/<pack>/cell_manifest.json', 'circuit_packs/<pack>/pack.mjs', 'project_assembly.json'],
-			nextCommand: 'node bin/easyeda-gsd.mjs plan project_spec.json',
+			nextCommand: 'node bin/easyeda-plexus.mjs plan project_spec.json',
 		});
 	}
 	const labelColumnFinding = planFindings.find(f => ruleMatches(f, /^GP4[4-6]|^GP6[3-5]/));
@@ -482,10 +482,10 @@ if (checks.gsdPlan.status !== 'pass') {
 		pushAction(actions, {
 			area: 'interface-label-columns',
 			action: 'Declare module-side layoutPolicy.labelColumns for each visible signal label and grouped-net-label interface. Every column needs module, routeEnd, side, x, tolerance, and allowed nets; duplicate module-side net budgets are forbidden.',
-			evidence: ['gsd_plan_report.json', 'project_assembly.json', 'docs/schematic-design-rules.md'],
+			evidence: ['plexus_plan_report.json', 'project_assembly.json', 'docs/schematic-design-rules.md'],
 			observed: labelColumnFinding,
 			editFiles: ['project_assembly.json'],
-			nextCommand: 'node bin/easyeda-gsd.mjs plan project_spec.json',
+			nextCommand: 'node bin/easyeda-plexus.mjs plan project_spec.json',
 		});
 	}
 	const routeFinding = planFindings.find(f => ruleMatches(f, /^GP2[7-9]|^GP3[0-4]/));
@@ -493,10 +493,10 @@ if (checks.gsdPlan.status !== 'pass') {
 		pushAction(actions, {
 			area: 'interface-routing-contract',
 			action: 'Declare layoutPolicy.interfaceRoutes before generation. Every project_contract interface needs net/from/to, strategy visible-continuity or grouped-net-label, a readable channel, and direction.',
-			evidence: ['gsd_plan_report.json', 'project_contract.json', 'project_assembly.json'],
+			evidence: ['plexus_plan_report.json', 'project_contract.json', 'project_assembly.json'],
 			observed: routeFinding,
 			editFiles: ['project_assembly.json', 'project_contract.json'],
-			nextCommand: 'node bin/easyeda-gsd.mjs plan project_spec.json',
+			nextCommand: 'node bin/easyeda-plexus.mjs plan project_spec.json',
 		});
 	}
 	const moduleRegionFinding = planFindings.find(f => ruleMatches(f, /^GP4[7-9]|^GP5[0-7]/));
@@ -504,10 +504,10 @@ if (checks.gsdPlan.status !== 'pass') {
 		pushAction(actions, {
 			area: 'module-region-contract',
 			action: 'Declare layoutPolicy.moduleRegions before generation. Every assembly module needs one anchor-relative readable rectangle with module, anchor, column, dx/dy, width, height, and enough gap from other module regions.',
-			evidence: ['gsd_plan_report.json', 'project_assembly.json', 'docs/schematic-design-rules.md'],
+			evidence: ['plexus_plan_report.json', 'project_assembly.json', 'docs/schematic-design-rules.md'],
 			observed: moduleRegionFinding,
 			editFiles: ['project_assembly.json'],
-			nextCommand: 'node bin/easyeda-gsd.mjs plan project_spec.json',
+			nextCommand: 'node bin/easyeda-plexus.mjs plan project_spec.json',
 		});
 	}
 	const ruleProfileFinding = planFindings.find(f => ruleMatches(f, /^PC29|^PC30|^GP-PC29|^GP-PC30/));
@@ -515,18 +515,18 @@ if (checks.gsdPlan.status !== 'pass') {
 		pushAction(actions, {
 			area: 'quality-rule-profile',
 			action: 'Declare qualityPolicy.ruleProfile from the executable harness budgets before generation: module gap, wire intrusions, component/text clearance, named-stub length, wire-name origins, fake-text-net ban, and NET PORT policy.',
-			evidence: ['gsd_plan_report.json', 'project_contract.json', 'harness/config.mjs'],
+			evidence: ['plexus_plan_report.json', 'project_contract.json', 'harness/config.mjs'],
 			observed: ruleProfileFinding,
 			editFiles: ['project_contract.json', 'contracts/module_contract.mjs', 'harness/config.mjs'],
-			nextCommand: 'node bin/easyeda-gsd.mjs plan project_spec.json',
+			nextCommand: 'node bin/easyeda-plexus.mjs plan project_spec.json',
 		});
 	}
 }
 if (checks.gsdGenerate.status !== 'pass') {
 	pushAction(actions, {
-		area: 'gsd-generate',
-		action: 'Run generation only through the plan-gated workflow. gsd_generate_report.json must prove a passing GSD plan produced full_model.json and report.json from the deterministic generator.',
-		evidence: ['gsd_generate_report.json', 'gsd_plan_report.json', 'full_model.json', 'report.json'],
+		area: 'plexus-generate',
+		action: 'Run generation only through the plan-gated workflow. plexus_generate_report.json must prove a passing Plexus plan produced full_model.json and report.json from the deterministic generator.',
+		evidence: ['plexus_generate_report.json', 'plexus_plan_report.json', 'full_model.json', 'report.json'],
 		observed: checks.gsdGenerate.firstFinding || checks.gsdGenerate,
 	});
 }
@@ -752,7 +752,7 @@ if (checks.applyGated.status === 'fail') {
 			observed: finding,
 			editFiles: ['circuit_packs/<pack>/pack.mjs', 'circuit_packs/<pack>/apply_writer.mjs', 'circuit_packs/<pack>/apply_run.mjs', 'engine/apply_gated.mjs'],
 			nextCommand: checks.acceptance.context?.spec
-				? `node bin/easyeda-gsd.mjs apply --gated --context-only ${checks.acceptance.context.spec}`
+				? `node bin/easyeda-plexus.mjs apply --gated --context-only ${checks.acceptance.context.spec}`
 				: 'npm.cmd run apply:gated',
 		});
 	} else {
@@ -791,8 +791,8 @@ if (INCLUDE_DELIVERY_REPORT && checks.delivery.status === 'fail') {
 		observed: checks.delivery.firstFinding || checks.delivery,
 		editFiles: ['engine/delivery_gate.mjs', 'engine/final_evidence_gate.mjs', 'engine/acceptance_run.mjs', 'project_spec.json', 'project_contract.json', 'project_assembly.json'],
 		nextCommand: checks.acceptance.context?.spec
-			? `node bin/easyeda-gsd.mjs live-check ${checks.acceptance.context.spec} && node bin/easyeda-gsd.mjs deliver ${checks.acceptance.context.spec}`
-			: 'node bin/easyeda-gsd.mjs live-check && node bin/easyeda-gsd.mjs deliver',
+			? `node bin/easyeda-plexus.mjs live-check ${checks.acceptance.context.spec} && node bin/easyeda-plexus.mjs deliver ${checks.acceptance.context.spec}`
+			: 'node bin/easyeda-plexus.mjs live-check && node bin/easyeda-plexus.mjs deliver',
 	});
 }
 if (checks.repairActions.status === 'fail') {

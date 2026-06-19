@@ -1,7 +1,7 @@
 import { existsSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { generateContext } from '../workflows/gsd_generate.mjs';
+import { generateContext } from '../workflows/plexus_generate.mjs';
 
 const DIR = (process.env.EASYEDA_WORKDIR || process.cwd()).replace(/\\/g, '/') + '/';
 const REPORT = process.env.EASYEDA_DELIVERY_REPORT || DIR + 'delivery_report.json';
@@ -112,7 +112,7 @@ requireFresh(findings, 'live.json', 'real EasyEDA snapshot');
 requireFresh(findings, 'live_canvas.png', 'real EasyEDA canvas image');
 
 if (reports.acceptance.data?.mode && reports.acceptance.data.mode !== 'full-with-live') {
-	hard(findings, 'DL7-live-acceptance-required', 'delivery requires node bin/easyeda-gsd.mjs live-check output; local-only acceptance is not final evidence', {
+	hard(findings, 'DL7-live-acceptance-required', 'delivery requires node bin/easyeda-plexus.mjs live-check output; local-only acceptance is not final evidence', {
 		file: 'acceptance_report.json',
 		mode: reports.acceptance.data.mode,
 	});

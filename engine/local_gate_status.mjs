@@ -21,7 +21,7 @@ function fail(code, msg) {
 }
 
 if (!existsSync(REPORT)) {
-	fail(2, `local gate status: ${REPORT} not found. Run "npm run accept" (or "node bin/easyeda-gsd.mjs accept") first.`);
+	fail(2, `local gate status: ${REPORT} not found. Run "npm run accept" (or "node bin/easyeda-plexus.mjs accept") first.`);
 }
 
 let acceptance;
@@ -54,7 +54,7 @@ if (localPass) {
 		+ `(${steps.filter(s => s.required).length - liveDeferred.length} required local gates green)`);
 	if (liveDeferred.length) {
 		console.log(`note: final delivery still requires real EasyEDA live evidence; deferred fail-closed gates: ${liveDeferred.join(', ')}`);
-		console.log('      run "node bin/easyeda-gsd.mjs live-check" then "deliver" once a live EasyEDA bridge is available.');
+		console.log('      run "node bin/easyeda-plexus.mjs live-check" then "deliver" once a live EasyEDA bridge is available.');
 	}
 	process.exit(0);
 }

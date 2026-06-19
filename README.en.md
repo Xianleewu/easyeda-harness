@@ -6,9 +6,9 @@ EasyEDA Harness is a schematic design collaboration and checking workflow for co
 
 The simplest user workflow is to hand this repository to an agent and ask it to follow `AGENTS.md` or `CLAUDE.md`. The agent should install dependencies, verify the official EasyEDA API Skill/Bridge, run the gates, generate visual evidence, and only write back to EasyEDA after every gate passes.
 
-The neutral runner entrypoint is `node bin/easyeda-gsd.mjs`; see `docs/agent-runner-guide.md`.
+The neutral runner entrypoint is `node bin/easyeda-plexus.mjs`; see `docs/agent-runner-guide.md`.
 
-The workflow is intentionally staged like a UI design loop: first produce a short, reviewable draft of the design intent, then generate and check deterministic artifacts. `node bin/easyeda-gsd.mjs design-brief` writes a strict `design_brief_report.json` with a block diagram, module assumptions, pin/net plan, layout/interface plan, ERC/layout checklist, and next tasks. Agents should use that brief to catch missing module rectangles, missing label columns, missing pin maps, floating labels, and unclear interface ownership before spending time on full generation. `design-brief --draft` is only for early incomplete scaffolds; draft output is not generation or delivery evidence.
+The workflow is intentionally staged like a UI design loop: first produce a short, reviewable draft of the design intent, then generate and check deterministic artifacts. `node bin/easyeda-plexus.mjs design-brief` writes a strict `design_brief_report.json` with a block diagram, module assumptions, pin/net plan, layout/interface plan, ERC/layout checklist, and next tasks. Agents should use that brief to catch missing module rectangles, missing label columns, missing pin maps, floating labels, and unclear interface ownership before spending time on full generation. `design-brief --draft` is only for early incomplete scaffolds; draft output is not generation or delivery evidence.
 
 ## Scope
 
@@ -16,7 +16,7 @@ This repository is an executable workflow, not a prompt pack for free-form drawi
 
 A PASS on the current model only proves the current model. It does not validate another project, another schematic, or manual EasyEDA edits.
 
-`project_spec.json` is the machine-readable user-intent input. `node bin/easyeda-gsd.mjs plan` writes `gsd_plan_report.json`, proving that the spec is realized by the current contract, netlist, assembly, and circuit pack. `node bin/easyeda-gsd.mjs design-brief` writes the strict fast review artifact that explains the current block diagram, pin/net plan, layout/interface plan, label-column plan, and open tasks. `node bin/easyeda-gsd.mjs generate` writes `gsd_generate_report.json`, refuses to generate if the plan fails, and runs full layout search by default; `generate --fast` is only a draft iteration mode. `project_contract.json` is the design contract derived from that spec. `npm run spec` checks that the contract covers the spec, and `npm run contract` / `npm run accept` continue checking the contract and generated model.
+`project_spec.json` is the machine-readable user-intent input. `node bin/easyeda-plexus.mjs plan` writes `plexus_plan_report.json`, proving that the spec is realized by the current contract, netlist, assembly, and circuit pack. `node bin/easyeda-plexus.mjs design-brief` writes the strict fast review artifact that explains the current block diagram, pin/net plan, layout/interface plan, label-column plan, and open tasks. `node bin/easyeda-plexus.mjs generate` writes `plexus_generate_report.json`, refuses to generate if the plan fails, and runs full layout search by default; `generate --fast` is only a draft iteration mode. `project_contract.json` is the design contract derived from that spec. `npm run spec` checks that the contract covers the spec, and `npm run contract` / `npm run accept` continue checking the contract and generated model.
 `npm run spec:schema` validates the spec shape before contract coverage is checked.
 
 `project_contract.json` is the first machine-readable file an agent must update for a new project. Each module must declare `drawingRules` for the reusable schematic-quality rules it expects. `project_netlist.json` records the required electrical endpoints. `circuit_packs/*/cell_manifest.json` declares deterministic cell capabilities for the selected circuit pack, and `project_assembly.json` maps each contract module to those cells, refs, anchors, nets, and layout policy. `npm run contract`, `npm run contract:netlist`, `npm run contract:cells`, `npm run contract:assembly`, `npm run contract:layout`, `npm run contract:geometry`, and `npm run accept` check them; if they fail, the agent should not edit write-back scripts, apply to EasyEDA, or claim completion.
@@ -76,25 +76,25 @@ Follow AGENTS.md for this repository. For a new project, create the project cont
 ```
 
 The agent runs the local checks, workflow smoke checks, generates preview evidence, and writes `acceptance_report.json`, `workflow_smoke_report.json`, `next_actions.json`, and `repair_actions.json`. If a check fails, `next_actions.json` is the handoff summary and `repair_actions.json` maps each finding to edit targets, inspection files, and the next command to rerun.
-`node bin/easyeda-gsd.mjs repair` builds a read-only grouped repair plan through `workflows/repair_loop.mjs` and writes `repair_loop_report.json`.
+`node bin/easyeda-plexus.mjs repair` builds a read-only grouped repair plan through `workflows/repair_loop.mjs` and writes `repair_loop_report.json`.
 `next_actions.json` is a validated `schemaVersion=1` action contract; `npm run action:schema` checks ids, normalized check statuses, targets, evidence, and pass/action consistency.
 `final:evidence` writes `final_evidence_report.json`, proving required evidence artifacts are present, fresh, passing, and free of open repair actions.
 
 Preferred agent commands:
 
 ```bash
-node bin/easyeda-gsd.mjs design-brief
-node bin/easyeda-gsd.mjs accept
-node bin/easyeda-gsd.mjs repair
-node bin/easyeda-gsd.mjs live-check
-node bin/easyeda-gsd.mjs deliver
-node bin/easyeda-gsd.mjs apply --gated project_spec.json
+node bin/easyeda-plexus.mjs design-brief
+node bin/easyeda-plexus.mjs accept
+node bin/easyeda-plexus.mjs repair
+node bin/easyeda-plexus.mjs live-check
+node bin/easyeda-plexus.mjs deliver
+node bin/easyeda-plexus.mjs apply --gated project_spec.json
 ```
 
-For an external project directory, pass that same spec path through every context-aware command, including final handoff and write-back: `node bin/easyeda-gsd.mjs deliver <project-dir>/project_spec.json` and `node bin/easyeda-gsd.mjs apply --gated <project-dir>/project_spec.json`.
+For an external project directory, pass that same spec path through every context-aware command, including final handoff and write-back: `node bin/easyeda-plexus.mjs deliver <project-dir>/project_spec.json` and `node bin/easyeda-plexus.mjs apply --gated <project-dir>/project_spec.json`.
 
 For a new project, the first implementation step is updating `project_spec.json`, realizing it in `project_contract.json` with module-level `drawingRules`, defining required endpoints in `project_netlist.json`, declaring/choosing a circuit-pack `cell_manifest.json`, then mapping the contract and layout policy in `project_assembly.json`. Only then should the agent implement project-specific deterministic cells and rules.
-For a new project directory, `node bin/easyeda-gsd.mjs init --pack <pack> --out <project-dir>` writes scaffold versions of those files plus `approved_library_manifest.json` and `gsd_scaffold_report.json`. If `<pack>` does not exist, it also creates `circuit_packs/<pack>/pack.mjs`, `circuit_packs/<pack>/cell_manifest.json`, and updates the pack registry. New pack manifests include per-module cell templates with executable `portLayout` entries, and the generated `project_assembly.json` references those cells so agents implement deterministic builders instead of inventing floating labels. The scaffold emits generic `layoutPolicy.anchorVariants` with enough candidates for the layout planner's minimum search-space gate, so new projects do not depend on the bundled USB/MCU/relay coordinate fields. The scaffold is intentionally incomplete and must not be treated as ready for generation until pack builders, cell manifest, contracts, netlist, library bindings, and assembly mappings make `plan` pass.
+For a new project directory, `node bin/easyeda-plexus.mjs init --pack <pack> --out <project-dir>` writes scaffold versions of those files plus `approved_library_manifest.json` and `plexus_scaffold_report.json`. If `<pack>` does not exist, it also creates `circuit_packs/<pack>/pack.mjs`, `circuit_packs/<pack>/cell_manifest.json`, and updates the pack registry. New pack manifests include per-module cell templates with executable `portLayout` entries, and the generated `project_assembly.json` references those cells so agents implement deterministic builders instead of inventing floating labels. The scaffold emits generic `layoutPolicy.anchorVariants` with enough candidates for the layout planner's minimum search-space gate, so new projects do not depend on the bundled USB/MCU/relay coordinate fields. The scaffold is intentionally incomplete and must not be treated as ready for generation until pack builders, cell manifest, contracts, netlist, library bindings, and assembly mappings make `plan` pass.
 
 ## Write Back To EasyEDA
 
@@ -105,13 +105,13 @@ The agent writes back through `apply:gated`. That entry point runs the checks fi
 Offline preview images are generated by the harness renderer. They are useful for fast structure, module-region, and obvious-overlap review, but they are not real EasyEDA canvas screenshots and are not sufficient as final evidence.
 
 It runs local gates, live snapshot, live canvas image, EasyEDA DRC, module-level live shots, and live diagnostics when needed, then writes `acceptance_report.json`.
-When a gate remains open, inspect `next_actions.json` first; it is the machine-readable handoff checklist for the next agent. Then inspect `repair_actions.json` for finding-level edit targets and rerun commands, or run `node bin/easyeda-gsd.mjs repair` to produce `repair_loop_report.json`.
+When a gate remains open, inspect `next_actions.json` first; it is the machine-readable handoff checklist for the next agent. Then inspect `repair_actions.json` for finding-level edit targets and rerun commands, or run `node bin/easyeda-plexus.mjs repair` to produce `repair_loop_report.json`.
 
 In live mode, `contract:live:model` checks `live.json` from the real EasyEDA canvas against `project_contract.json`. Final acceptance is not based on `full_model.json` alone.
 `contract:geometry:live` checks the real EasyEDA geometry, so local previews cannot hide live wire crossings, text overlap, or wires through symbols.
 `contract:labels:live` also checks the real EasyEDA wire `Name` geometry, so a local label contract cannot hide floating labels, wrong origins, or scattered live wire names.
 
-`node bin/easyeda-gsd.mjs deliver` writes `delivery_report.json` and is the final handoff gate. It rejects local-only `accept` output and only passes with `full-with-live` acceptance, live final evidence, `live.json`, `live_canvas.png`, live shots, live model proof, and EasyEDA DRC `0 error / 0 warning / 0 info`.
+`node bin/easyeda-plexus.mjs deliver` writes `delivery_report.json` and is the final handoff gate. It rejects local-only `accept` output and only passes with `full-with-live` acceptance, live final evidence, `live.json`, `live_canvas.png`, live shots, live model proof, and EasyEDA DRC `0 error / 0 warning / 0 info`.
 
 `live:shots` is fail-closed. It first tries requested EasyEDA zoom-region captures. If the EasyEDA API returns the same full-page rendered image for every zoom request, the harness falls back to coordinate crops from that real EasyEDA rendered schematic image. Those crops are accepted only when at least 10 module images exist, all required crops are inside the real rendered image, hashes are distinct, and every image-quality gate passes.
 
@@ -144,8 +144,8 @@ For handoff, review the global sheet and local crops for USB, LDO, RESET, BOOT, 
 - EasyEDA live shots: at least 10 distinct module-level evidence images
 - `next_actions.json` has no open handoff summary actions
 - `action_schema_report.json` proves `next_actions.json` follows the stable action schema
-- `gsd_plan_report.json` proves the current spec is realized by contract, netlist, assembly, and circuit pack
-- `gsd_generate_report.json` proves deterministic generation was plan-gated
+- `plexus_plan_report.json` proves the current spec is realized by contract, netlist, assembly, and circuit pack
+- `plexus_generate_report.json` proves deterministic generation was plan-gated
 - `project_library_report.json` proves every required part has approved library bindings
 - `repair_actions.json` has no finding-level repair actions
 - `repair_loop_report.json` has no grouped repair actions
@@ -169,7 +169,7 @@ For handoff, review the global sheet and local crops for USB, LDO, RESET, BOOT, 
 ## Repository Layout
 
 - `engine/`: template assembly, layout search, write-back, rendering, DRC and live helpers.
-- `bin/easyeda-gsd.mjs`: neutral workflow wrapper for agent runners and CI.
+- `bin/easyeda-plexus.mjs`: neutral workflow wrapper for agent runners and CI.
 - `docs/agent-runner-guide.md`: concise runner contract for Codex, Claude Code, and other agents.
 - `reports/README.md`: generated report contract notes, including the `next_actions.json` action schema.
 - `harness/`: normalized model, module registry, and rule gates.
@@ -178,10 +178,10 @@ For handoff, review the global sheet and local crops for USB, LDO, RESET, BOOT, 
 - `contracts/module_contract.mjs` / `contracts/net_contract.mjs` / `contracts/layout_contract.mjs`: reusable validators for functional modules, electrical endpoint intent, and project-driven layout policy.
 - `docs/schematic-design-rules.md`: executable schematic layout rules for wire crossings, object overlap, label origins, label columns, module rectangles, and live evidence.
 - `workflows/repair_loop.mjs`: read-only repair loop planner that groups `next_actions.json` and `repair_actions.json` into fix kinds, files, evidence, and rerun commands, then emits `repair_loop_report.json`.
-- `workflows/gsd_plan.mjs`: spec-to-contract realization planner that emits `gsd_plan_report.json`.
+- `workflows/plexus_plan.mjs`: spec-to-contract realization planner that emits `plexus_plan_report.json`.
 - `workflows/design_brief.mjs`: short-cycle design review builder that emits `design_brief_report.json`.
-- `workflows/gsd_generate.mjs`: plan-gated deterministic generation wrapper that emits `gsd_generate_report.json`.
-- `workflows/gsd_scaffold.mjs`: new-project scaffold writer for spec, contract, netlist, assembly, and `gsd_scaffold_report.json`.
+- `workflows/plexus_generate.mjs`: plan-gated deterministic generation wrapper that emits `plexus_generate_report.json`.
+- `workflows/plexus_scaffold.mjs`: new-project scaffold writer for spec, contract, netlist, assembly, and `plexus_scaffold_report.json`.
 - `contracts/library_contract.mjs`: approved library binding validator for required parts.
 - `engine/final_evidence_gate.mjs`: fail-closed local/live evidence gate for freshness, zero DRC, live model proof, and empty repair actions.
 - `circuit_packs/*/cell_manifest.json`: circuit-pack deterministic cell capability contracts.

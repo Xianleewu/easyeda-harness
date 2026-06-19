@@ -82,7 +82,7 @@ export function buildScaffold(spec, { pack = 'aihwdebugger', useGeneratedCells =
 		allowedAnonymousNets: [],
 	};
 	const libraryManifest = {
-		generatedFrom: 'gsd scaffold',
+		generatedFrom: 'plexus scaffold',
 		purpose: 'Approved EasyEDA library bindings for this project. Fill every contract requiredPart before generation.',
 		bindingKeys: ['Symbol', 'Device', 'Footprint'],
 		parts: {},
@@ -231,8 +231,8 @@ export function writeScaffold({ outDir, spec, pack = 'aihwdebugger', useGenerate
 		circuitPack: normalizedSpec.circuitPack,
 		files: Object.keys(files),
 		readyForGenerate: false,
-		nextStep: 'Fill requiredParts, approved library bindings, requiredPins, deterministic cell mappings, refs, registryModule, netArgs, portLayout, layoutPolicy.labelColumns, anchors, and writer implementation until node bin/easyeda-gsd.mjs plan <outDir>/project_spec.json passes.',
+		nextStep: 'Fill requiredParts, approved library bindings, requiredPins, deterministic cell mappings, refs, registryModule, netArgs, portLayout, layoutPolicy.labelColumns, anchors, and writer implementation until node bin/easyeda-plexus.mjs plan <outDir>/project_spec.json passes.',
 	};
-	writeFileSync(`${outDir}/gsd_scaffold_report.json`, JSON.stringify(report, null, 2) + '\n', 'utf8');
+	writeFileSync(`${outDir}/plexus_scaffold_report.json`, JSON.stringify(report, null, 2) + '\n', 'utf8');
 	return report;
 }

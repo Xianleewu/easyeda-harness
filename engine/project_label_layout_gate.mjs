@@ -45,7 +45,7 @@ function hard(findings, rule, msg, where = {}) {
 function suggestForLabelRule(rule, pack) {
 	const cell = `circuit_packs/${pack}/pack.mjs`;
 	if (/^LL0/.test(rule)) {
-		return { editFiles: ['project_spec.json'], hint: 'Generate the model first (node bin/easyeda-gsd.mjs generate) so label evidence exists before the audit.' };
+		return { editFiles: ['project_spec.json'], hint: 'Generate the model first (node bin/easyeda-plexus.mjs generate) so label evidence exists before the audit.' };
 	}
 	if (/^LL16/.test(rule)) {
 		return { editFiles: ['project_assembly.json', cell], hint: 'Either declare the net in layoutPolicy.labelColumns (if the interface is required) or stop emitting the visible label in the deterministic cell.' };

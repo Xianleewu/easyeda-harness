@@ -4,8 +4,8 @@ import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { validateSpecSchema } from '../contracts/spec_schema.mjs';
 import { loadRepairLoopPlan } from '../workflows/repair_loop.mjs';
-import { buildGeneratePlan, runGsdGenerate } from '../workflows/gsd_generate.mjs';
-import { writeScaffold } from '../workflows/gsd_scaffold.mjs';
+import { buildGeneratePlan, runPlexusGenerate } from '../workflows/plexus_generate.mjs';
+import { writeScaffold } from '../workflows/plexus_scaffold.mjs';
 import { writeDesignBrief } from '../workflows/design_brief.mjs';
 import { buildMinimalSpec, validatePackId, writePackScaffold } from '../workflows/pack_scaffold.mjs';
 import { circuitPackIds } from '../circuit_packs/registry.mjs';
@@ -18,7 +18,7 @@ function log(text = '') {
 }
 
 function usage() {
-	log(`easyeda-gsd
+	log(`easyeda-plexus
 
 Agent-neutral workflow wrapper for EasyEDA Harness.
 
@@ -45,6 +45,8 @@ Commands:
   live-check [spec]            Run live EasyEDA snapshot, image, DRC, and live shot checks (pre-flights the bridge first).
   deliver [spec]               Verify final handoff evidence from live-check; rejects local-only PASS.
   apply --gated [spec]         Write back through the fail-closed gated entrypoint for the selected spec context.
+  optimize                     Audit a connected schematic, classify findings (auto/resolve/ask/skip), and write a dry-run fix plan + decisions template.
+  audit                        Run the six-pillar design-language conformance audit (extract netlist + roles → score) on the live snapshot.
   repair [--max-iterations N]  Write repair_loop_report.json from next_actions/repair_actions.
   report                       Summarize latest acceptance and repair artifacts.
 
@@ -101,7 +103,7 @@ function writeInit(args) {
 		if (!/\.[A-Za-z0-9]+$/.test(target)) {
 			const scaffold = writeScaffold({ outDir: target, spec, pack, useGeneratedCells: !packExists });
 			log(JSON.stringify({ pack: packScaffold, project: scaffold }, null, 2));
-			log(`${target}/gsd_scaffold_report.json`);
+			log(`${target}/plexus_scaffold_report.json`);
 			return 0;
 		}
 		mkdirSync(dirname(target), { recursive: true });
@@ -124,9 +126,9 @@ function plan(args) {
 			return 2;
 		}
 		const report = buildGeneratePlan(ROOT, spec);
-		writeFileSync(`${ROOT}/gsd_plan_report.json`, JSON.stringify(report, null, 2), 'utf8');
+		writeFileSync(`${ROOT}/plexus_plan_report.json`, JSON.stringify(report, null, 2), 'utf8');
 		log(JSON.stringify(report, null, 2));
-		log('report -> gsd_plan_report.json');
+		log('report -> plexus_plan_report.json');
 		return report.pass ? 0 : 1;
 	} finally {
 		lock.release();
@@ -205,9 +207,9 @@ function generate(args) {
 	const spec = args.find(a => !a.startsWith('-')) || 'project_spec.json';
 	const fast = args.includes('--fast');
 	const command = fast ? ['engine/pipeline_fast.mjs'] : ['engine/pipeline.mjs'];
-	const { report, status } = runGsdGenerate({ root: ROOT, specPath: spec, command, draft: fast });
+	const { report, status } = runPlexusGenerate({ root: ROOT, specPath: spec, command, draft: fast });
 	log(JSON.stringify(report, null, 2));
-	log('report -> gsd_generate_report.json');
+	log('report -> plexus_generate_report.json');
 	process.exit(status);
 }
 
@@ -258,6 +260,12 @@ switch (cmd) {
 			process.exit(2);
 		}
 		runNode(['engine/apply_gated.mjs', ...args.filter(arg => arg !== '--gated')]);
+		break;
+	case 'optimize':
+		runNode(['engine/optimize_loop.mjs', ...args]);
+		break;
+	case 'audit':
+		runNode(['engine/plexus_audit.mjs', ...args]);
 		break;
 	case 'repair':
 		process.exit(repair(args));

@@ -1,6 +1,6 @@
 import { spawnSync } from 'node:child_process';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
-import { generateContext } from '../workflows/gsd_generate.mjs';
+import { generateContext } from '../workflows/plexus_generate.mjs';
 import { acquireRunLock } from '../workflows/run_lock.mjs';
 
 const DIR = (process.env.EASYEDA_WORKDIR || process.cwd()).replace(/\\/g, '/') + '/';
@@ -59,9 +59,9 @@ const steps = [];
 steps.push(runStep('entrypoints', 'node', ['engine/entrypoint_audit.mjs']));
 steps.push(runStep('agent:instructions', 'node', ['engine/agent_instruction_gate.mjs']));
 steps.push(runStep('workflow:smoke', 'node', ['engine/workflow_smoke_gate.mjs']));
-steps.push(runStep('gsd:plan', 'node', ['bin/easyeda-gsd.mjs', 'plan', SPEC_PATH]));
-steps.push(runStep('design:brief', 'node', ['bin/easyeda-gsd.mjs', 'design-brief', SPEC_PATH]));
-steps.push(runStep('gsd:generate', 'node', ['bin/easyeda-gsd.mjs', 'generate', '--fast', SPEC_PATH]));
+steps.push(runStep('plexus:plan', 'node', ['bin/easyeda-plexus.mjs', 'plan', SPEC_PATH]));
+steps.push(runStep('design:brief', 'node', ['bin/easyeda-plexus.mjs', 'design-brief', SPEC_PATH]));
+steps.push(runStep('plexus:generate', 'node', ['bin/easyeda-plexus.mjs', 'generate', '--fast', SPEC_PATH]));
 steps.push(runStep('spec:schema', 'node', ['engine/spec_schema_gate.mjs']));
 steps.push(runStep('spec', 'node', ['engine/project_spec_gate.mjs']));
 steps.push(runStep('contract', 'node', ['engine/project_contract_gate.mjs']));
@@ -98,9 +98,9 @@ for (const [key, path] of Object.entries({
 	report: DIR + 'report.json',
 	agentInstructions: DIR + 'agent_instruction_report.json',
 	workflowSmoke: DIR + 'workflow_smoke_report.json',
-	gsdPlan: DIR + 'gsd_plan_report.json',
+	gsdPlan: DIR + 'plexus_plan_report.json',
 	designBrief: DIR + 'design_brief_report.json',
-	gsdGenerate: DIR + 'gsd_generate_report.json',
+	gsdGenerate: DIR + 'plexus_generate_report.json',
 	specSchema: DIR + 'spec_schema_report.json',
 	projectSpec: DIR + 'project_spec_report.json',
 	projectContract: DIR + 'project_contract_report.json',
@@ -148,9 +148,9 @@ const acceptance = {
 		local: {
 			agentInstructions: steps.find(s => s.name === 'agent:instructions')?.pass === true,
 			workflowSmoke: steps.find(s => s.name === 'workflow:smoke')?.pass === true,
-			gsdPlan: steps.find(s => s.name === 'gsd:plan')?.pass === true,
+			gsdPlan: steps.find(s => s.name === 'plexus:plan')?.pass === true,
 			designBrief: steps.find(s => s.name === 'design:brief')?.pass === true,
-			gsdGenerate: steps.find(s => s.name === 'gsd:generate')?.pass === true,
+			gsdGenerate: steps.find(s => s.name === 'plexus:generate')?.pass === true,
 			specSchema: steps.find(s => s.name === 'spec:schema')?.pass === true,
 			spec: steps.find(s => s.name === 'spec')?.pass === true,
 			contract: steps.find(s => s.name === 'contract')?.pass === true,

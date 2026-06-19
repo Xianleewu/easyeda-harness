@@ -22,9 +22,9 @@ EasyEDA Harness 是给 Codex、Claude Code 等编码 Agent 使用的 EasyEDA 原
 Follow AGENTS.md for this repository. Install/verify easyeda-api-skill first. For a new project, create project_spec.json, project_contract.json, project_netlist.json, project_assembly.json, circuit_packs/<pack>/cell_manifest.json, and rule coverage before any drawing. Do not free-draw in EasyEDA. Use deterministic cells, run workflow:smoke and accept, collect live EasyEDA evidence, and write back only through apply:gated after every gate passes.
 ```
 
-用户通常不需要逐条执行命令；命令是给 Agent 和 CI 使用的稳定入口。中立入口是 `node bin/easyeda-gsd.mjs`，详细 Runner 约定见 `docs/agent-runner-guide.md`。
+用户通常不需要逐条执行命令；命令是给 Agent 和 CI 使用的稳定入口。中立入口是 `node bin/easyeda-plexus.mjs`，详细 Runner 约定见 `docs/agent-runner-guide.md`。
 
-工作流应像 UI 设计一样先形成短周期草案，再进入完整生成和验收。`node bin/easyeda-gsd.mjs design-brief` 默认是严格检查，会写出 `design_brief_report.json`，包含功能 block diagram、模块假设、pin/net plan、布局/接口计划、label column 计划、ERC/版式 checklist 和下一步任务。Agent 应先用这个 brief 发现模块矩形缺失、label column 缺失、pin map 缺失、接口方向不清、浮空 label 等问题；只有 `HARD=0 SOFT=0 INFO=0` 才能继续写 deterministic cell。`design-brief --draft` 只用于早期不完整 scaffold 的探索，不是生成或交付证据。
+工作流应像 UI 设计一样先形成短周期草案，再进入完整生成和验收。`node bin/easyeda-plexus.mjs design-brief` 默认是严格检查，会写出 `design_brief_report.json`，包含功能 block diagram、模块假设、pin/net plan、布局/接口计划、label column 计划、ERC/版式 checklist 和下一步任务。Agent 应先用这个 brief 发现模块矩形缺失、label column 缺失、pin map 缺失、接口方向不清、浮空 label 等问题；只有 `HARD=0 SOFT=0 INFO=0` 才能继续写 deterministic cell。`design-brief --draft` 只用于早期不完整 scaffold 的探索，不是生成或交付证据。
 
 ## 工作流边界
 
@@ -45,9 +45,9 @@ Follow AGENTS.md for this repository. Install/verify easyeda-api-skill first. Fo
 
 - `workflow:smoke`：证明坏 spec、缺库绑定、失败 generate、未完成 scaffold 都会被拦住，并写出 `workflow_smoke_report.json`。
 - 新 pack 的 `init --pack <pack> --out <project-dir>` 会生成按模块拆分的 `cell_manifest.json` cell 模板和 `portLayout`，并让 `project_assembly.json` 引用这些 cell；agent 必须实现这些 deterministic builders，不能绕回自由绘图。
-- `easyeda-gsd plan`：检查 spec 是否被合同、netlist、assembly 和 circuit pack 实现，并写出 `gsd_plan_report.json`。
-- `easyeda-gsd design-brief`：生成严格快速审阅报告，说明 block diagram、pin/net plan、布局/接口计划、label column、ERC/版式 checklist 和下一步；`--draft` 只用于早期草稿。
-- `easyeda-gsd generate`：只有 plan 通过才生成模型，并写出 `gsd_generate_report.json`。
+- `easyeda-plexus plan`：检查 spec 是否被合同、netlist、assembly 和 circuit pack 实现，并写出 `plexus_plan_report.json`。
+- `easyeda-plexus design-brief`：生成严格快速审阅报告，说明 block diagram、pin/net plan、布局/接口计划、label column、ERC/版式 checklist 和下一步；`--draft` 只用于早期草稿。
+- `easyeda-plexus generate`：只有 plan 通过才生成模型，并写出 `plexus_generate_report.json`。
 - `contract:pack`：检查选中的 circuit pack 和生成 hook。
 - `contract:library`：检查器件 Symbol、Device、Footprint、名称、值和 BOM/PCB 状态。
 - `contract:geometry` / `contract:geometry:live`：检查正交导线、异网交叉、导线穿越可见对象、文字/属性/符号/器件 bbox 重叠。
@@ -95,13 +95,13 @@ Follow AGENTS.md for this repository. Install/verify easyeda-api-skill first. Fo
 ## 仓库结构
 
 - `AGENTS.md` / `CLAUDE.md`：Codex、Claude Code 等 Agent 的操作约束。
-- `bin/easyeda-gsd.mjs`：统一工作流入口。
+- `bin/easyeda-plexus.mjs`：统一工作流入口。
 - `docs/agent-runner-guide.md`：给 Agent Runner 和 CI 的简明协议。
 - `docs/schematic-design-rules.md`：原理图版式、几何和标签规则。
 - `contracts/`：spec、模块、netlist、布局、库绑定等合同检查。
 - `circuit_packs/`：可复用 circuit pack、cell builders 和 `cell_manifest.json`。
 - `engine/`：生成、布局搜索、门禁、写回、live snapshot、DRC 和证据收集。
-- `workflows/`：GSD plan/generate/scaffold/repair 流程。
+- `workflows/`：Plexus plan/generate/scaffold/repair 流程。
 - `workflows/design_brief.mjs`：短周期设计审阅报告生成器。
 - `reports/README.md`：生成报告和 action contract 说明。
 

@@ -13,7 +13,7 @@ import { auditSeverityPolicy, auditReportSeverityZero } from './severity_policy.
 import { auditDocumentStyleFromSnapshot } from './document_style_gate.mjs';
 import { auditPageComposition } from './page_composition.mjs';
 import { acquireRunLock } from '../workflows/run_lock.mjs';
-import { generateContext } from '../workflows/gsd_generate.mjs';
+import { generateContext } from '../workflows/plexus_generate.mjs';
 import { resolveApplyWriter } from '../contracts/apply_writer_contract.mjs';
 import { getCircuitPack } from '../circuit_packs/registry.mjs';
 

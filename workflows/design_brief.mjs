@@ -1,6 +1,6 @@
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { validateSpecSchema, asArray } from '../contracts/spec_schema.mjs';
-import { generateContext } from './gsd_generate.mjs';
+import { generateContext } from './plexus_generate.mjs';
 
 function readJson(path) {
 	return JSON.parse(readFileSync(path, 'utf8').replace(/^\uFEFF/, ''));

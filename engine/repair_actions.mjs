@@ -10,8 +10,8 @@ const BASE_REPORTS = [
 	{ gate: 'agent-instructions', file: 'agent_instruction_report.json', rerun: 'npm.cmd run agent:instructions' },
 	{ gate: 'workflow-smoke', file: 'workflow_smoke_report.json', rerun: 'npm.cmd run workflow:smoke' },
 	{ gate: 'action-schema', file: 'action_schema_report.json', rerun: 'npm.cmd run action:schema' },
-	{ gate: 'gsd-plan', file: 'gsd_plan_report.json', rerun: 'node bin/easyeda-gsd.mjs plan project_spec.json' },
-	{ gate: 'gsd-generate', file: 'gsd_generate_report.json', rerun: 'node bin/easyeda-gsd.mjs generate project_spec.json' },
+	{ gate: 'plexus-plan', file: 'plexus_plan_report.json', rerun: 'node bin/easyeda-plexus.mjs plan project_spec.json' },
+	{ gate: 'plexus-generate', file: 'plexus_generate_report.json', rerun: 'node bin/easyeda-plexus.mjs generate project_spec.json' },
 	{ gate: 'spec-schema', file: 'spec_schema_report.json', rerun: 'npm.cmd run spec:schema' },
 	{ gate: 'project-spec', file: 'project_spec_report.json', rerun: 'npm.cmd run spec' },
 	{ gate: 'project-contract', file: 'project_contract_report.json', rerun: 'npm.cmd run contract' },
@@ -98,19 +98,19 @@ function isExternalSpec(spec) {
 function contextAwareCommand(command) {
 	const spec = currentSpecArg();
 	if (!isExternalSpec(spec)) return command;
-	if (/easyeda-gsd\.mjs plan|gsd:plan/.test(command || '')) {
-		return `node bin/easyeda-gsd.mjs plan ${spec}`;
+	if (/easyeda-plexus\.mjs plan|plexus:plan/.test(command || '')) {
+		return `node bin/easyeda-plexus.mjs plan ${spec}`;
 	}
-	if (/easyeda-gsd\.mjs generate|gsd:generate/.test(command || '')) {
-		return `node bin/easyeda-gsd.mjs generate ${spec}`;
+	if (/easyeda-plexus\.mjs generate|plexus:generate/.test(command || '')) {
+		return `node bin/easyeda-plexus.mjs generate ${spec}`;
 	}
 	if (/apply:gated|apply --gated/.test(command || '')) {
-		return `node bin/easyeda-gsd.mjs apply --gated --context-only ${spec}`;
+		return `node bin/easyeda-plexus.mjs apply --gated --context-only ${spec}`;
 	}
 	if (/(accept:live|live:|drc|final:evidence:live)/.test(command || '')) {
-		return `node bin/easyeda-gsd.mjs live-check ${spec}`;
+		return `node bin/easyeda-plexus.mjs live-check ${spec}`;
 	}
-	return `node bin/easyeda-gsd.mjs accept ${spec}`;
+	return `node bin/easyeda-plexus.mjs accept ${spec}`;
 }
 
 function firstMatch(rule, patterns) {
@@ -134,7 +134,7 @@ const RULE_PLANS = [
 	}],
 	[/^WS/, {
 		area: 'workflow-smoke',
-		editFiles: ['engine/workflow_smoke_gate.mjs', 'workflows/gsd_plan.mjs', 'workflows/gsd_generate.mjs', 'workflows/gsd_scaffold.mjs', 'contracts/library_contract.mjs'],
+		editFiles: ['engine/workflow_smoke_gate.mjs', 'workflows/plexus_plan.mjs', 'workflows/plexus_generate.mjs', 'workflows/plexus_scaffold.mjs', 'contracts/library_contract.mjs'],
 		inspectFiles: ['workflow_smoke_report.json', 'project_spec.json', 'project_contract.json', 'project_netlist.json', 'project_assembly.json', 'approved_library_manifest.json'],
 		nextCommand: 'npm.cmd run workflow:smoke',
 		repairHint: 'Keep reusable workflow regression checks fail-closed: bad specs must be rejected, scaffold must not be generation-ready, library bindings must be required, and negative generate must not rewrite full_model.json.',
@@ -163,15 +163,15 @@ const RULE_PLANS = [
 	[/^PC29|^PC30|^GP-PC29|^GP-PC30/, {
 		area: 'quality-rule-profile',
 		editFiles: ['project_contract.json', 'contracts/module_contract.mjs', 'harness/config.mjs'],
-		inspectFiles: ['project_contract_report.json', 'gsd_plan_report.json', 'project_contract.json', 'harness/config.mjs'],
-		nextCommand: 'node bin/easyeda-gsd.mjs plan project_spec.json',
+		inspectFiles: ['project_contract_report.json', 'plexus_plan_report.json', 'project_contract.json', 'harness/config.mjs'],
+		nextCommand: 'node bin/easyeda-plexus.mjs plan project_spec.json',
 		repairHint: 'Declare qualityPolicy.ruleProfile from the executable harness budgets: module gap, wire-intrusion budget, component/text clearance, named-stub length, wire-name origins, no fake text nets, and no unnecessary NET PORTs.',
 	}],
 	[/^PC12|^GP6-contract-parts$/, {
 		area: 'module-contract-bootstrap',
 		editFiles: ['project_spec.json', 'project_contract.json', 'project_netlist.json'],
-		inspectFiles: ['project_spec.json', 'project_contract.json', 'project_contract_report.json', 'gsd_plan_report.json'],
-		nextCommand: 'node bin/easyeda-gsd.mjs plan project_spec.json',
+		inspectFiles: ['project_spec.json', 'project_contract.json', 'project_contract_report.json', 'plexus_plan_report.json'],
+		nextCommand: 'node bin/easyeda-plexus.mjs plan project_spec.json',
 		repairHint: 'Bootstrap the module contract from the user intent: every module needs concrete requiredParts, requiredNets, drawingRules, visualEvidence, and matching structured netlist endpoints before any cell geometry is edited.',
 	}],
 	[/^PC/, {
@@ -198,8 +198,8 @@ const RULE_PLANS = [
 	[/^(GP-)?DR|^PR-DR/, {
 		area: 'drawing-rule-bindings',
 		editFiles: ['contracts/drawing_rule_registry.mjs', 'harness/rule_registry.mjs', 'project_contract.json', 'circuit_packs/<pack>/cell_manifest.json'],
-		inspectFiles: ['gsd_plan_report.json', 'project_rule_report.json', 'contracts/drawing_rule_registry.mjs', 'harness/rule_registry.mjs'],
-		nextCommand: 'node bin/easyeda-gsd.mjs plan project_spec.json',
+		inspectFiles: ['plexus_plan_report.json', 'project_rule_report.json', 'contracts/drawing_rule_registry.mjs', 'harness/rule_registry.mjs'],
+		nextCommand: 'node bin/easyeda-plexus.mjs plan project_spec.json',
 		repairHint: 'Bind every contract drawingRules and manifest qualityRules string to executable harness rules; do not let prose-only drawing rules pass generation.',
 	}],
 	[/^PR6|^PR7|^PR8/, {
@@ -226,8 +226,8 @@ const RULE_PLANS = [
 	[/^CM1[6-9]|^CM20|^CB1[4-8]/, {
 		area: 'cell-port-layout',
 		editFiles: ['circuit_packs/<pack>/cell_manifest.json', 'circuit_packs/<pack>/pack.mjs', 'project_assembly.json'],
-		inspectFiles: ['cell_manifest_report.json', 'gsd_plan_report.json', 'circuit_packs/<pack>/cell_manifest.json'],
-		nextCommand: 'node bin/easyeda-gsd.mjs plan project_spec.json',
+		inspectFiles: ['cell_manifest_report.json', 'plexus_plan_report.json', 'circuit_packs/<pack>/cell_manifest.json'],
+		nextCommand: 'node bin/easyeda-plexus.mjs plan project_spec.json',
 		repairHint: 'Make port layout executable: manifest portLayout must declare each port side/kind/label, and builders must emit real netflags on those ports with left-bottom alignMode=6 or right-bottom alignMode=8 instead of fake text or floating labels.',
 	}],
 	[/^CM/, {
@@ -247,22 +247,22 @@ const RULE_PLANS = [
 	[/^GP8|^GP1[5-7]/, {
 		area: 'cell-builder-bootstrap',
 		editFiles: ['project_assembly.json', 'circuit_packs/<pack>/cell_manifest.json', 'circuit_packs/<pack>/pack.mjs'],
-		inspectFiles: ['gsd_plan_report.json', 'project_assembly.json', 'cell_manifest_report.json'],
-		nextCommand: 'node bin/easyeda-gsd.mjs plan project_spec.json',
+		inspectFiles: ['plexus_plan_report.json', 'project_assembly.json', 'cell_manifest_report.json'],
+		nextCommand: 'node bin/easyeda-plexus.mjs plan project_spec.json',
 		repairHint: 'Bootstrap executable cell mappings: every assembly module needs cell, refs, anchor, netArgs/nets, and a selected manifest cell implemented by the active circuit pack before generation runs.',
 	}],
 	[/^CBG-PG/, {
 		area: 'cell-builder-geometry',
 		editFiles: ['circuit_packs/<pack>/pack.mjs', 'circuit_packs/<pack>/cell_manifest.json', 'project_assembly.json'],
-		inspectFiles: ['gsd_plan_report.json', 'full_model.json', 'project_geometry_report.json'],
-		nextCommand: 'node bin/easyeda-gsd.mjs plan project_spec.json',
+		inspectFiles: ['plexus_plan_report.json', 'full_model.json', 'project_geometry_report.json'],
+		nextCommand: 'node bin/easyeda-plexus.mjs plan project_spec.json',
 		repairHint: 'Fix deterministic cell builder geometry before generation: no local wire crossings, no wires through component bodies or visible labels, and no text/flag/attribute overlaps inside the cell output.',
 	}],
 	[/^CB/, {
 		area: 'cell-builder-output',
 		editFiles: ['circuit_packs/<pack>/pack.mjs', 'circuit_packs/<pack>/cell_manifest.json', 'project_assembly.json', 'project_contract.json'],
-		inspectFiles: ['gsd_plan_report.json', 'cell_manifest_report.json', 'project_assembly.json', 'full_model.json'],
-		nextCommand: 'node bin/easyeda-gsd.mjs plan project_spec.json',
+		inspectFiles: ['plexus_plan_report.json', 'cell_manifest_report.json', 'project_assembly.json', 'full_model.json'],
+		nextCommand: 'node bin/easyeda-plexus.mjs plan project_spec.json',
 		repairHint: 'Fix deterministic cell builder output before model generation: return real place/wires/flags arrays, use orthogonal segments, declare output nets, and avoid fake text labels.',
 	}],
 	[/^PA/, {
@@ -275,22 +275,22 @@ const RULE_PLANS = [
 	[/^GP2[7-9]|^GP3[0-4]|^PL2[2-9]/, {
 		area: 'interface-routing-contract',
 		editFiles: ['project_assembly.json', 'project_contract.json'],
-		inspectFiles: ['gsd_plan_report.json', 'project_layout_report.json', 'project_assembly.json'],
-		nextCommand: 'node bin/easyeda-gsd.mjs plan project_spec.json',
+		inspectFiles: ['plexus_plan_report.json', 'project_layout_report.json', 'project_assembly.json'],
+		nextCommand: 'node bin/easyeda-plexus.mjs plan project_spec.json',
 		repairHint: 'Declare layoutPolicy.interfaceRoutes for every project_contract interface: net/from/to, strategy visible-continuity or grouped-net-label, readable channel, and direction before generation or layout acceptance.',
 	}],
 	[/^GP4[7-9]|^GP5[0-7]|^PL3[4-9]|^PL4[0-6]/, {
 		area: 'module-region-contract',
 		editFiles: ['project_assembly.json'],
-		inspectFiles: ['gsd_plan_report.json', 'project_layout_report.json', 'project_assembly.json', 'docs/schematic-design-rules.md'],
-		nextCommand: 'node bin/easyeda-gsd.mjs plan project_spec.json',
+		inspectFiles: ['plexus_plan_report.json', 'project_layout_report.json', 'project_assembly.json', 'docs/schematic-design-rules.md'],
+		nextCommand: 'node bin/easyeda-plexus.mjs plan project_spec.json',
 		repairHint: 'Declare layoutPolicy.moduleRegions for every module as anchor-relative minimum readable rectangles and keep each generated structure module bbox inside its planned rectangle. For PL45/PL46, use project_layout_report.json plannedBox/actualBox/tolerance to repair project_assembly.json or deterministic cell geometry.',
 	}],
 	[/^GP4[4-6]|^GP6[3-5]|^PL3[0-3]|^PL5[2-4]/, {
 		area: 'interface-label-columns',
 		editFiles: ['project_assembly.json'],
-		inspectFiles: ['gsd_plan_report.json', 'project_layout_report.json', 'project_assembly.json', 'docs/schematic-design-rules.md'],
-		nextCommand: 'node bin/easyeda-gsd.mjs plan project_spec.json',
+		inspectFiles: ['plexus_plan_report.json', 'project_layout_report.json', 'project_assembly.json', 'docs/schematic-design-rules.md'],
+		nextCommand: 'node bin/easyeda-plexus.mjs plan project_spec.json',
 		repairHint: 'Declare module-side layoutPolicy.labelColumns for every visible signal label and grouped-net-label interface: each column needs module, routeEnd, side, x, tolerance, and nets; duplicate module-side net budgets are forbidden.',
 	}],
 	[/^LL22/, {
@@ -436,7 +436,7 @@ const RULE_PLANS = [
 	[/^FE/, {
 		area: 'final-evidence',
 		editFiles: ['engine/final_evidence_gate.mjs', 'engine/acceptance_run.mjs', 'project_spec.json', 'project_contract.json', 'project_netlist.json', 'project_assembly.json'],
-		inspectFiles: ['final_evidence_report.json', 'acceptance_report.json', 'gsd_plan_report.json', 'gsd_generate_report.json', 'repair_actions.json', 'next_actions.json'],
+		inspectFiles: ['final_evidence_report.json', 'acceptance_report.json', 'plexus_plan_report.json', 'plexus_generate_report.json', 'repair_actions.json', 'next_actions.json'],
 		nextCommand: 'npm.cmd run accept',
 		repairHint: 'Regenerate evidence for the active project spec context; stale or mismatched root-project reports must not be used as final proof.',
 	}],

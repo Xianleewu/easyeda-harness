@@ -1,6 +1,6 @@
 import { existsSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { generateContext } from '../workflows/gsd_generate.mjs';
+import { generateContext } from '../workflows/plexus_generate.mjs';
 
 const DIR = (process.env.EASYEDA_WORKDIR || process.cwd()).replace(/\\/g, '/') + '/';
 const REPORT = process.env.EASYEDA_FINAL_EVIDENCE_REPORT || DIR + 'final_evidence_report.json';
@@ -96,8 +96,8 @@ const expectedSpecRel = relPath(CONTEXT.specAbs);
 
 const local = {
 	workflowSmoke: requireReportPass(findings, 'workflow_smoke_report.json', 'workflow smoke report'),
-	gsdPlan: requireReportPass(findings, 'gsd_plan_report.json', 'GSD plan report'),
-	gsdGenerate: requireReportPass(findings, 'gsd_generate_report.json', 'GSD generate report'),
+	gsdPlan: requireReportPass(findings, 'plexus_plan_report.json', 'Plexus plan report'),
+	gsdGenerate: requireReportPass(findings, 'plexus_generate_report.json', 'Plexus generate report'),
 	nextActions: requireReportPass(findings, 'next_actions.json', 'next actions report', data => data?.pass === true && (data?.actions || []).length === 0),
 	repairActions: requireReportPass(findings, 'repair_actions.json', 'repair actions report', data => data?.pass === true && (data?.actions || []).length === 0),
 	actionSchema: requireReportPass(findings, 'action_schema_report.json', 'action schema report'),
@@ -123,8 +123,8 @@ function requireProjectId(report, rel, label) {
 }
 
 for (const [rel, label, report] of [
-	['gsd_plan_report.json', 'GSD plan report', local.gsdPlan],
-	['gsd_generate_report.json', 'GSD generate report', local.gsdGenerate],
+	['plexus_plan_report.json', 'Plexus plan report', local.gsdPlan],
+	['plexus_generate_report.json', 'Plexus generate report', local.gsdGenerate],
 	['project_contract_report.json', 'project contract report', local.projectContract],
 	['project_library_report.json', 'project library report', local.projectLibrary],
 	['project_netlist_report.json', 'project netlist report', local.projectNetlist],
@@ -137,13 +137,13 @@ for (const [rel, label, report] of [
 }
 
 if (local.gsdPlan.data?.spec !== undefined && relPath(local.gsdPlan.data.spec) !== expectedSpecRel) {
-	hard(findings, 'FE7-plan-spec-context-match', 'GSD plan report must be for the current spec path', {
+	hard(findings, 'FE7-plan-spec-context-match', 'Plexus plan report must be for the current spec path', {
 		expectedSpec: expectedSpecRel,
 		actualSpec: local.gsdPlan.data.spec,
 	});
 }
 if (local.gsdGenerate.data?.spec !== undefined && relPath(local.gsdGenerate.data.spec) !== expectedSpecRel) {
-	hard(findings, 'FE8-generate-spec-context-match', 'GSD generate report must be for the current spec path', {
+	hard(findings, 'FE8-generate-spec-context-match', 'Plexus generate report must be for the current spec path', {
 		expectedSpec: expectedSpecRel,
 		actualSpec: local.gsdGenerate.data.spec,
 	});
