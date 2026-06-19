@@ -135,9 +135,15 @@ export async function elkLayout({ snapshot, logical, byDes, elk = new ELK(), lay
 		for (let i = 1; i < ids.length; i++) segs.push({ net: n.name, pinA: a0, pinB: pinAbs.get(ids[i]) });
 	}
 	const routed = routeNets(segs.map(s => ({ a: escape(s.pinA), b: escape(s.pinB), net: s.net })), obstacles, { wireClearance: 2 });
-	// 布线失败的网 → 整网回退【按名标签】(保电气完整:同名标签 EDA 连通)。任一段失败则全网回退,避免半连。
+	// 布线失败【或导线过长(跨图)】的网 → 整网回退【按名标签】(商用:远程信号用标签而非长线;
+	// 长线还会横穿其他标签=L4)。保电气完整(同名标签 EDA 连通)。任一段触发则全网回退,避免半连。
+	const MAX_WIRE = 560;
 	const failedNets = new Set();
-	routed.forEach((r, i) => { if (!r.path) failedNets.add(segs[i].net); });
+	routed.forEach((r, i) => {
+		if (!r.path) { failedNets.add(segs[i].net); return; }
+		let len = 0; for (let k = 1; k < r.path.length; k++) len += Math.abs(r.path[k][0] - r.path[k - 1][0]) + Math.abs(r.path[k][1] - r.path[k - 1][1]);
+		if (len > MAX_WIRE) failedNets.add(segs[i].net);
+	});
 	routed.forEach((r, i) => {
 		if (!r.path || failedNets.has(segs[i].net)) return;
 		const s = segs[i];
