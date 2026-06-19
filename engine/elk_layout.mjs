@@ -186,14 +186,35 @@ export async function elkLayout({ snapshot, logical, byDes, elk = new ELK(), lay
 			}
 		}
 
+	// 左右侧 power/gnd 符号竖向堆叠(框高 ~20 > 脚距)→ 横向错排:同件同侧 gnd/power 脚
+	// 按 y 序交替分两列(符号紧凑、非 sig,无 L9 长桩/L4 穿标风险),消竖向符号叠压。
+	const pgCol = new Map();
+	{
+		const groups = new Map();
+		for (const [id, p] of pinAbs) {
+			if (p.side !== 'left' && p.side !== 'right') continue;
+			const rr = roles.get(id); if (!rr || (rr.role !== 'power' && rr.role !== 'gnd')) continue;
+			const k = p.des + '|' + p.side;
+			if (!groups.has(k)) groups.set(k, []);
+			groups.get(k).push({ id, y: p.y });
+		}
+		for (const arr of groups.values()) {
+			if (arr.length < 2) continue;
+			arr.sort((a, b) => b.y - a.y);
+			let minPitch = Infinity;
+			for (let i = 1; i < arr.length; i++) minPitch = Math.min(minPitch, Math.abs(arr[i].y - arr[i - 1].y));
+			if (minPitch >= 22) continue;
+			arr.forEach((o, i) => pgCol.set(o.id, i % 2));
+		}
+	}
 	// 单脚 signal → 列对齐标签;power/ground → 符号(均朝外逃逸,落 pad 内)
 	for (const [id, p] of pinAbs) {
 		const r = roles.get(id); if (!r) continue;
 		// 布线失败的多脚网 → 该网各脚回退成标签(按名连通)。
 		const role = (r.role === 'wire' && failedNets.has(r.net)) ? 'label' : r.role;
 		const [ex, ey] = escape(p, LABEL_GAP);
-		if (role === 'gnd') { netflags.push({ kind: 'gnd', net: r.net, x: ex, y: ey, rot: 0 }); wires.push({ net: r.net, line: [p.x, p.y, ex, ey] }); }
-		else if (role === 'power') { netflags.push({ kind: 'power', net: r.net, x: ex, y: ey, rot: 0 }); wires.push({ net: r.net, line: [p.x, p.y, ex, ey] }); }
+		if (role === 'gnd') { const gc = pgCol.get(id) || 0; const [gx, gy] = gc ? escape(p, LABEL_GAP + gc * 24) : [ex, ey]; netflags.push({ kind: 'gnd', net: r.net, x: gx, y: gy, rot: 0 }); wires.push({ net: r.net, line: [p.x, p.y, gx, gy] }); }
+		else if (role === 'power') { const pc = pgCol.get(id) || 0; const [px2, py2] = pc ? escape(p, LABEL_GAP + pc * 24) : [ex, ey]; netflags.push({ kind: 'power', net: r.net, x: px2, y: py2, rot: 0 }); wires.push({ net: r.net, line: [p.x, p.y, px2, py2] }); }
 		else if (role === 'label') {
 			// 左右脚→水平标签(文字朝外);上下脚→竖排标签(rot 90/270,窄框,密集横向不叠压)。
 			// 上下脚标签逃逸距加大到 48(>总线深~20),让竖排标签落在总线之外,避总线穿标(L4)。
