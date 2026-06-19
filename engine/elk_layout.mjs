@@ -148,8 +148,11 @@ export async function elkLayout({ snapshot, logical, byDes, elk = new ELK(), lay
 		else if (r.role === 'power') { netflags.push({ kind: 'power', net: r.net, x: ex, y: ey, rot: 0 }); wires.push({ net: r.net, line: [p.x, p.y, ex, ey] }); }
 		else if (r.role === 'label') {
 			wires.push({ net: r.net, line: [p.x, p.y, ex, ey] });
-			const growLeft = p.side === 'left';
-			netflags.push({ kind: 'sig', net: r.net, x: ex, y: ey, textX: ex, textY: ey, rot: growLeft ? 180 : 0, alignMode: growLeft ? 8 : 6 });
+			// 左右脚→水平标签(文字朝外);上下脚→竖排标签(rot 90/270,窄框,密集横向不叠压)。
+			if (p.side === 'left') netflags.push({ kind: 'sig', net: r.net, x: ex, y: ey, textX: ex, textY: ey, rot: 180, alignMode: 8 });
+			else if (p.side === 'right') netflags.push({ kind: 'sig', net: r.net, x: ex, y: ey, textX: ex, textY: ey, rot: 0, alignMode: 6 });
+			else if (p.side === 'top') netflags.push({ kind: 'sig', net: r.net, x: ex, y: ey, textX: ex, textY: ey, rot: 270, alignMode: 2 });
+			else netflags.push({ kind: 'sig', net: r.net, x: ex, y: ey, textX: ex, textY: ey, rot: 90, alignMode: 2 });
 		}
 	}
 

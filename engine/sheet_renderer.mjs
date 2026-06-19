@@ -175,7 +175,8 @@ function pushText(out, textBoxes, spec) {
 		};
 		out.push(`<rect x="${backplate.x.toFixed(2)}" y="${backplate.y.toFixed(2)}" width="${backplate.width.toFixed(2)}" height="${backplate.height.toFixed(2)}" rx="${rx.toFixed(2)}" fill="#fffef8" fill-opacity="0.96" stroke="${fill}" stroke-width="0.55"/>`);
 	}
-	out.push(`<text x="${spec.x.toFixed(2)}" y="${spec.y.toFixed(2)}" font-size="${fontSize}" font-family="Arial" text-anchor="${anchor}" font-weight="${weight}" fill="${fill}">${esc(text)}</text>`);
+	const rotAttr = spec.rotate ? ` transform="rotate(${spec.rotate} ${spec.x.toFixed(2)} ${spec.y.toFixed(2)})"` : '';
+	out.push(`<text x="${spec.x.toFixed(2)}" y="${spec.y.toFixed(2)}"${rotAttr} font-size="${fontSize}" font-family="Arial" text-anchor="${anchor}" font-weight="${weight}" fill="${fill}">${esc(text)}</text>`);
 	return item;
 }
 
@@ -505,15 +506,23 @@ export function renderSheetOutput(snapshot, outPng = DEFAULT_OUT, opts = {}) {
 					ty = [3, 6, 8, 9].includes(alignMode) ? p.maxY - 1 : p.minY + 8;
 				}
 			}
+			let rotate = 0;
 			if (!box && rot === 180) {
 				tx = x - 5;
 				anchor = 'end';
 			} else if (!box && (rot === 90 || rot === 270)) {
-				ty = y - 7;
-				anchor = 'middle';
+				// 竖排网名(上/下边脚密集标签):文字旋转 90/270,锚在标签端点,框为竖窄。
+				rotate = rot;
+				tx = x;
+				ty = y;
+				anchor = 'start';
+				const fs = 8.5, tw = f.net.length * fs * 0.55;
+				box = rot === 90
+					? { minX: x - fs * 0.7, maxX: x + fs * 0.35, minY: y - 2, maxY: y + tw + 2 }
+					: { minX: x - fs * 0.7, maxX: x + fs * 0.35, minY: y - tw - 2, maxY: y + 2 };
 			}
-			if (box && [1, 3, 6, 7, 8, 9].includes(alignMode)) {
-				pushText(out, textBoxes, { x: tx, y: ty, text: f.net, fontSize: 8.5, anchor, fill: color, role: 'net-label', owner: f.net, callout: 'net-label-backplate', box });
+			if (box && ([1, 3, 6, 7, 8, 9].includes(alignMode) || rotate)) {
+				pushText(out, textBoxes, { x: tx, y: ty, text: f.net, fontSize: 8.5, anchor, fill: color, role: 'net-label', owner: f.net, callout: 'net-label-backplate', box, rotate });
 			} else {
 				pushText(out, textBoxes, { x: tx, y: ty, text: f.net, fontSize: 8.5, anchor, fill: color, role: 'net-label', owner: f.net, callout: 'net-label-backplate' });
 			}
