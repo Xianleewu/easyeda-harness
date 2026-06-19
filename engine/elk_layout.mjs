@@ -199,7 +199,7 @@ export async function elkLayout({ snapshot, logical, byDes, elk = new ELK(), lay
 			// 上下脚标签逃逸距加大到 48(>总线深~20),让竖排标签落在总线之外,避总线穿标(L4)。
 			if (p.side === 'left') { wires.push({ net: r.net, line: [p.x, p.y, ex, ey] }); netflags.push({ kind: 'sig', net: r.net, x: ex, y: ey, textX: ex, textY: ey, rot: 180, alignMode: 8 }); }
 			else if (p.side === 'right') { wires.push({ net: r.net, line: [p.x, p.y, ex, ey] }); netflags.push({ kind: 'sig', net: r.net, x: ex, y: ey, textX: ex, textY: ey, rot: 0, alignMode: 6 }); }
-			else { const rb = rowByPin.get(id); const [tx, ty] = escape(p, 48 + (rb ? rb.row * rb.step : 0)); wires.push({ net: r.net, line: [p.x, p.y, tx, ty] }); netflags.push({ kind: 'sig', net: r.net, x: tx, y: ty, textX: tx, textY: ty, rot: p.side === 'top' ? 270 : 90, alignMode: 2 }); }
+			else { const rb = rowByPin.get(id); const [tx, ty] = escape(p, 48 + (rb ? rb.row * rb.step : 0)); wires.push({ net: r.net, line: [p.x, p.y, tx, ty] }); netflags.push({ kind: 'sig', net: r.net, x: tx, y: ty, textX: tx, textY: ty, rot: p.side === 'top' ? 90 : 270, alignMode: 2 }); }
 		}
 	}
 
