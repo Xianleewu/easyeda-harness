@@ -94,7 +94,7 @@ export function routeEdge(pins, vdir, hside, clearY) {
 }
 
 // 按 localBox 最近边把引脚分到 left/right/bottom/top(优先左右,再上下;内部回退 x 符号)。
-function classifyEdge(local, lb, m = 2) {
+export function classifyEdge(local, lb, m = 2) {
 	const [lx, ly] = local;
 	if (lx <= lb.minX + m) return 'left';
 	if (lx >= lb.maxX - m) return 'right';

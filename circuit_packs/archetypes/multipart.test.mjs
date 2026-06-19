@@ -70,3 +70,20 @@ test('multipart:冒烟 — 2 件簇过真实 geomQC/labelQC hard=0', () => {
 	assert.equal(g.crossings, 0, 'crossings');
 	assert.deepEqual(labelQC(model).filter(f => f.severity === 'hard'), [], 'labelQC hard');
 });
+
+// 回归:栈底件含底边引脚排(如开关 A/B/C 同 y),旧 routeSide 水平逃逸会横穿邻脚(wireThruPin,
+// 真实板 SW2.B)。栈底件底边脚应向下竖直逃逸 → wireThruPin=0、无交叉。
+test('multipart:栈底件底边引脚排向下逃逸,wireThruPin=0、无交叉、标签净', () => {
+	const synIC = () => ({ designator: 'UB', pins: [{ num: '1', local: [-30, 5] }, { num: '2', local: [30, 5] }], localBox: { minX: -15, minY: -20, maxX: 15, maxY: 20 } });
+	// 开关:A/B/C 在体下边一排(local y=-25 < minY=-20),x 各异 → 底边排
+	const synSw = () => ({ designator: 'SWB', pins: [{ num: 'A', local: [-10, -25] }, { num: 'B', local: [0, -25] }, { num: 'C', local: [10, -25] }], localBox: { minX: -15, minY: -20, maxX: 15, maxY: 20 } });
+	const nets = { 'UB.1': { name: 'N1', class: 'signal' }, 'UB.2': { name: 'N2', class: 'signal' }, 'SWB.A': { name: 'SA', class: 'signal' }, 'SWB.B': { name: 'SB', class: 'signal' }, 'SWB.C': { name: 'SC', class: 'signal' } };
+	const c = multipartArchetype({ parts: [synIC(), synSw()], anchor, nets: { pinNets: nets } });   // SWB 为栈底件
+	const model = { components: [worldComponent(synIC(), c.place.UB), worldComponent(synSw(), c.place.SWB)], wires: c.wires, netflags: c.flags };
+	const g = geomQC(model);
+	assert.equal(g.wireThruPin.length, 0, `wireThruPin ${g.wireThruPin.join(' ')}`);
+	assert.equal(g.wireThruComp.length, 0, 'wireThruComp');
+	assert.equal(g.crossings, 0, 'crossings');
+	assert.deepEqual(labelQC(model).filter(f => f.severity === 'hard'), [], 'labelQC hard');
+	assert.equal(c.flags.filter(f => f.kind === 'sig').length, 5, '5 个有网脚各一标签');
+});
