@@ -1,0 +1,171 @@
+// ELK 自动布局引擎:用 elkjs(Eclipse Layout Kernel)做件放置(layered,左→右信号流,紧凑+功能分层),
+// 再用本仓避障布线器 routeNets 画真实正交连线(绕开器件,无 wireThruComp),单脚 signal→标签、
+// 电源/地→符号。取代旧"每件孤立成 cell + 标签汤"列布局——产出紧凑、连线清晰、商用可读的原理图。
+//
+// 关键:ELK 节点按"件体 + 标签/符号留白"加 pad,使 ELK 排布时为标签预留空间,标签落 pad 内不撞邻件。
+// 引脚用 FIXED_POS(真实脚位,件体边缘),布线交给 routeNets(不用 ELK 连线,避免穿件)。
+// 经验来源:netlistsvg/ELK(见记忆 elk-layout-direction)。
+import ELK from 'elkjs';
+import { classifyEdge } from '../circuit_packs/archetypes/densefanout.mjs';
+import { routeNets } from './route_nets.mjs';
+
+const GRID = 10;
+const snap = v => Math.round(v / GRID) * GRID;
+const portId = (des, num) => `${des}::${num}`;
+const labelLen = name => Math.max(40, String(name).length * 6 + 18);
+
+const LABEL_PAD = 110;   // 有标签/符号侧的留白(容标签框 + 净空)
+const EDGE_PAD = 14;     // 无标签侧的小留白
+const LABEL_GAP = 24;    // 件边到标签桩端
+
+const DEFAULT_OPTS = {
+	'elk.algorithm': 'layered',
+	'elk.direction': 'RIGHT',
+	'elk.spacing.nodeNode': '40',
+	'elk.layered.spacing.nodeNodeBetweenLayers': '90',
+	'elk.layered.spacing.edgeNodeBetweenLayers': '30',
+	'elk.routing.edgeRouting': 'ORTHOGONAL',
+	'elk.layered.crossingMinimization.strategy': 'LAYER_SWEEP',
+	'elk.layered.nodePlacement.strategy': 'NETWORK_SIMPLEX',
+	'elk.layered.thoroughness': '20',
+};
+
+// 每脚角色:wire(多脚 signal,布线)/ label(单脚 signal)/ power / gnd / none。
+function pinRoles(logical) {
+	const role = new Map();
+	for (const n of (logical.nets || [])) {
+		const cnt = (n.pins || []).length;
+		const r = n.class === 'ground' ? 'gnd' : n.class === 'power' ? 'power' : cnt >= 2 ? 'wire' : 'label';
+		for (const s of (n.pins || [])) { const d = s.lastIndexOf('.'); role.set(portId(s.slice(0, d), s.slice(d + 1)), { role: r, net: n.name }); }
+	}
+	return role;
+}
+
+// 构建 ELK 图:节点 = 件体 + 各侧 label/符号留白;端口 FIXED_POS 落件体边;signal 多脚网→edge(仅指导分层)。
+function buildGraph(snapshot, logical, byDes, roles) {
+	const children = [];
+	const meta = new Map();   // designator → {lb, pad, compW, compH}
+	for (const c of snapshot.components) {
+		const wc = byDes.get(c.designator);
+		const lb = wc.localBox;
+		const compW = Math.max(20, lb.maxX - lb.minX), compH = Math.max(20, lb.maxY - lb.minY);
+		// 各侧是否有标签/符号脚 + 该侧最长标签
+		const need = { left: 0, right: 0, top: 0, bottom: 0 };
+		for (const p of (wc.pins || [])) {
+			const r = roles.get(portId(c.designator, p.num)); if (!r || r.role === 'wire') continue;
+			const side = classifyEdge(p.local, lb);
+			const len = r.role === 'label' ? labelLen(r.net) + LABEL_GAP + 20 : 50;
+			need[side] = Math.max(need[side], Math.max(LABEL_PAD, len));
+		}
+		const pad = {
+			left: need.left || EDGE_PAD, right: need.right || EDGE_PAD,
+			top: need.top || EDGE_PAD, bottom: need.bottom || EDGE_PAD,
+		};
+		const W = compW + pad.left + pad.right, H = compH + pad.top + pad.bottom;
+		const ports = [];
+		for (const p of (wc.pins || [])) {
+			ports.push({ id: portId(c.designator, p.num),
+				x: (p.local[0] - lb.minX) + pad.left,            // 件体在 pad 内偏移
+				y: (lb.maxY - p.local[1]) + pad.top });          // y 下翻
+		}
+		children.push({ id: c.designator, width: W, height: H, ports, layoutOptions: { 'elk.portConstraints': 'FIXED_POS' } });
+		meta.set(c.designator, { lb, pad, compW, compH });
+	}
+	const edges = [];
+	let ei = 0;
+	for (const n of (logical.nets || [])) {
+		if (n.class !== 'signal' || (n.pins || []).length < 2) continue;
+		const ps = (n.pins || []).map(s => { const d = s.lastIndexOf('.'); return portId(s.slice(0, d), s.slice(d + 1)); }).filter(id => meta.has(id.split('::')[0]));
+		for (let i = 1; i < ps.length; i++) edges.push({ id: `e${ei++}`, sources: [ps[0]], targets: [ps[i]] });
+	}
+	return { graph: { id: 'root', layoutOptions: { ...DEFAULT_OPTS }, children, edges }, meta };
+}
+
+export async function elkLayout({ snapshot, logical, byDes, elk = new ELK(), layoutOptions = {} }) {
+	const roles = pinRoles(logical);
+	const { graph, meta } = buildGraph(snapshot, logical, byDes, roles);
+	Object.assign(graph.layoutOptions, layoutOptions);
+	const res = await elk.layout(graph);
+
+	const FY = y => -y;
+	const comps = [];
+	const pinAbs = new Map();   // portId → {x,y,side,des}
+	for (const c of res.children) {
+		const m = meta.get(c.id);
+		const nx = snap(c.x), ny = snap(c.y);
+		const cMinX = nx + m.pad.left, cTopElk = ny + m.pad.top;
+		const cMaxX = cMinX + m.compW, cBotElk = cTopElk + m.compH;
+		const pins = [];
+		for (const pt of (c.ports || [])) {
+			const px = snap(nx + (pt.x || 0)), py = snap(ny + (pt.y || 0));
+			const num = pt.id.split('::')[1];
+			pins.push({ num, x: px, y: FY(py) });
+			const side = classifyEdge([px - (cMinX + m.compW / 2) + (m.lb.minX + m.compW / 2), 0], m.lb); // 退回符号侧
+			const realSide = px <= cMinX + 2 ? 'left' : px >= cMaxX - 2 ? 'right' : py <= cTopElk + 2 ? 'top' : 'bottom';
+			pinAbs.set(pt.id, { x: px, y: FY(py), side: realSide, des: c.id });
+		}
+		comps.push({ designator: c.id, bbox: { minX: cMinX, minY: FY(cBotElk), maxX: cMaxX, maxY: FY(cTopElk) }, pins });
+	}
+
+	const obstacles = comps.map(c => ({ minX: c.bbox.minX - 6, minY: c.bbox.minY - 6, maxX: c.bbox.maxX + 6, maxY: c.bbox.maxY + 6 }));
+	const escape = (p, d = 20) => p.side === 'left' ? [snap(p.x - d), p.y] : p.side === 'right' ? [snap(p.x + d), p.y] : p.side === 'top' ? [p.x, snap(p.y + d)] : [p.x, snap(p.y - d)];
+
+	const wires = [], netflags = [];
+	// 多脚 signal → 避障布线(星形)
+	const segs = [];
+	for (const n of (logical.nets || [])) {
+		if (n.class !== 'signal' || (n.pins || []).length < 2) continue;
+		const ids = (n.pins || []).map(s => { const d = s.lastIndexOf('.'); return portId(s.slice(0, d), s.slice(d + 1)); }).filter(id => pinAbs.has(id));
+		if (ids.length < 2) continue;
+		const a0 = pinAbs.get(ids[0]);
+		for (let i = 1; i < ids.length; i++) segs.push({ net: n.name, pinA: a0, pinB: pinAbs.get(ids[i]) });
+	}
+	const routed = routeNets(segs.map(s => ({ a: escape(s.pinA), b: escape(s.pinB), net: s.net })), obstacles, { wireClearance: 2 });
+	routed.forEach((r, i) => {
+		if (!r.path) return;
+		const s = segs[i];
+		const line = []; for (const [x, y] of [[s.pinA.x, s.pinA.y], ...r.path, [s.pinB.x, s.pinB.y]]) line.push(x, y);
+		wires.push({ net: r.net, line });
+	});
+
+	// 单脚 signal → 列对齐标签;power/ground → 符号(均朝外逃逸,落 pad 内)
+	for (const [id, p] of pinAbs) {
+		const r = roles.get(id); if (!r) continue;
+		const [ex, ey] = escape(p, LABEL_GAP);
+		if (r.role === 'gnd') { netflags.push({ kind: 'gnd', net: r.net, x: ex, y: ey, rot: 0 }); wires.push({ net: r.net, line: [p.x, p.y, ex, ey] }); }
+		else if (r.role === 'power') { netflags.push({ kind: 'power', net: r.net, x: ex, y: ey, rot: 0 }); wires.push({ net: r.net, line: [p.x, p.y, ex, ey] }); }
+		else if (r.role === 'label') {
+			wires.push({ net: r.net, line: [p.x, p.y, ex, ey] });
+			const growLeft = p.side === 'left';
+			netflags.push({ kind: 'sig', net: r.net, x: ex, y: ey, textX: ex, textY: ey, rot: growLeft ? 180 : 0, alignMode: growLeft ? 8 : 6 });
+		}
+	}
+
+	return { components: comps, wires, netflags };
+}
+
+// CLI:node engine/elk_layout.mjs [snapshot.json] [out.png] — 合成并渲染,打印质量指标。
+if (import.meta.url === `file:///${process.argv[1]?.replace(/\\/g, '/')}`) {
+	const { readFileSync, writeFileSync } = await import('node:fs');
+	const { extractLogical } = await import('./schematic_extract.mjs');
+	const { withLocalPins } = await import('./transform.mjs');
+	const { renderSheetOutput } = await import('./sheet_renderer.mjs');
+	const { geomQC } = await import('./geom_qc.mjs');
+	const { labelQC } = await import('./label_qc.mjs');
+	const snapPath = process.argv[2] || 'live.json';
+	const outPng = process.argv[3] || 'elk_sheet.png';
+	const snapshot = JSON.parse(readFileSync(snapPath, 'utf8'));
+	const logical = extractLogical(snapshot);
+	const byDes = new Map(snapshot.components.map(c => [c.designator, withLocalPins(c)]));
+	const model = await elkLayout({ snapshot, logical, byDes });
+	writeFileSync(outPng.replace(/\.png$/, '.model.json'), JSON.stringify(model), 'utf8');
+	const g = geomQC(model);
+	const lh = labelQC(model).filter(f => f.severity === 'hard');
+	const bb = model.components.reduce((a, c) => ({ minX: Math.min(a.minX, c.bbox.minX), minY: Math.min(a.minY, c.bbox.minY), maxX: Math.max(a.maxX, c.bbox.maxX), maxY: Math.max(a.maxY, c.bbox.maxY) }), { minX: 1e9, minY: 1e9, maxX: -1e9, maxY: -1e9 });
+	const { report } = renderSheetOutput(model, outPng);
+	console.log(`ELK 布局: 件 ${model.components.length} 连线 ${model.wires.length} 标签/符号 ${model.netflags.length}`);
+	console.log(`图纸 ${Math.round(bb.maxX - bb.minX)}×${Math.round(bb.maxY - bb.minY)}`);
+	console.log(`geom: wireThruComp ${g.wireThruComp.length} wireThruPin ${g.wireThruPin.length} crossings ${g.crossings} overlaps ${g.overlaps.length} offgrid ${g.offgrid}`);
+	console.log(`label hard: ${lh.length}`);
+	console.log(`render: ${report.pass ? 'pass' : 'FAIL'} → ${outPng}`);
+}
