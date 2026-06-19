@@ -17,10 +17,31 @@ export function wireConnectivity({ model, logical } = {}) {
 	const uni = (a, b) => par.set(find(a), find(b));
 
 	// 合并每条线的相邻顶点(整条线一簇)。
+	const segs = [];
 	for (const w of (model.wires || [])) {
 		const l = w.line || []; const pts = [];
 		for (let i = 0; i + 1 < l.length; i += 2) pts.push(key(l[i], l[i + 1]));
 		for (let i = 1; i < pts.length; i++) uni(pts[i - 1], pts[i]);
+		for (let i = 0; i + 3 < l.length; i += 2) {
+			if (l[i] === l[i + 2] && l[i + 1] === l[i + 3]) continue;
+			segs.push({ a: [l[i], l[i + 1]], b: [l[i + 2], l[i + 3]] });
+		}
+	}
+	// T 接 / 点压线:线顶点 + 引脚坐标若落在某轴向线段上(含内部),union 入该段——匹配 EDA 几何连通。
+	// 原 union 只连每条线自身相邻顶点,漏「端点落在另一线内部」的 T 接 → 靠无名线 T 接连通的脚被误判断连。
+	const onSeg = (px, py, s) => {
+		const [ax, ay] = s.a, [bx, by] = s.b;
+		if (ay === by) return Math.abs(py - ay) < 1 && px >= Math.min(ax, bx) - 0.5 && px <= Math.max(ax, bx) + 0.5;
+		if (ax === bx) return Math.abs(px - ax) < 1 && py >= Math.min(ay, by) - 0.5 && py <= Math.max(ay, by) + 0.5;
+		return false;
+	};
+	const touchPts = [];
+	for (const w of (model.wires || [])) { const l = w.line || []; for (let i = 0; i + 1 < l.length; i += 2) touchPts.push([l[i], l[i + 1]]); }
+	for (const c of model.components) for (const p of (c.pins || [])) touchPts.push([p.x, p.y]);
+	for (const [px, py] of touchPts) {
+		for (const s of segs) {
+			if (onSeg(px, py, s)) { const k = key(px, py); uni(k, key(s.a[0], s.a[1])); uni(k, key(s.b[0], s.b[1])); }
+		}
 	}
 
 	// 簇 → 网名(命名线首端点 + 网标位置)。

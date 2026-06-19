@@ -45,6 +45,29 @@ test('连通:经无名逃逸线中转到命名 stub → 无 finding', () => {
 	assert.deepEqual(wireConnectivity({ model, logical }), []);
 });
 
+test('连通:脚靠无名线 T 接(端点贴命名线中段)到命名线 → 无 finding（T 接 union 修复）', () => {
+	// B.1 的连通靠无名线端点(30,50)落在命名线 NET [0,50→50,50] 的内部(T 接)。
+	// EDA 几何连通会连上;原 union 只连每条线自身相邻顶点、漏 T 接 → 会误报 B.1 断连。
+	const model = {
+		components: [comp('A', [{ num: '1', x: 0, y: 50 }]), comp('B', [{ num: '1', x: 30, y: 80 }])],
+		wires: [
+			{ net: 'NET', line: [0, 50, 50, 50] },
+			{ net: '', line: [30, 50, 30, 80] },
+		], netflags: [],
+	};
+	const logical = { nets: [{ name: 'NET', class: 'signal', pins: ['A.1', 'B.1'] }] };
+	assert.deepEqual(wireConnectivity({ model, logical }), []);
+});
+
+test('断连:脚悬空(不在任何线/簇上)仍正确报 WC-disconnected（T 接修复不掩盖真断连）', () => {
+	const model = {
+		components: [comp('A', [{ num: '1', x: 0, y: 50 }]), comp('B', [{ num: '1', x: 30, y: 800 }])],
+		wires: [{ net: 'NET', line: [0, 50, 50, 50] }], netflags: [],
+	};
+	const logical = { nets: [{ name: 'NET', class: 'signal', pins: ['A.1', 'B.1'] }] };
+	assert.ok(wireConnectivity({ model, logical }).some(x => x.severity === 'hard'), 'B.1 悬空应报断连');
+});
+
 test('单脚网/缺参数:不报/抛错', () => {
 	assert.deepEqual(wireConnectivity({ model: { components: [comp('R1', [{ num: '1', x: 0, y: 0 }])], wires: [], netflags: [] }, logical: { nets: [{ name: 'X', class: 'signal', pins: ['R1.1'] }] } }), []);
 	assert.throws(() => wireConnectivity({}));
