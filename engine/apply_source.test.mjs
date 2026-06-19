@@ -99,6 +99,20 @@ test('expectedLines 与 newSrc 的 LINE 记录精确一致(投递后核对基准
 		assert.ok(live.has(`${g}|${a}|${b}|${c}|${d}`), `预期段 ${g}|${a},${b},${c},${d} 应在 newSrc`);
 });
 
+test('删多余组:synth 线数 < 现有组数 → 多余 WIRE 组连 LINE/ATTR 一并删除', () => {
+	const r3 = { placements: r.placements, model: { wires: [{ net: 'ONLY', line: [0, 0, 10, 0] }] } };
+	const { newSrc, delivered, groupCount } = buildSource(SRC, r3, idByDes);
+	assert.equal(delivered, 1, 'cap=min(1,2)=1');
+	assert.equal(groupCount, 2);
+	const recs = parseSource(newSrc).filter(x => x.head);
+	const ids = recs.map(x => x.head.id);
+	assert.ok(!ids.includes('w2'), '多余 WIRE w2 删除');
+	assert.ok(!ids.includes('l2'), '多余 LINE l2 删除');
+	assert.ok(!ids.includes('a2'), '多余 ATTR a2 删除');
+	assert.equal(recs.filter(x => x.head.type === 'WIRE').length, 1, '仅剩 1 组');
+	assert.equal(recs.find(x => x.head.id === 'a1').data.value, 'ONLY', 'w1 复用为 ONLY');
+});
+
 test('守卫 droppedOverflow:溢出线无同网组 → 显式记录(防静默断脚)', () => {
 	const r2 = { placements: r.placements, model: { wires: [
 		{ net: 'GND', line: [0, 0, 10, 0] },
