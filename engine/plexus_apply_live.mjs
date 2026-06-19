@@ -179,8 +179,10 @@ async function apply() {
 
 	console.log('5) 画合成线 + 电源地符号(信号靠命名线连通,可选跳过重/不可靠的 netPort)...');
 	// 整条 pin→label 路径拼成单条命名折线 → 无独立无名段可被 EDA 合并丢名。
-	const fixedWires = concatNamedPaths(r.model.wires);
-	const wireOps = fixedWires.map(w => `try{ await eda.sch_PrimitiveWire.create(${JSON.stringify(w.line)}, ${JSON.stringify(w.net || '')}); n++; }catch(e){}`);
+	// ELK:每条线【无网名】创建(EDA 会把同网名线合并成乱序折线=视觉乱麻;无名线各自独立、几何干净),
+	// 连通/网名靠 netPort 提供。旧合成:concatNamedPaths 拼单条命名路径(其结构本就连续,不乱)。
+	const fixedWires = useElk ? r.model.wires : concatNamedPaths(r.model.wires);
+	const wireOps = fixedWires.map(w => `try{ await eda.sch_PrimitiveWire.create(${JSON.stringify(w.line)}, ${JSON.stringify(useElk ? '' : (w.net || ''))}); n++; }catch(e){}`);
 	await runOps('画线', wireOps);
 	const noSig = process.argv.includes('--no-sig-port') || process.env.PLEXUS_NO_SIG_PORT;
 	const flagOps = r.model.netflags.map(f => {
