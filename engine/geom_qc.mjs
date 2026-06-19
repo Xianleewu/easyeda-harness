@@ -95,7 +95,19 @@ export function geomQC(model, opt = {}) {
 		if (nets.size > 1) { endpointShort++; if (endEx.length < 8) endEx.push(`${[...nets].join('|')}@${k}`); }
 	}
 
-	return { overlaps, wireThruComp, wireThruPin, offgrid, offEx, crossings, crossEx, collinear, collEx, endpointShort, endEx };
+	// 7) 异网 T 接（一条线端点落在另一条异网线内部 = 该点短路；wireThruPin 的线-线类比，前述检测皆漏）
+	let endpointOnWire = 0; const eowEx = [];
+	for (const s of segs) {
+		if (!s.net) continue;
+		for (const [px, py] of [s.a, s.b]) {
+			for (const t of segs) {
+				if (t === s || !t.net || t.net === s.net) continue;
+				if (ptOnSegInterior(px, py, t)) { endpointOnWire++; if (eowEx.length < 8) eowEx.push(`${s.net}|${t.net}@${px},${py}`); }
+			}
+		}
+	}
+
+	return { overlaps, wireThruComp, wireThruPin, offgrid, offEx, crossings, crossEx, collinear, collEx, endpointShort, endEx, endpointOnWire, eowEx };
 }
 
 if (process.argv[1] && process.argv[1].endsWith('geom_qc.mjs') && process.argv[2]) {

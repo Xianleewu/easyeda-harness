@@ -68,6 +68,7 @@ test('fanout 属性:300 随机连接器 — 出图者全门 0,过密者 fail-clo
 		assert.equal(g.wireThruPin.length, 0, `${ctx} wireThruPin ${g.wireThruPin.join(' ')}`);
 		assert.equal(g.collinear, 0, `${ctx} collinear ${g.collEx.join(' ')}`);
 		assert.equal(g.endpointShort, 0, `${ctx} endpointShort ${g.endEx.join(' ')}`);
+		assert.equal(g.endpointOnWire, 0, `${ctx} endpointOnWire ${g.eowEx.join(' ')}`);
 		assert.equal(g.wireThruComp.length, 0, `${ctx} wireThruComp ${g.wireThruComp.join(' ')}`);
 		assert.equal(g.overlaps.length, 0, `${ctx} overlaps ${g.overlaps.join(' ')}`);
 		assert.equal(g.offgrid, 0, `${ctx} offgrid ${g.offEx.join(' ')}`);

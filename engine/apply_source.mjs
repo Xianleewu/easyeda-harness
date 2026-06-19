@@ -231,8 +231,8 @@ export async function applySource({ robust = false, maxTries = 3 } = {}) {
 	const lh = labelQC(r.model).filter(f => f.severity === 'hard').length;
 	const faith = synthesisFaithfulness({ logical, contract, model: deliveredModel }).length;
 	const conn = wireConnectivity({ model: deliveredModel, logical }).filter(f => f.severity === 'hard').length;
-	const defects = g.overlaps.length + g.wireThruComp.length + g.wireThruPin.length + g.crossings + g.collinear + g.endpointShort + lh + faith + conn;
-	console.log(`投递态质量门:overlaps=${g.overlaps.length} wireThruComp=${g.wireThruComp.length} wireThruPin=${g.wireThruPin.length} crossings=${g.crossings} collinear=${g.collinear} endpointShort=${g.endpointShort} labelHard=${lh} faithHard=${faith} connHard=${conn}（忠实/连通基于投递态线集）`);
+	const defects = g.overlaps.length + g.wireThruComp.length + g.wireThruPin.length + g.crossings + g.collinear + g.endpointShort + g.endpointOnWire + lh + faith + conn;
+	console.log(`投递态质量门:overlaps=${g.overlaps.length} wireThruComp=${g.wireThruComp.length} wireThruPin=${g.wireThruPin.length} crossings=${g.crossings} collinear=${g.collinear} endpointShort=${g.endpointShort} endpointOnWire=${g.endpointOnWire} labelHard=${lh} faithHard=${faith} connHard=${conn}（忠实/连通基于投递态线集）`);
 	if (dropN) {
 		// 区分:命名线丢弃=真断网(该网脚会断);无名线丢弃=逃逸残段,连通门已证冗余(只是不渲染该几何)。
 		if (droppedNamed.length) console.warn(`⚠ ${droppedNamed.length} 条**命名**溢出线无同网组可并、被丢弃(${[...new Set(droppedNamed)].slice(0, 6).join(',')})——该网这些脚会断!`);

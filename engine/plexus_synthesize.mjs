@@ -45,7 +45,7 @@ export function runPlexusSynthesize() {
 		skipped: r.skipped.length,
 		skipByReason,
 		model: { components: r.model.components.length, wires: r.model.wires.length, flags: r.model.netflags.length },
-		geom: { overlaps: g.overlaps.length, wireThruComp: g.wireThruComp.length, wireThruPin: g.wireThruPin.length, offgrid: g.offgrid, offgrid5: g5.offgrid, crossings: g.crossings, collinear: g.collinear, endpointShort: g.endpointShort },
+		geom: { overlaps: g.overlaps.length, wireThruComp: g.wireThruComp.length, wireThruPin: g.wireThruPin.length, offgrid: g.offgrid, offgrid5: g5.offgrid, crossings: g.crossings, collinear: g.collinear, endpointShort: g.endpointShort, endpointOnWire: g.endpointOnWire },
 		labelHard,
 		faithHard: faithHard.length,
 		faithFindings: faithHard.slice(0, 8),
@@ -58,10 +58,10 @@ if (import.meta.url === `file://${process.argv[1]}`) {
 	const out = runPlexusSynthesize();
 	if (!out.ok) { console.error(out.error); process.exit(2); }
 	// 硬判:重叠/线穿件/线压外部脚/异网交叉/共线异网短路/异网端点短路/标签硬伤/跨模块连通丢失/导线连通断为 0 才过门(offgrid 暂列软)。
-	const hard = out.geom.overlaps + out.geom.wireThruComp + out.geom.wireThruPin + out.geom.crossings + out.geom.collinear + out.geom.endpointShort + out.labelHard + out.faithHard + out.connHard;
+	const hard = out.geom.overlaps + out.geom.wireThruComp + out.geom.wireThruPin + out.geom.crossings + out.geom.collinear + out.geom.endpointShort + out.geom.endpointOnWire + out.labelHard + out.faithHard + out.connHard;
 	writeFileSync(REPORT, JSON.stringify({ generatedAt: new Date().toISOString(), ...out }, null, 2), 'utf8');
 	console.log(`Plexus 合成:placed=${out.placed}/${out.modules} wires=${out.model.wires} flags=${out.model.flags}`
-		+ ` | geom overlaps=${out.geom.overlaps} wireThruComp=${out.geom.wireThruComp} wireThruPin=${out.geom.wireThruPin} crossings=${out.geom.crossings} collinear=${out.geom.collinear} endpointShort=${out.geom.endpointShort} labelHard=${out.labelHard} faithHard=${out.faithHard} connHard=${out.connHard}`
+		+ ` | geom overlaps=${out.geom.overlaps} wireThruComp=${out.geom.wireThruComp} wireThruPin=${out.geom.wireThruPin} crossings=${out.geom.crossings} collinear=${out.geom.collinear} endpointShort=${out.geom.endpointShort} endpointOnWire=${out.geom.endpointOnWire} labelHard=${out.labelHard} faithHard=${out.faithHard} connHard=${out.connHard}`
 		+ ` | offgrid=${out.geom.offgrid}@10栅 ${out.geom.offgrid5}@5栅(器件原生栅)`);
 	console.log(`report -> ${REPORT}`);
 	process.exit(hard ? 1 : 0);
