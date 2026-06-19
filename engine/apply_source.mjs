@@ -192,8 +192,16 @@ export async function applySource({ robust = false, maxTries = 3 } = {}) {
 	const conn = wireConnectivity({ model: r.model, logical }).filter(f => f.severity === 'hard').length;
 	const defects = g.overlaps.length + g.wireThruComp.length + g.wireThruPin.length + g.crossings + lh + faith + conn;
 	console.log(`合成质量门:overlaps=${g.overlaps.length} wireThruComp=${g.wireThruComp.length} wireThruPin=${g.wireThruPin.length} crossings=${g.crossings} labelHard=${lh} faithHard=${faith} connHard=${conn}`);
-	if (defects) console.warn(`⚠ 被投合成布局含 ${defects} 处硬伤(几何短路 / 跨模块标签缺失 / 连通断)——源式投递会原样投入,非干净布局。`
-		+ (g.wireThruPin.length ? ` wireThruPin: ${g.wireThruPin.slice(0, 4).join(' ')}` : ''));
+	if (defects) {
+		console.warn(`⚠ 被投合成布局含 ${defects} 处硬伤(几何短路 / 跨模块标签缺失 / 连通断)——源式投递会原样投入,非干净布局。`
+			+ (g.wireThruPin.length ? ` wireThruPin: ${g.wireThruPin.slice(0, 4).join(' ')}` : ''));
+		// fail-closed:默认拒投有硬伤的布局(源式投递不像 create 拒短路线,会静默投入)。--force 沙盒强投。
+		if (!process.argv.includes('--force')) {
+			console.error(`✗ 拒绝投递 ${defects} 处硬伤的布局(与 synthesize 门一致 fail-closed)。先修合成,或加 --force 沙盒强投。`);
+			process.exitCode = 1;
+			return;
+		}
+	}
 	if (!robust) {
 		if (!(await deliverOnce(r, idByDes))) {
 			console.error('✗ 投递静默回退——源已被归一化,先 `node engine/plexus_apply_live.mjs --undo` 重建自然源再重试(或加 --robust 自愈)。');
