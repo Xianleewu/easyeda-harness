@@ -207,14 +207,25 @@ export async function elkLayout({ snapshot, logical, byDes, elk = new ELK(), lay
 			arr.forEach((o, i) => pgCol.set(o.id, i % 2));
 		}
 	}
+	// 左右侧 power/gnd 若与 sig 标同侧 → 把符号移到该侧所有 sig 标之外(逃逸 += 最长 sig 标宽),
+	// 使符号脱离信号标横带、不再压标。桩在 power/gnd 脚 y(邻 sig 标在别 y、框高 8 够不到)→ 无 L4。
+	const sideMaxSig = new Map();
+	for (const [id, p] of pinAbs) {
+		if (p.side !== 'left' && p.side !== 'right') continue;
+		const rr = roles.get(id); if (!rr) continue;
+		const role2 = (rr.role === 'wire' && failedNets.has(rr.net)) ? 'label' : rr.role;
+		if (role2 !== 'label') continue;
+		const k = p.des + '|' + p.side;
+		sideMaxSig.set(k, Math.max(sideMaxSig.get(k) || 0, labelLen(rr.net)));
+	}
 	// 单脚 signal → 列对齐标签;power/ground → 符号(均朝外逃逸,落 pad 内)
 	for (const [id, p] of pinAbs) {
 		const r = roles.get(id); if (!r) continue;
 		// 布线失败的多脚网 → 该网各脚回退成标签(按名连通)。
 		const role = (r.role === 'wire' && failedNets.has(r.net)) ? 'label' : r.role;
 		const [ex, ey] = escape(p, LABEL_GAP);
-		if (role === 'gnd') { const gc = pgCol.get(id) || 0; const [gx, gy] = gc ? escape(p, LABEL_GAP + gc * 24) : [ex, ey]; netflags.push({ kind: 'gnd', net: r.net, x: gx, y: gy, rot: 0 }); wires.push({ net: r.net, line: [p.x, p.y, gx, gy] }); }
-		else if (role === 'power') { const pc = pgCol.get(id) || 0; const [px2, py2] = pc ? escape(p, LABEL_GAP + pc * 24) : [ex, ey]; netflags.push({ kind: 'power', net: r.net, x: px2, y: py2, rot: 0 }); wires.push({ net: r.net, line: [p.x, p.y, px2, py2] }); }
+		if (role === 'gnd') { const gc = pgCol.get(id) || 0; const sm = (p.side === 'left' || p.side === 'right') ? (sideMaxSig.get(p.des + '|' + p.side) || 0) : 0; const off = sm + gc * 24; const [gx, gy] = off ? escape(p, LABEL_GAP + off) : [ex, ey]; netflags.push({ kind: 'gnd', net: r.net, x: gx, y: gy, rot: 0 }); wires.push({ net: r.net, line: [p.x, p.y, gx, gy] }); }
+		else if (role === 'power') { const pc = pgCol.get(id) || 0; const sm = (p.side === 'left' || p.side === 'right') ? (sideMaxSig.get(p.des + '|' + p.side) || 0) : 0; const off = sm + pc * 24; const [px2, py2] = off ? escape(p, LABEL_GAP + off) : [ex, ey]; netflags.push({ kind: 'power', net: r.net, x: px2, y: py2, rot: 0 }); wires.push({ net: r.net, line: [p.x, p.y, px2, py2] }); }
 		else if (role === 'label') {
 			// 左右脚→水平标签(文字朝外);上下脚→竖排标签(rot 90/270,窄框,密集横向不叠压)。
 			// 上下脚标签逃逸距加大到 48(>总线深~20),让竖排标签落在总线之外,避总线穿标(L4)。
