@@ -43,6 +43,16 @@ export function cellExtentMinY(worldComps, cell) {
 	return Math.min(...ys);
 }
 
+// cell 真实顶(max Y),口径与 cellExtentMinY 镜像。供列内放置「顶对齐」防上向重叠。
+export function cellExtentMaxY(worldComps, cell) {
+	const ys = [];
+	for (const c of worldComps) ys.push(c.bbox.minY, c.bbox.maxY);
+	for (const w of cell.wires || []) { const l = w.line || []; for (let i = 1; i < l.length; i += 2) ys.push(l[i]); }
+	for (const f of cell.flags || []) ys.push(f.y);
+	if (!ys.length) throw new Error('cellExtentMaxY: archetype produced empty geometry');
+	return Math.max(...ys);
+}
+
 export function planLayout({ contract, byDes, logical, opts = {} } = {}) {
 	if (!contract || !Array.isArray(contract.modules)) {
 		throw new TypeError('planLayout: contract.modules required');
@@ -145,6 +155,18 @@ export function planLayout({ contract, byDes, logical, opts = {} } = {}) {
 				continue;
 			}
 			const wcs = parts.map(p => worldComponent(p, cell.place[p.designator]));
+			// 顶对齐:cell 锚不一定是其顶(连接器/各原型锚位各异,有的向上延伸)。仅当 cell 顶超出锚位
+			// (向上延伸)时,整 cell 下移(ceil 到栅格,保证清空 + 引脚仍全格对齐)使顶≤cursorY,防向上压到
+			// 上一 cell。对任意锚位模块都防住列内重叠(任意图)。dyShift 必为栅格倍数,不破坏分数 localBox 的格对齐。
+			const _anchorY = snapGrid(cursorY);
+			const _cellTop = cellExtentMaxY(wcs, cell);
+			const dyShift = _cellTop > _anchorY ? -Math.ceil((_cellTop - _anchorY) / GRID) * GRID : 0;
+			if (dyShift) {
+				for (const c of wcs) { c.bbox.minY += dyShift; c.bbox.maxY += dyShift; for (const p of (c.pins || [])) p.y += dyShift; }
+				for (const p of parts) { cell.place[p.designator].y += dyShift; }
+				for (const w of (cell.wires || [])) { const l = w.line || []; for (let i = 1; i < l.length; i += 2) l[i] += dyShift; }
+				for (const f of (cell.flags || [])) { f.y += dyShift; if (f.textY != null) f.textY += dyShift; }
+			}
 			for (const p of parts) { const pl = cell.place[p.designator]; cPlace.push({ designator: p.designator, x: pl.x, y: pl.y, rot: pl.rot || 0, mirror: !!pl.mirror }); }
 			cursorY = cellExtentMinY(wcs, cell) - o.rowGap;
 			cComps.push(...wcs);
