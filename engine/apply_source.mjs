@@ -9,6 +9,7 @@
 //    还原:`--undo` 即可(create 路径重建原图)。实测成果:画布 1232×909→3076×2291(紧凑 1.34
 //    =美观)、extract floating 45 ≈ 原图 42(create 式 72-92)= 电气近乎等价(自洽)。
 import { readFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
 import { extractLogical } from './schematic_extract.mjs';
 import { inferRoles } from './role_infer.mjs';
 import { synthesizeContract } from './design_contract.mjs';
@@ -149,30 +150,45 @@ export function buildSource(src, r, idByDes) {
 	return { newSrc: out.join('\n'), delivered: cap, synthWireCount: synthWires.length, groupCount: groupIds.length };
 }
 
-export async function applySource() {
-	const { r, idByDes } = synth();
+// 投递一次:取源 → 变换 → setDocumentSource → 自检。返回是否生效。
+async function deliverOnce(r, idByDes) {
 	const { result: src } = await executeCode('return await eda.sys_FileManager.getDocumentSource();', { timeoutMs: 60000 });
 	const { newSrc, delivered, synthWireCount, groupCount } = buildSource(src, r, idByDes);
 	console.log(`源式投递:合成线=${synthWireCount} 现有组=${groupCount} 投递=${delivered}（封顶 min,溢出同网并组）`);
-	const code = `await eda.sys_FileManager.setDocumentSource(${JSON.stringify(newSrc)}); return { ok: true };`;
-	await executeCode(code, { timeoutMs: 90000 });
-
-	// 投递后自检:回读源,验证首个器件确实移到了合成位。setDocumentSource 在归一化源上会
-	// ok 却静默整体回退 → 这里 fail-loud,提示先 `--undo` 重建自然源。
+	await executeCode(`await eda.sys_FileManager.setDocumentSource(${JSON.stringify(newSrc)}); return { ok: true };`, { timeoutMs: 90000 });
+	// 自检:回读源,验证首个器件确实移到了合成位(setDocumentSource 在归一化源上会 ok 却静默回退)。
 	const firstPl = r.placements[0];
 	const firstId = idByDes.get(firstPl.designator);
 	const { result: back } = await executeCode('return await eda.sys_FileManager.getDocumentSource();', { timeoutMs: 60000 });
 	const rec = parseSource(back).find(x => x.head?.type === 'COMPONENT' && x.head.id === firstId);
 	const applied = rec && Math.abs(rec.data.x - firstPl.x) < 1 && Math.abs(rec.data.y - (-firstPl.y)) < 1;
-	if (applied) {
-		console.log(`✓ 投递生效(${firstPl.designator} 已到合成位 [${firstPl.x},${-firstPl.y}])`);
-	} else {
-		console.error(`✗ 投递静默回退(${firstPl.designator} 仍在 [${rec?.data.x},${rec?.data.y}])——源已被归一化,`
-			+ '先运行 `node engine/plexus_apply_live.mjs --undo` 重建自然源再重试。');
-		process.exitCode = 1;
+	if (applied) console.log(`✓ 投递生效(${firstPl.designator} 已到合成位 [${firstPl.x},${-firstPl.y}])`);
+	return applied;
+}
+
+export async function applySource({ robust = false, maxTries = 3 } = {}) {
+	const { r, idByDes } = synth();
+	if (!robust) {
+		if (!(await deliverOnce(r, idByDes))) {
+			console.error('✗ 投递静默回退——源已被归一化,先 `node engine/plexus_apply_live.mjs --undo` 重建自然源再重试(或加 --robust 自愈)。');
+			process.exitCode = 1;
+		}
+		return;
 	}
+	// 自愈:回退则 `--undo`(create 重建自然源)后重试,守 post-check、有界 maxTries(应对 setDocumentSource 非确定性)。
+	const UNDO = `${ROOT}/engine/plexus_apply_live.mjs`;
+	for (let t = 1; t <= maxTries; t++) {
+		if (await deliverOnce(r, idByDes)) { console.log(`✓ robust:第 ${t} 次成功`); return; }
+		if (t < maxTries) {
+			console.log(`  robust:第 ${t} 次回退,--undo 重建自然源后重试…`);
+			try { execFileSync('node', [UNDO, '--undo'], { stdio: 'ignore' }); } catch (e) { console.error('  undo 失败:', e.message.slice(0, 60)); }
+		}
+	}
+	console.error(`✗ robust:${maxTries} 次均回退——EDA setDocumentSource 持续拒绝,请人工检查 bridge/文档状态。`);
+	process.exitCode = 1;
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
-	applySource().catch(e => { console.error('源式投递失败:', e.message); process.exit(1); });
+	const robust = process.argv.includes('--robust');
+	applySource({ robust }).catch(e => { console.error('源式投递失败:', e.message); process.exit(1); });
 }
