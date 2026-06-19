@@ -282,6 +282,25 @@ export async function applySource({ robust = false, maxTries = 3 } = {}) {
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
+	if (process.argv.includes('--help') || process.argv.includes('-h')) {
+		console.log(`源式 live 投递(setDocumentSource 原子加载,绕开 create 合并)。把 EASYEDA_APPLY_MODEL
+合成布局投到 EasyEDA 当前文档:移器件 + 复用 WIRE 组改线几何/网名。
+
+用法: node engine/apply_source.mjs [--robust] [--force]
+
+选项:
+  --robust            回退则 --undo 重建自然源后重试(有界 3 次,应对 setDocumentSource 非确定性)。推荐。
+  --force             即使投递态质量门有硬伤也强投(沙盒用;默认 fail-closed 拒投)。
+  -h, --help          显示本帮助。
+
+环境变量:
+  EASYEDA_APPLY_MODEL 被投板的捕获快照(默认 <workdir>/live_clean.json)。换板:用 snapshot2.js 捕获后指此。
+  APPLY_SOURCE_REPORT 投递报告输出路径(默认 <workdir>/apply_source_report.json)。
+  EASYEDA_WORKDIR     工作目录(默认 cwd)。
+
+需先启动 EasyEDA bridge 并打开对应工程。还原原图: node engine/plexus_apply_live.mjs --undo`);
+		process.exit(0);
+	}
 	const robust = process.argv.includes('--robust');
 	applySource({ robust }).catch(e => { console.error('源式投递失败:', e.message); process.exit(1); });
 }
