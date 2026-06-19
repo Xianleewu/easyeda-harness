@@ -105,7 +105,18 @@ test('守卫 droppedOverflow:溢出线无同网组 → 显式记录(防静默断
 		{ net: 'SIG', line: [40, 0, 50, 0] },
 		{ net: 'UNIQUE', line: [60, 0, 70, 0] },   // 溢出且无同网组 → 应记入 droppedOverflow
 	] } };
-	const { droppedOverflow, packed } = buildSource(SRC, r2, idByDes);
+	const { droppedOverflow, droppedNamed, deliveredWires, packed } = buildSource(SRC, r2, idByDes);
 	assert.deepEqual(droppedOverflow, ['UNIQUE']);
 	assert.equal(packed, 0);
+	// 命名线丢弃=真断网:droppedNamed 含 UNIQUE,deliveredWires 排除它(投递态忠实/连通据此评估)。
+	assert.deepEqual(droppedNamed, ['UNIQUE']);
+	assert.ok(!deliveredWires.some(w => w.net === 'UNIQUE'), '投递态线集不含被丢弃的 UNIQUE');
+	assert.equal(deliveredWires.length, 2, '投递态 = GND + SIG(UNIQUE 丢弃)');
+});
+
+test('deliveredWires:默认 fixture 投递态 = 全投(并组不算丢弃),无命名线丢弃', () => {
+	const { deliveredWires, droppedNamed, synthWireCount } = buildSource(SRC, r, idByDes);
+	// 3 条合成线:GND(cap)、SIG(cap)、GND(溢出但并入同网 w1)→ 全在投递态,零命名丢弃。
+	assert.equal(deliveredWires.length, synthWireCount, '并组的溢出线仍算投递态(只有无同网组的才丢)');
+	assert.deepEqual(droppedNamed, [], '无命名线被丢弃');
 });

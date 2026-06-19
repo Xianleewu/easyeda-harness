@@ -128,10 +128,10 @@ export function buildSource(src, r, idByDes) {
 	//     不占新槽)。实测溢出 4 条全是电源/地(GND/+5V/VCC_3V3),都有同网组可并 → 达 floating 42。
 	const netToGroup = new Map();
 	for (let i = 0; i < cap; i++) { const n = synthWires[i].net; if (n && !netToGroup.has(n)) netToGroup.set(n, groupIds[i]); }
-	let packed = 0; const droppedOverflow = [];
+	let packed = 0; const droppedOverflow = []; const droppedWires = new Set();
 	for (let i = cap; i < synthWires.length; i++) {
 		const w = synthWires[i]; const gid = netToGroup.get(w.net);
-		if (!gid) { droppedOverflow.push(w.net || '(无名)'); continue; }   // 无同网组可并 → 静默丢会断脚,显式记录
+		if (!gid) { droppedOverflow.push(w.net || '(无名)'); droppedWires.add(w); continue; }   // 无同网组可并 → 静默丢会断脚,显式记录
 		const g = groups.get(gid);
 		const pts = []; for (let k = 0; k + 1 < w.line.length; k += 2) pts.push([w.line[k], -w.line[k + 1]]);
 		for (let s = 0; s < pts.length - 1; s++) {
@@ -159,13 +159,16 @@ export function buildSource(src, r, idByDes) {
 		else out.push(rec.raw);                                                     // 未改的保留原 raw(关键)
 		for (const nl of (addAfter.get(rec.i) || [])) out.push(nl);
 	}
-	return { newSrc: out.join('\n'), delivered: cap, synthWireCount: synthWires.length, groupCount: groupIds.length, packed, droppedOverflow, missingDes, expectedLines };
+	// 投递态线集 = 合成线减去丢弃的(cap 内全投 + 溢出并组都投,只有无同网组的溢出被丢)→ 供「投递态」忠实/连通评估。
+	const deliveredWires = synthWires.filter(w => !droppedWires.has(w));
+	const droppedNamed = [...droppedWires].filter(w => w.net).map(w => w.net);
+	return { newSrc: out.join('\n'), delivered: cap, synthWireCount: synthWires.length, groupCount: groupIds.length, packed, droppedOverflow, droppedNamed, deliveredWires, missingDes, expectedLines };
 }
 
 // 投递一次:取源 → 变换 → setDocumentSource → 自检。返回是否生效。
 async function deliverOnce(r, idByDes) {
 	const { result: src } = await executeCode('return await eda.sys_FileManager.getDocumentSource();', { timeoutMs: 60000 });
-	const { newSrc, delivered, synthWireCount, groupCount, packed, droppedOverflow, missingDes, expectedLines } = buildSource(src, r, idByDes);
+	const { newSrc, delivered, synthWireCount, groupCount, packed, missingDes, expectedLines } = buildSource(src, r, idByDes);
 	console.log(`源式投递:合成线=${synthWireCount} 现有组=${groupCount} 投递=${delivered}+并组${packed}（封顶 min,溢出同网并组）`);
 	// 预检:live 文档器件 id 与 live_clean 项目不一致 → fail-loud,别投出半套垃圾。
 	if (missingDes.length) {
@@ -173,7 +176,7 @@ async function deliverOnce(r, idByDes) {
 			+ '——live 文档与 live_clean.json 不是同一项目?请确认已打开对应工程。中止本次投递。');
 		return false;
 	}
-	if (droppedOverflow.length) console.warn(`⚠ ${droppedOverflow.length} 条溢出线无同网组可并、未投递(${[...new Set(droppedOverflow)].slice(0, 6).join(',')})——该网这些脚会断,需扩槽或调封顶顺序。`);
+	// (溢出丢线的分类警告由 applySource 在投递态质量门处统一报告,这里不重复。)
 	await executeCode(`await eda.sys_FileManager.setDocumentSource(${JSON.stringify(newSrc)}); return { ok: true };`, { timeoutMs: 90000 });
 	// 自检:回读源,深度验证(setDocumentSource 是非确定性的——ok 却静默回退,且可能**部分**生效)。
 	// ① 所有被投器件都到合成位;② 所有写入的 LINE 段都在对应组——**线落地是直接核对、非靠器件推断**
@@ -211,16 +214,33 @@ async function deliverOnce(r, idByDes) {
 
 export async function applySource({ robust = false, maxTries = 3 } = {}) {
 	const { r, idByDes, logical, contract } = synth();
-	// 投递前质量门报告:镜像 synthesize 全硬门(几何 + 标签 + 忠实度 + 连通)。源式投递原子加载、不像
-	// create 拒短路线 → 缺陷会被静默投到 live;故投递前显式报告全门,fail-loud 哲学一致。
+	// 投递前质量门报告:镜像 synthesize 全硬门。源式投递原子加载、不像 create 拒短路线 → 缺陷会被
+	// 静默投到 live;故投递前显式报告全门 + fail-closed。**关键:忠实/连通在「投递态线集」上评估**
+	// ——封顶取决于现有组数,溢出若丢命名线会断网;合成全集 connHard=0 会假绿。故先读一次源定投递态。
+	let deliveredWires = r.model.wires, droppedNamed = [], dropN = 0;
+	try {
+		const { result: src0 } = await executeCode('return await eda.sys_FileManager.getDocumentSource();', { timeoutMs: 60000 });
+		const b = buildSource(src0, r, idByDes);
+		deliveredWires = b.deliveredWires; droppedNamed = b.droppedNamed; dropN = b.droppedOverflow.length;
+	} catch (e) {
+		console.warn(`⚠ 投递态预读源失败(${e.message.slice(0, 40)})——回退用合成全集评估忠实/连通(可能偏乐观)。`);
+	}
+	const deliveredModel = { ...r.model, wires: deliveredWires };
+	// 几何/标签:器件与标签全投,合成全集=投递态;忠实/连通:用投递态线集(反映封顶丢线)。
 	const g = geomQC(r.model);
 	const lh = labelQC(r.model).filter(f => f.severity === 'hard').length;
-	const faith = synthesisFaithfulness({ logical, contract, model: r.model }).length;
-	const conn = wireConnectivity({ model: r.model, logical }).filter(f => f.severity === 'hard').length;
+	const faith = synthesisFaithfulness({ logical, contract, model: deliveredModel }).length;
+	const conn = wireConnectivity({ model: deliveredModel, logical }).filter(f => f.severity === 'hard').length;
 	const defects = g.overlaps.length + g.wireThruComp.length + g.wireThruPin.length + g.crossings + lh + faith + conn;
-	console.log(`合成质量门:overlaps=${g.overlaps.length} wireThruComp=${g.wireThruComp.length} wireThruPin=${g.wireThruPin.length} crossings=${g.crossings} labelHard=${lh} faithHard=${faith} connHard=${conn}`);
+	console.log(`投递态质量门:overlaps=${g.overlaps.length} wireThruComp=${g.wireThruComp.length} wireThruPin=${g.wireThruPin.length} crossings=${g.crossings} labelHard=${lh} faithHard=${faith} connHard=${conn}（忠实/连通基于投递态线集）`);
+	if (dropN) {
+		// 区分:命名线丢弃=真断网(该网脚会断);无名线丢弃=逃逸残段,连通门已证冗余(只是不渲染该几何)。
+		if (droppedNamed.length) console.warn(`⚠ ${droppedNamed.length} 条**命名**溢出线无同网组可并、被丢弃(${[...new Set(droppedNamed)].slice(0, 6).join(',')})——该网这些脚会断!`);
+		const unnamed = dropN - droppedNamed.length;
+		if (unnamed) console.warn(`ℹ ${unnamed} 条无名溢出线(逃逸残段)未渲染——连通门已证冗余、不断网。`);
+	}
 	if (defects) {
-		console.warn(`⚠ 被投合成布局含 ${defects} 处硬伤(几何短路 / 跨模块标签缺失 / 连通断)——源式投递会原样投入,非干净布局。`
+		console.warn(`⚠ 被投布局含 ${defects} 处硬伤(几何短路 / 跨模块标签缺失 / 投递态连通断)——源式投递会原样投入,非干净布局。`
 			+ (g.wireThruPin.length ? ` wireThruPin: ${g.wireThruPin.slice(0, 4).join(' ')}` : ''));
 		// fail-closed:默认拒投有硬伤的布局(源式投递不像 create 拒短路线,会静默投入)。--force 沙盒强投。
 		if (!process.argv.includes('--force')) {
