@@ -72,10 +72,21 @@ export function supportArchetype(spec = {}) {
 	const top = pin[parts[0].designator].p2;
 	if (nets.top && nets.top.class === 'power') frags.push(powerStub(nets.top.name, top, { dir: 'up', len: 50 }));
 	else if (nets.top && nets.top.class === 'ground') frags.push(gndStub(top, { dir: 'up', len: 30, net: nets.top.name }));
+	else if (nets.top && nets.top.class === 'signal') {
+		// 信号端点:无源件脚在中心 x、水平逃逸会穿体,故先竖直逃逸到体上方,再顶部水平标签(单电容/滤波等)。
+		const e = [top[0], top[1] + 30];
+		frags.push({ wires: [wire(nets.top.name, [top, e])], flags: [] });
+		frags.push(labelStub(nets.top.name, e, { side: 'right', escX: e[0] + 30 }));
+	}
 
 	const bot = pin[parts[parts.length - 1].designator].p1;
 	if (nets.bottom && nets.bottom.class === 'ground') frags.push(gndStub(bot, { dir: 'down', len: 30, net: nets.bottom.name }));
 	else if (nets.bottom && nets.bottom.class === 'power') frags.push(powerStub(nets.bottom.name, bot, { dir: 'down', len: 50 }));
+	else if (nets.bottom && nets.bottom.class === 'signal') {
+		const e = [bot[0], bot[1] - 30];
+		frags.push({ wires: [wire(nets.bottom.name, [bot, e])], flags: [] });
+		frags.push(labelStub(nets.bottom.name, e, { side: 'right', escX: e[0] + 30 }));
+	}
 
 	const merged = mergeParts(...frags);
 	const pts = [];
