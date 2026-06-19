@@ -96,15 +96,18 @@ function propagateNets(wires) {
 }
 
 // 分批执行一串 op 脚本片段(每片返回 {ids?} 可选)。ops 为字符串数组(EDA 端代码)。
-const batchScript = chunk => `let n=0; const ids=[];\n${chunk.join('\n')}\nreturn { n, ids };`;
+// op 内 catch 可把失败标记 push 进 errs(批返回),runOps 汇总到 opErrs 供自愈/诊断用。
+const batchScript = chunk => `let n=0; const ids=[]; const errs=[];\n${chunk.join('\n')}\nreturn { n, ids, errs };`;
+let opErrs = [];   // 上一次 runOps 收集到的失败标记(由 op 的 catch push)
 
 async function runOps(label, ops) {
 	let done = 0;
 	let failedChunks = [];
+	opErrs = [];
 	for (let i = 0; i < ops.length; i += BATCH) {
 		const chunk = ops.slice(i, i + BATCH);
 		const r = await execRetry(batchScript(chunk));
-		if (r && r.result) done += r.result.n; else failedChunks.push(chunk);
+		if (r && r.result) { done += r.result.n; if (r.result.errs) opErrs.push(...r.result.errs); } else failedChunks.push(chunk);
 		await sleep(350);
 	}
 	// 第二/三遍:只重试失败批(填补缺口、不产重复),给 EDA 重连时间。
@@ -113,7 +116,7 @@ async function runOps(label, ops) {
 		for (const chunk of retry) {
 			await sleep(2500);
 			const r = await execRetry(batchScript(chunk));
-			if (r && r.result) done += r.result.n; else failedChunks.push(chunk);
+			if (r && r.result) { done += r.result.n; if (r.result.errs) opErrs.push(...r.result.errs); } else failedChunks.push(chunk);
 		}
 	}
 	console.log(`  ${label}: ${done}/${ops.length}${failedChunks.length ? ` (仍失败 ${failedChunks.length * BATCH})` : ' ✓'}`);
@@ -182,10 +185,35 @@ async function apply() {
 	// ELK:每条线【无网名】创建(EDA 会把同网名线合并成乱序折线=视觉乱麻;无名线各自独立、几何干净),
 	// 连通/网名靠 netPort 提供。旧合成:concatNamedPaths 拼单条命名路径(其结构本就连续,不乱)。
 	const fixedWires = useElk ? r.model.wires : concatNamedPaths(r.model.wires);
-	const wireOps = fixedWires.map(w => `try{ await eda.sch_PrimitiveWire.create(${JSON.stringify(w.line)}, ${JSON.stringify(useElk ? '' : (w.net || ''))}); n++; }catch(e){}`);
+	// op 的 catch 把失败线坐标 push 进 errs → opErrs。某些密集脚的短桩会被 EDA 拒("create failed!"),
+	// 需在画标阶段把这些脚改为「脚尖直建端口/标」自愈(见下)。
+	const wireOps = fixedWires.map(w => `try{ await eda.sch_PrimitiveWire.create(${JSON.stringify(w.line)}, ${JSON.stringify(useElk ? '' : (w.net || ''))}); n++; }catch(e){ errs.push(${JSON.stringify(w.line)}); }`);
 	await runOps('画线', wireOps);
+	const failedLines = opErrs.slice();
+	if (failedLines.length) writeFileSync(`${ROOT}/diag_failed_wires.json`, JSON.stringify(failedLines, null, 2));
+
+	// 自愈:每条失败短桩 = 脚→escape(escape 处落着一个 netflag)。建桩失败 → 该脚不达其 escape 端口
+	// → 浮空。修法:把该 netflag 改建在【脚尖】(免桩、端口自带引线直连),不再在 escape 留孤立端口。
+	// netflag 与桩 escape 端坐标一一对应(214 桩↔214 标);脚端 = 桩另一端。泛化适配任意板。
+	const near = (a, b) => Math.abs(a[0] - b[0]) < 2 && Math.abs(a[1] - b[1]) < 2;
+	const flagPos = useElk ? r.model.netflags.map(f => ({ f, xy: [f.x, f.y], deliverXY: [f.x, f.y], moved: false })) : null;
+	let healed = 0;
+	if (useElk && failedLines.length) {
+		for (const line of failedLines) {
+			const e0 = [line[0], line[1]], e1 = [line[line.length - 2], line[line.length - 1]];
+			// escape 端 = 与某未移 netflag 重合的端;脚端 = 另一端
+			const hit = flagPos.find(fp => !fp.moved && (near(fp.xy, e0) || near(fp.xy, e1)));
+			if (!hit) continue;
+			hit.deliverXY = near(hit.xy, e0) ? e1 : e0;   // 改投到脚尖
+			hit.moved = true;
+			healed++;
+		}
+		console.log(`  自愈:${healed}/${failedLines.length} 失败桩脚改为脚尖直建端口(免桩直连)`);
+	}
+
 	const noSig = process.argv.includes('--no-sig-port') || process.env.PLEXUS_NO_SIG_PORT;
-	const flagOps = r.model.netflags.map(f => {
+	const flagSrc = useElk ? flagPos.map(fp => ({ ...fp.f, x: fp.deliverXY[0], y: fp.deliverXY[1] })) : r.model.netflags;
+	const flagOps = flagSrc.map(f => {
 		const x = f.x, y = f.y, rot = f.rot || 0;
 		if (f.kind === 'sig') return noSig ? null : `try{ await eda.sch_PrimitiveComponent.createNetPort('BI', ${JSON.stringify(f.net)}, ${x}, ${y}, ${rot}); n++; }catch(e){}`;
 		if (f.kind === 'power') return `try{ await eda.sch_PrimitiveComponent.createNetFlag('Power', ${JSON.stringify(f.net)}, ${x}, ${y}, ${rot}); n++; }catch(e){}`;
