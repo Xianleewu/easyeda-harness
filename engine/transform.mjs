@@ -32,5 +32,12 @@ export function withLocalPins(c) {
 			lminx = Math.min(lminx, lx); lmaxx = Math.max(lmaxx, lx); lminy = Math.min(lminy, ly); lmaxy = Math.max(lmaxy, ly);
 		}
 	}
+	// localBox 必须包络引脚:有些器件符号的引脚端点伸出体框外(声明 bbox 不含脚)。仅用 bbox 角点会
+	// 漏掉伸出脚 → 按 localBox 留间隙的堆叠/对齐(multipart)算少真实占位,邻件脚穿入本件体
+	// (wireThruComp)。把引脚本地坐标并入包络,任意输入都鲁棒;真实 bbox⊇脚的器件不受影响。
+	for (const p of pins) {
+		lminx = Math.min(lminx, p.local[0]); lmaxx = Math.max(lmaxx, p.local[0]);
+		lminy = Math.min(lminy, p.local[1]); lmaxy = Math.max(lmaxy, p.local[1]);
+	}
 	return { ...c, pins, localBox: { minX: lminx, minY: lminy, maxX: lmaxx, maxY: lmaxy } };
 }

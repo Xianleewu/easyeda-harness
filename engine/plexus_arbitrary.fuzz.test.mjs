@@ -94,3 +94,34 @@ test('任意图 fuzz:确定性(同种子两次装配模型深相等)', () => {
 	const run = () => { const rnd = lcg(0x5151); const out = []; for (let t = 0; t < 12; t++) out.push(synth(genArbitrary(rnd, t)).r.model); return out; };
 	assert.deepEqual(run(), run());
 });
+
+// 回归(XHARD 5000 板压测发现):引脚端点伸出体框外的件(EasyEDA 常见)与 IC 同模块走 multipart 时,
+// 旧 withLocalPins 只用 bbox 角点算 localBox、漏掉伸出脚 → 堆叠间隙算少 → 邻件脚穿入本件体(wireThruComp)。
+// 修:withLocalPins 把引脚本地坐标并入 localBox 包络。此例 J 的 12 脚 y 跨度 220 > bbox 半高 144×2 的下半,
+// 即脚伸出体框下沿 46;与 IC U 共网 → 同模块。断言 multipart 装配后无穿体/重叠。
+test('任意图回归:引脚伸出体框的件 + IC 同 multipart 模块不得穿体(wireThruComp=0)', () => {
+	// 大控制器 IC(40 脚)使 U1(13 脚)非控制器、可经 SHARED 网与 J1 同组 → 走 multipart(复现 #179)。
+	const ucPins = []; for (let i = 0; i < 40; i++) ucPins.push(P(i + 1, i < 20 ? 300 - 40 : 300 + 40, 500 - (i % 20) * 20));
+	const UC = comp('U0', 300, 300, ucPins, 40, 210);
+	const jPins = []; for (let i = 0; i < 12; i++) jPins.push(P(i + 1, 1300, 880 - i * 20));   // 脚 y 660..880,体框 706..994(脚伸出下沿 46)
+	const J = comp('J1', 1330, 850, jPins, 15, 144);
+	const uPins = []; for (let i = 0; i < 13; i++) uPins.push(P(i + 1, i < 6.5 ? 1290 : 1370, 655 - (i % 7) * 20));
+	const U = comp('U1', 1330, 590, uPins, 40, 75);
+	const snap = {
+		components: [UC, J, U],
+		wires: [
+			{ id: 'w0', net: 'SHARED', line: [1300, 880, 1315, 880] },
+			{ id: 'w1', net: 'SHARED', line: [1290, 655, 1275, 655] },
+			{ id: 'w2', net: 'CTRL0', line: [260, 500, 245, 500] },
+		],
+		netflags: [flag('VCC', 'power', 300, 250), flag('GND', 'ground', 300, 230)],
+	};
+	const { contract, r } = synth(snap);
+	const multi = contract.modules.find(m => (m.parts || []).includes('J1') && (m.parts || []).includes('U1'));
+	assert.ok(multi, 'J1 与 U1 共网 → 同一多件模块(multipart)');
+	assert.equal(r.placed.length, contract.modules.length, `全模块落地 skipped=${JSON.stringify(r.skipped)}`);
+	const g = geomQC(r.model);
+	assert.equal(g.wireThruComp.length, 0, `wireThruComp 应 0,实=${g.wireThruComp.slice(0, 3).join(' ')}`);
+	assert.equal(g.overlaps.length, 0, `overlaps 应 0,实=${g.overlaps.slice(0, 3).join(' ')}`);
+	assert.equal(g.wireThruPin.length, 0, `wireThruPin 应 0,实=${g.wireThruPin.slice(0, 3).join(' ')}`);
+});
