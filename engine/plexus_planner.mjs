@@ -129,7 +129,9 @@ export function planLayout({ contract, byDes, logical, opts = {} } = {}) {
 			try { fn = getArchetype(m.role); } catch { fn = null; }
 			const nets = {};
 			const side = sideByModule.get(m.id);
-			if (side) nets.side = { name: side.net, class: 'signal' };
+			// 侧信号抽头只对多件链有意义(需内部结点);单件无源(去耦/旁路电容)无结点,
+			// 下面把侧信号转作端点(top/bottom),避免单件 support 抛错被跳过(任意图:单电容必须能放)。
+			if (side && parts.length >= 2) nets.side = { name: side.net, class: 'signal' };
 			const ep = (o.endpointNets || {})[m.id] || {};
 			if (ep.top) nets.top = ep.top;
 			if (ep.bottom) nets.bottom = ep.bottom;
@@ -139,6 +141,12 @@ export function planLayout({ contract, byDes, logical, opts = {} } = {}) {
 				const sep = deriveSupportEndpoints(parts, logical);
 				if (!nets.top && sep.top) nets.top = sep.top;
 				if (!nets.bottom && sep.bottom) nets.bottom = sep.bottom;
+			}
+			// 单件 support 的侧信号转作端点:填空闲的 top/bottom(2 脚件最多 2 网,不会冲突)。
+			// 这样单电容(signal-GND / 双信号等)能作端点路由,不再因「side 需≥2件」抛错被跳。
+			if (side && parts.length === 1) {
+				if (!nets.top) nets.top = { name: side.net, class: 'signal' };
+				else if (!nets.bottom) nets.bottom = { name: side.net, class: 'signal' };
 			}
 			const anchorPt = { x: 0, y: snapGrid(cursorY) };   // 临时 x=0,整列后偏移
 			let cell = null;
