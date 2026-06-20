@@ -196,7 +196,7 @@ export function layoutClusterTemplate(anchor, members, ctx, depth = 0) {
 	// fallback = 离散子电路:剩余未放置成员按【共享网连通】分组,每组以最高脚件为锚【递归模板布局】
 	// (离散三极管级等正确成块);depth≥1 不再递归(防无限),退化为逐件带连线网标。
 	const rem = members.filter(d => !used.has(d) && compByDes.get(d));
-	let fx0 = cx - 60; const fy0 = (ic.bbox ? ic.bbox.maxY : (ic.y || 0)) + 100;
+	let fx0 = cx - 60; const fy0 = (ic.bbox ? ic.bbox.maxY : (ic.y || 0)) + 55;   // 子电路在 IC 下方间距(IC底部flag约+30,留余量;更紧凑减留白)
 	const dumpOne = (d, fx) => {   // 逐件带连线网标(退化路径)
 		const lp = withLocalPins(compByDes.get(d));
 		const bx = lp.x != null ? lp.x : cx, byy = lp.y != null ? lp.y : 0, dx0 = fx - bx, dy0 = fy0 - byy;
