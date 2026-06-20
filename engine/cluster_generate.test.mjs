@@ -5,6 +5,7 @@ import { buildCleanLogical, clusterComponents, generateLayout, layoutClusterTemp
 import { withLocalPins } from './transform.mjs';
 import { geomQC } from './geom_qc.mjs';
 import { labelQC } from './label_qc.mjs';
+import { renderSheetOutput } from './sheet_renderer.mjs';
 
 // 合成快照:U1.1-C1.1 经有名线 SIG;C1.2 经 GND 标接地;U1.2 仅接无名线(NC,应不入网)。
 const snap = {
@@ -247,4 +248,10 @@ test('generateLayout 健壮性:缺 rotation / 无锚点 / 空板不崩溃', asyn
 	assert.equal(await generateLayout({ components: [two('R1', 0, 0), two('R2', 50, 0)], wires: [], netflags: [] }), null, '无 IC 锚点返回 null');
 	// 空板:返回 null
 	assert.equal(await generateLayout({ components: [], wires: [], netflags: [] }), null, '空板返回 null');
+});
+
+// 渲染健壮性:空模型/单件渲染不崩(早先空内容 union 返 null → footprintMetrics/inferSheetBox 崩)。
+test('renderSheetOutput 健壮性:空模型/单件不崩', () => {
+	assert.doesNotThrow(() => renderSheetOutput({ components: [], wires: [], netflags: [] }, '/tmp/test_render_empty.png', {}), '空模型不崩');
+	assert.doesNotThrow(() => renderSheetOutput({ components: [{ designator: 'U1', x: 0, y: 0, rotation: 0, mirror: false, bbox: { minX: -20, minY: -20, maxX: 20, maxY: 20 }, pins: [{ num: '1', x: -20, y: 0 }] }], wires: [], netflags: [] }, '/tmp/test_render_single.png', {}), '单件不崩');
 });
