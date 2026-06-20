@@ -163,35 +163,22 @@ async function apply() {
 	}
 	console.log(`2) 布局质量差(${assess.reasons.join('; ') || 'forced'})或强制生成 → 合成路径...`);
 
-	// 布局模式:cluster=裸网表→功能块模块图(cluster_generate,推荐坏布局/裸网表);
-	// elk=扁平自动布局;默认(空)=OLD 契约流水线 planLayout。cluster/elk 共用 ELK 投递口径(无名线+netport)。
-	const layoutMode = (process.env.PLEXUS_LAYOUT || '').toLowerCase();
-	const useCluster = layoutMode === 'cluster';
-	const useElk = layoutMode === 'elk' || useCluster;   // cluster 复用 ELK 投递口径
+	// PLEXUS_LAYOUT=elk:用 elkjs 自动布局(紧凑+真实连线,商用可读),scale=false 保符号原尺寸→脚接得上。
+	const useElk = (process.env.PLEXUS_LAYOUT || '').toLowerCase() === 'elk';
 	let r;
-	if (useCluster) {
-		const { generateLayout } = await import('./cluster_generate.mjs');
-		const cg = await generateLayout(local, { scale: false });
-		if (!cg) { console.error('fail-closed:无 IC 锚点,无法聚类生成'); process.exit(1); }
-		r = { placements: cg.placements, model: cg.model };
-		console.log(`   cluster 生成模块图:${JSON.stringify(cg.stats)}`);
-	} else if (layoutMode === 'elk') {
+	if (useElk) {
 		const m = await elkLayout({ snapshot: local, logical, byDes, scale: false });
 		r = { placements: m.placements, model: { components: m.components, wires: m.wires, netflags: m.netflags } };
 	} else {
 		r = planLayout({ contract, byDes, logical });
 	}
 	const g = geomQC(r.model);
-	// cluster 模块图:交叉线是原理图常态(无结点=不连),非电气短路 → 降为告警;
-	// 真短路(overlaps/穿件/穿脚)仍 fail-closed。ELK 扁平图仍含交叉(历史 0)。
-	const geomHard = g.overlaps.length + g.wireThruComp.length + g.wireThruPin.length + (useCluster ? 0 : g.crossings);
+	const geomHard = g.overlaps.length + g.wireThruComp.length + g.wireThruPin.length + g.crossings;
 	if (useElk) {
 		// ELK:门只 fail-closed【电气】(几何短路/穿件/穿脚 + 连通断);标签叠压(cosmetic)、faith(契约式,
 		// 对扁平 ELK 模型不适用)仅告警不阻断——「门是必要非充分,先看渲染图」。
-		// cluster 用干净 logical(buildCleanLogical,绕提取碎片化)做连通门,避免 N$ 碎片误判连通断。
-		const gateLogical = useCluster ? (await import('./cluster_generate.mjs')).buildCleanLogical(local) : logical;
-		const connHard = wireConnectivity({ model: r.model, logical: gateLogical }).filter(f => f.severity === 'hard').length;
-		if (geomHard + connHard) { console.error(`fail-closed:${useCluster ? 'cluster' : 'ELK'} 布局 ${geomHard} 几何短路 + ${connHard} 连通断,中止`); process.exit(1); }
+		const connHard = wireConnectivity({ model: r.model, logical }).filter(f => f.severity === 'hard').length;
+		if (geomHard + connHard) { console.error(`fail-closed:ELK 布局 ${geomHard} 几何短路 + ${connHard} 连通断,中止`); process.exit(1); }
 		const lh = labelQC(r.model).filter(f => f.severity === 'hard').length;
 		console.log(`   ELK 布局:几何全净、连通完整;标签叠压 ${lh}(cosmetic,先看渲染图)`);
 	} else {
