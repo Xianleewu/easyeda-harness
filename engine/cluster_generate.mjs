@@ -10,6 +10,7 @@ import { withLocalPins } from './transform.mjs';
 import { elkLayout } from './elk_layout.mjs';
 import { labelQC } from './label_qc.mjs';
 import { geomQC } from './geom_qc.mjs';
+import { netflagCreateRotation } from './preserve_deliver.mjs';
 
 // 标签去冲突(opt-in,较慢):贪心把叠压网标移开——【向外:沿 escape 轴直桩延】或
 // 【垂直:L 形桩(pin→原escape→新位)】,逐个试,仅当 labelHard 严格下降且【短路=0、交叉不增】
@@ -142,7 +143,9 @@ export async function deliverGenerated(snap, opts = {}) {
 	await exec(`for(let p=0;p<10;p++){const ws=(await eda.sch_PrimitiveWire.getAll())||[];const wid=ws.map(w=>w.primitiveId);if(wid.length){try{await eda.sch_PrimitiveWire.delete(wid);}catch(e){}}const ids=(await eda.sch_PrimitiveComponent.getAllPrimitiveId())||[];const fc=[];for(const id of ids){const c=await eda.sch_Primitive.getPrimitiveByPrimitiveId(id);if(c&&(c.componentType==='netflag'||c.componentType==='netport'))fc.push(id);}if(fc.length){try{await eda.sch_PrimitiveComponent.delete(fc);}catch(e){}}if(!wid.length&&!fc.length)break;}return{};`);
 	await runOps('移件', cg.placements.map(p => { const id = desToId.get(p.designator); return id ? `try{await eda.sch_PrimitiveComponent.modify(${JSON.stringify(id)},{x:${p.x},y:${p.y},rotation:${p.rot || 0},mirror:${!!p.mirror}});n++;}catch(e){}` : null; }).filter(Boolean));
 	await runOps('命名连线', cg.model.wires.map(w => `try{await eda.sch_PrimitiveWire.create(${JSON.stringify(w.line)},${JSON.stringify(w.net || '')});n++;}catch(e){}`));
-	await runOps('网标/符号', cg.model.netflags.map(f => { const x = f.x, y = f.y, r = f.rot || 0; if (f.kind === 'sig') return `try{await eda.sch_PrimitiveComponent.createNetPort('BI',${JSON.stringify(f.net)},${x},${y},${r});n++;}catch(e){}`; return `try{await eda.sch_PrimitiveComponent.createNetFlag('${f.kind === 'gnd' ? 'Ground' : 'Power'}',${JSON.stringify(f.net)},${x},${y},${r});n++;}catch(e){}`; }));
+	// createNetPort/createNetFlag 旋转约定均为镜像(输入 R → 回读 360-R,已实证),
+	// 模型 f.rot 是【目标显示旋转】(deconflict/geomQC 据此验证),投递须补偿镜像否则 90↔270 翻转。
+	await runOps('网标/符号', cg.model.netflags.map(f => { const x = f.x, y = f.y, r = netflagCreateRotation(f.rot); if (f.kind === 'sig') return `try{await eda.sch_PrimitiveComponent.createNetPort('BI',${JSON.stringify(f.net)},${x},${y},${r});n++;}catch(e){}`; return `try{await eda.sch_PrimitiveComponent.createNetFlag('${f.kind === 'gnd' ? 'Ground' : 'Power'}',${JSON.stringify(f.net)},${x},${y},${r});n++;}catch(e){}`; }));
 	// 覆盖式自愈:回读已连网,对完全没连上的命名网在连线两端补 netport(密集脚 create 失败兜底)。
 	const covered = await exec(`const ws=await eda.sch_PrimitiveWire.getAll();const ps=await eda.sch_PrimitiveComponent.getAll();return [...new Set([...(ws||[]).map(w=>w.net),...(ps||[]).map(p=>p.net)].filter(Boolean))];`);
 	const cset = new Set(covered || []);
