@@ -14,6 +14,7 @@ import { geomQC } from './geom_qc.mjs';
 import { labelQC } from './label_qc.mjs';
 import { synthesisFaithfulness } from './synthesis_faithfulness.mjs';
 import { executeCode, executeJsFile } from './bridge_client.mjs';
+import { assessLayout, buildPreserveModel } from './preserve_deliver.mjs';
 
 const ROOT = (process.env.EASYEDA_WORKDIR || process.cwd()).replace(/\\/g, '/');
 const RESTORE = `${ROOT}/plexus_restore.json`;
@@ -141,6 +142,27 @@ async function apply() {
 	const logical = extractLogical(local);
 	const contract = synthesizeContract(inferRoles(logical), logical);
 	const byDes = new Map((local.components || []).map(c => [c.designator, withLocalPins(c)]));
+	// ★保留门(2026-06-20,见记忆 tool-degrades-good-layouts):输入已有【好布局】(真实连线为主、
+	// 件分组合理)→ 保留设计者件位+真实连线,绝不 ELK 重排摧毁成散落+标签汤。只有裸网表/坏布局才生成。
+	// 强制重排:--force-generate 或 PLEXUS_FORCE_GENERATE。
+	const forceGen = process.argv.includes('--force-generate') || process.env.PLEXUS_FORCE_GENERATE;
+	const assess = assessLayout(local);
+	if (assess.good && !forceGen) {
+		console.log(`2) 输入已有好布局 ${JSON.stringify(assess.stats)} → 保留式交付(不重排;强制生成用 --force-generate)`);
+		const pm = buildPreserveModel(local);
+		const idBy0 = new Map(comps.map(c => [c.designator, c.id]));
+		console.log('3) 件保留到设计者位...');
+		await runOps('保留件位', pm.components.map(c => { const id = idBy0.get(c.designator); return id ? `try{ await eda.sch_PrimitiveComponent.modify(${JSON.stringify(id)}, { x:${c.x}, y:${c.y}, rotation:${c.rotation}, mirror:${c.mirror} }); n++; }catch(e){}` : null; }).filter(Boolean));
+		console.log('4) 清除现有线/标(保留矩形框/文本)...');
+		await execRetry(`for(let p=0;p<10;p++){const ws=(await eda.sch_PrimitiveWire.getAll())||[];const wid=ws.map(w=>w.primitiveId);if(wid.length){try{await eda.sch_PrimitiveWire.delete(wid);}catch(e){}}const ids=(await eda.sch_PrimitiveComponent.getAllPrimitiveId())||[];const fc=[];for(const id of ids){const c=await eda.sch_Primitive.getPrimitiveByPrimitiveId(id);if(c&&(c.componentType==='netflag'||c.componentType==='netport'))fc.push(id);}if(fc.length){try{await eda.sch_PrimitiveComponent.delete(fc);}catch(e){}}if(!wid.length&&!fc.length)break;}return {n:1};`);
+		console.log('5) 重建设计者真实连线 + 电源/地符号...');
+		await runOps('真实连线', pm.wires.map(w => `try{ await eda.sch_PrimitiveWire.create(${JSON.stringify(w.line)}, ${JSON.stringify(w.net)}); n++; }catch(e){}`));
+		await runOps('电源地符号', pm.netflags.map(f => `try{ await eda.sch_PrimitiveComponent.createNetFlag('${f.flagId}', ${JSON.stringify(f.net)}, ${f.x}, ${f.y}, ${f.rotation}); n++; }catch(e){}`));
+		console.log(`保留式交付完成:${pm.components.length} 件 / ${pm.wires.length} 真实连线 / ${pm.netflags.length} 电源地符号(保留设计者商业布局)。还原:--undo`);
+		return;
+	}
+	console.log(`2) 布局质量差(${assess.reasons.join('; ') || 'forced'})或强制生成 → 合成路径...`);
+
 	// PLEXUS_LAYOUT=elk:用 elkjs 自动布局(紧凑+真实连线,商用可读),scale=false 保符号原尺寸→脚接得上。
 	const useElk = (process.env.PLEXUS_LAYOUT || '').toLowerCase() === 'elk';
 	let r;
