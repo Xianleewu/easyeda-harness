@@ -108,7 +108,7 @@ export function layoutClusterTemplate(anchor, members, ctx, depth = 0) {
 	const cy = ic.y != null ? ic.y : (ic.bbox ? (ic.bbox.minY + ic.bbox.maxY) / 2 : 0);
 	const out = { components: [{ ...ic }], wires: [], netflags: [], placements: [{ designator: anchor, x: ic.x, y: ic.y, rot: ic.rotation || 0, mirror: !!ic.mirror }] };
 	const used = new Set([anchor]);
-	const STUB = 30, PASS = 40, ROWC = 90, FLAGV = 18;   // ROWC=去耦带行距(电容含上下符号跨度~60,需≥76 防相邻符号叠压)
+	const STUB = 30, PASS = 40, ROWC = 100, FLAGV = 28;   // FLAGV=去耦电容脚到电源/地符号间距(≥28 防符号/文字与电容框及designator叠压);ROWC=去耦带行距(电容含上下符号跨度~80,需≥96 防相邻叠压)
 	const isPass = d => /^[CRL]/.test(d) || /^Y/.test(d);
 	const isDecoup = d => { const c = compByDes.get(d); return /^C/.test(d) && c && (c.pins || []).length === 2 && c.pins.every(p => { const nn = netOf(`${d}.${p.num}`); return nn && (nn.class === 'power' || nn.class === 'ground'); }); };
 	// 引脚真实边:优先合法 p.side,否则按【到 bbox 四边的最近距离】判定(aspect-aware,对高/宽 IC 都对;
