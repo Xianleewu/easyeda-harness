@@ -12,6 +12,27 @@ import { labelQC } from './label_qc.mjs';
 import { geomQC } from './geom_qc.mjs';
 import { netflagCreateRotation } from './preserve_deliver.mjs';
 
+// 电源/地轨合并:同 net 同 x 的【密集 flag 列】(连续间距≤34=堆叠,如多上拉到 VDD 的 far flag)→
+// 画竖直 rail 连接 + 仅保留首个 flag、移除其余(电气经 rail 同 net 连通)。间距大的(去耦带 ROWC 90)不动。
+// 移除 flag 只减叠压(不像交错移入新叠压);rail 在标签列内不穿件。实测净正向、clean 板无 dense 列故零回归。
+function consolidateRails(model) {
+	const groups = new Map();
+	model.netflags.forEach((f, i) => { const key = `${f.net}|${Math.round(f.x / 4) * 4}`; if (!groups.has(key)) groups.set(key, []); groups.get(key).push({ f, i }); });
+	const rm = new Set();
+	for (const grp of groups.values()) {
+		if (grp.length < 3) continue;
+		grp.sort((a, b) => a.f.y - b.f.y);
+		let dense = true;
+		for (let k = 1; k < grp.length; k++) if (grp[k].f.y - grp[k - 1].f.y > 34) { dense = false; break; }
+		if (!dense) continue;
+		const x = grp[0].f.x;
+		model.wires.push({ net: grp[0].f.net, line: [x, grp[0].f.y, x, grp[grp.length - 1].f.y] });
+		for (let k = 1; k < grp.length; k++) rm.add(grp[k].i);
+	}
+	if (rm.size) model.netflags = model.netflags.filter((f, i) => !rm.has(i));
+	return model;
+}
+
 // 标签去冲突(opt-in,较慢):贪心把叠压网标移开——【向外:沿 escape 轴直桩延】或
 // 【垂直:L 形桩(pin→原escape→新位)】,逐个试,仅当 labelHard 严格下降且【短路=0、交叉不增】
 // 才保留(验证式,零回归)。实测 vibe-buddy scale=false:labelHard 7→2(71%消除)。
@@ -303,6 +324,7 @@ export async function generateLayout(snap, opts = {}) {
 		moduleRegions.push({ name: s.anchor, title: `${s.anchor} (${s.count})`, box: { minX: curX - 12, minY: curY + TITLE - 8, maxX: curX + s.w + 12, maxY: curY + TITLE + s.h + 10 }, parts: s.count });
 		curX += s.w + PAD; rowH = Math.max(rowH, TITLE + s.h);
 	}
+	consolidateRails(out);   // 密集电源/地 flag 列(多上拉等)合并成轨,减叠压(clean 板无 dense 列故零回归)
 	if (opts.deconflict) deconflictLabels(out);   // opt-in 标签去冲突(验证式向外移,零回归)
 	const sigLabels = out.netflags.filter(f => f.kind === 'sig').length;
 	return { model: out, moduleRegions, placements, stats: { clusters: subs.length, components: out.components.length, wires: out.wires.length, sigLabels, powerGnd: out.netflags.length - sigLabels, nets: logical.nets.length, placements: placements.length } };
