@@ -98,6 +98,7 @@ function rectsGap(a, b) {
 }
 
 function rectArea(b) {
+	if (!b) return 0;   // 空框(union 对空内容返 null)→零面积,免崩
 	return Math.max(0, b.maxX - b.minX) * Math.max(0, b.maxY - b.minY);
 }
 
@@ -254,16 +255,18 @@ function footprintMetrics(sheetBox, titleBlock, moduleRegions, electricalBox) {
 	};
 	const usableW = Math.max(1, usable.maxX - usable.minX);
 	const usableH = Math.max(1, usable.maxY - usable.minY);
-	const moduleUnion = union(moduleRegions.map(r => r.box));
+	const zeroBox = { minX: usable.minX, minY: usable.minY, maxX: usable.minX, maxY: usable.minY };   // 空内容退化框(比率为0)
+	const moduleUnion = union(moduleRegions.map(r => r.box)) || zeroBox;
+	const eb = electricalBox || zeroBox;
 	const moduleArea = moduleRegions.reduce((sum, r) => sum + rectArea(r.box), 0);
 	const moduleUnionArea = rectArea(moduleUnion);
-	const electricalArea = rectArea(electricalBox);
+	const electricalArea = rectArea(eb);
 	return {
 		usable,
-		electricalBox,
+		electricalBox: eb,
 		moduleUnion,
-		electricalWidthRatio: Number(((electricalBox.maxX - electricalBox.minX) / usableW).toFixed(6)),
-		electricalHeightRatio: Number(((electricalBox.maxY - electricalBox.minY) / usableH).toFixed(6)),
+		electricalWidthRatio: Number(((eb.maxX - eb.minX) / usableW).toFixed(6)),
+		electricalHeightRatio: Number(((eb.maxY - eb.minY) / usableH).toFixed(6)),
 		moduleWidthRatio: Number(((moduleUnion.maxX - moduleUnion.minX) / usableW).toFixed(6)),
 		moduleHeightRatio: Number(((moduleUnion.maxY - moduleUnion.minY) / usableH).toFixed(6)),
 		moduleAreaRatio: Number((moduleArea / Math.max(1, rectArea(usable))).toFixed(6)),
