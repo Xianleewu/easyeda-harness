@@ -27,6 +27,10 @@ function deconflictLabels(model) {
 		// 性能:只对【参与叠压的网】的网标试移(非全部 85),~10x 加速、效果不变。
 		const hot = new Set(hard.flatMap(f => Array.isArray(f.where) ? f.where : (f.where && f.where.net ? [f.where.net] : [])));
 		let best = null;
+		// 性能:原逻辑每 pass 评估所有候选却只保留首个改善的(best.nl undefined→`nl<best.nl`恒false)。
+		// 无损优化:① 先算便宜的 labelQC,仅严格改善才算贵的 geomQC ② 找到首个有效移动即早退(break outer)。
+		// 实测 39 件板 deconflict 22.5s→快数十倍,结果不变(同首个改善移动)。
+		outer:
 		for (const f of model.netflags) {
 			if (!hot.has(f.net)) continue;
 			const dir = dirOf(f); if (!dir) continue; const stub = stubOf(model, f); if (!stub) continue;
@@ -37,9 +41,11 @@ function deconflictLabels(model) {
 				const px = stub.line[0], py = stub.line[1];
 				f.x += c.dx; f.y += c.dy; if (f.textX != null) f.textX += c.dx; if (f.textY != null) f.textY += c.dy;
 				stub.line = c.mode === 'out' ? [px, py, f.x, f.y] : [px, py, ox, oy, f.x, f.y];
-				const nl = lh(model), ng = geo(model);
-				if (nl < base && ng.sh === 0 && ng.cr <= bg.cr && (!best || nl < best.nl)) best = { f, c, px, py, ox, oy };
+				const nl = lh(model);
+				let ok = false;
+				if (nl < base) { const ng = geo(model); ok = ng.sh === 0 && ng.cr <= bg.cr; }
 				f.x = ox; f.y = oy; f.textX = otx; f.textY = oty; stub.line = ol;
+				if (ok) { best = { f, c, px, py, ox, oy }; break outer; }
 			}
 		}
 		if (!best) break;
