@@ -71,17 +71,19 @@ export async function generateLayout(snap, opts = {}) {
 	let curX = 0, curY = 0, rowH = 0;
 	const out = { components: [], wires: [], netflags: [], rectangles: [], texts: [] };
 	const moduleRegions = [];
+	const placements = [];   // 件原点全局位(供 live 投递移件)
 	for (const s of subs) {
 		if (curX > 0 && curX + s.w > MAXW) { curY += rowH + PAD; curX = 0; rowH = 0; }
 		const ox = curX - s.bb.minX, oy = curY + TITLE - s.bb.minY;
 		for (const c of s.model.components) out.components.push({ ...c, bbox: { minX: c.bbox.minX + ox, minY: c.bbox.minY + oy, maxX: c.bbox.maxX + ox, maxY: c.bbox.maxY + oy }, pins: (c.pins || []).map(p => ({ ...p, x: p.x + ox, y: p.y + oy })) });
 		for (const w of s.model.wires) out.wires.push({ net: w.net, line: w.line.map((v, k) => k % 2 === 0 ? v + ox : v + oy) });
 		for (const f of s.model.netflags) out.netflags.push({ ...f, x: f.x + ox, y: f.y + oy, textX: (f.textX || f.x) + ox, textY: (f.textY || f.y) + oy });
+		for (const pl of (s.model.placements || [])) placements.push({ ...pl, x: pl.x + ox, y: pl.y + oy });
 		moduleRegions.push({ name: s.anchor, title: `${s.anchor} (${s.count})`, box: { minX: curX - 12, minY: curY + TITLE - 8, maxX: curX + s.w + 12, maxY: curY + TITLE + s.h + 10 }, parts: s.count });
 		curX += s.w + PAD; rowH = Math.max(rowH, TITLE + s.h);
 	}
 	const sigLabels = out.netflags.filter(f => f.kind === 'sig').length;
-	return { model: out, moduleRegions, stats: { clusters: subs.length, components: out.components.length, wires: out.wires.length, sigLabels, powerGnd: out.netflags.length - sigLabels, nets: logical.nets.length } };
+	return { model: out, moduleRegions, placements, stats: { clusters: subs.length, components: out.components.length, wires: out.wires.length, sigLabels, powerGnd: out.netflags.length - sigLabels, nets: logical.nets.length, placements: placements.length } };
 }
 
 if (process.argv[1] && process.argv[1].replace(/\\/g, '/').endsWith('engine/cluster_generate.mjs')) {
