@@ -549,7 +549,7 @@ export function runProjectLabelLayoutGate({
 	return report;
 }
 
-if (import.meta.url === `file:///${process.argv[1]?.replace(/\\/g, '/')}`) {
+if (process.argv[1] && process.argv[1].replace(/\\/g, '/').endsWith('engine/project_label_layout_gate.mjs')) {
 	const report = runProjectLabelLayoutGate();
 	console.log(`project label layout ${report.pass ? 'PASS' : 'FAIL'} source=${report.source} hard=${report.severity.hard}`);
 	console.log(`report -> ${REPORT}`);

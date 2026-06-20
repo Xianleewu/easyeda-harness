@@ -135,7 +135,7 @@ export function runProjectModelGate({ contractPath = CONTRACT, modelPath = MODEL
 	return report;
 }
 
-if (import.meta.url === `file:///${process.argv[1]?.replace(/\\/g, '/')}`) {
+if (process.argv[1] && process.argv[1].replace(/\\/g, '/').endsWith('engine/project_model_gate.mjs')) {
 	const report = runProjectModelGate();
 	console.log(`project model ${report.pass ? 'PASS' : 'FAIL'} hard=${report.severity.hard}`);
 	console.log(`report -> ${REPORT}`);
