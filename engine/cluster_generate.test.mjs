@@ -3,6 +3,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { buildCleanLogical, clusterComponents, generateLayout, layoutClusterTemplate } from './cluster_generate.mjs';
 import { withLocalPins } from './transform.mjs';
+import { geomQC } from './geom_qc.mjs';
+import { labelQC } from './label_qc.mjs';
 
 // 合成快照:U1.1-C1.1 经有名线 SIG;C1.2 经 GND 标接地;U1.2 仅接无名线(NC,应不入网)。
 const snap = {
@@ -136,4 +138,24 @@ test('generateLayout 模板布局:四边脚 IC 正确判边、不掉件、零浮
 	// 顶部 VDD 脚被识别为 power(side 推断正确)→ 有 power flag
 	assert.ok((r.model.netflags || []).some(f => f.kind === 'power' && f.net === 'VDD'), 'VDD 顶部脚→power flag');
 	assert.ok((r.model.netflags || []).some(f => f.kind === 'gnd'), 'GND 底部脚→gnd flag');
+});
+
+// 多无源件同脚(反馈分压 R1→VOUT + R2→GND 共接 FB):节点 rail 都内联、不掉件、零浮空、零叠压。
+test('generateLayout 模板布局:反馈分压(多无源件同脚)节点rail、零浮空零叠压', async () => {
+	const ic = (des, x, y, pins) => ({ designator: des, x, y, rotation: 0, mirror: false, bbox: { minX: x - 40, minY: y - pins.length * 10, maxX: x + 40, maxY: y + pins.length * 10 }, pins: pins.map((p, i) => ({ num: String(i + 1), name: p.n, x: p.s === 'L' ? x - 40 : x + 40, y: y - pins.length * 10 + i * 20 + 10, side: p.s === 'L' ? 'left' : 'right' })) });
+	const rc = (des, x, y) => ({ designator: des, x, y, rotation: 0, mirror: false, bbox: { minX: x - 15, minY: y - 5, maxX: x + 15, maxY: y + 5 }, pins: [{ num: '1', x: x - 15, y }, { num: '2', x: x + 15, y }] });
+	const U1 = ic('U1', 400, 400, [{ n: 'VIN', s: 'L' }, { n: 'GND', s: 'L' }, { n: 'FB', s: 'L' }, { n: 'SW', s: 'R' }]);
+	const comps = [U1, rc('R1', 250, 460), rc('R2', 250, 490), rc('CIN', 250, 300)];
+	const pin = (d, n) => { const c = comps.find(x => x.designator === d); return [c.pins[n - 1].x, c.pins[n - 1].y]; };
+	const W = (net, a, b) => ({ net, line: [a[0], a[1], b[0], b[1]] });
+	const snap = {
+		components: comps,
+		wires: [W('VIN', pin('U1', 1), pin('CIN', 1)), W('VOUT', pin('R1', 1), pin('U1', 4)), W('FB', pin('R1', 2), pin('U1', 3)), W('FB', pin('R2', 1), pin('U1', 3))],
+		netflags: [{ net: 'GND', symbol: 'Ground-GND', x: pin('U1', 2)[0], y: pin('U1', 2)[1] }, { net: 'GND', symbol: 'Ground-GND', x: pin('R2', 2)[0], y: pin('R2', 2)[1] }, { net: 'GND', symbol: 'Ground-GND', x: pin('CIN', 2)[0], y: pin('CIN', 2)[1] }],
+	};
+	const r = await generateLayout(snap, { scale: false, deconflict: true });
+	assert.equal(r.stats.placements, comps.length, '不掉件(含分压 R1/R2)');
+	for (const d of ['R1', 'R2']) assert.ok(r.model.components.some(c => c.designator === d), `${d} 入图(非fallback浮空)`);
+	const g = geomQC(r.model), lh = labelQC(r.model).filter(f => f.severity === 'hard').length;
+	assert.equal(g.overlaps.length, 0, '零叠压'); assert.equal(g.crossings, 0, '零交叉'); assert.equal(lh, 0, '零硬标签');
 });

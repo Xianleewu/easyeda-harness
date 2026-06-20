@@ -108,7 +108,7 @@ export function layoutClusterTemplate(anchor, members, ctx) {
 	const cy = ic.y != null ? ic.y : (ic.bbox ? (ic.bbox.minY + ic.bbox.maxY) / 2 : 0);
 	const out = { components: [{ ...ic }], wires: [], netflags: [], placements: [{ designator: anchor, x: ic.x, y: ic.y, rot: ic.rotation || 0, mirror: !!ic.mirror }] };
 	const used = new Set([anchor]);
-	const STUB = 30, PASS = 40, ROWC = 70, FLAGV = 18;
+	const STUB = 30, PASS = 40, ROWC = 90, FLAGV = 18;   // ROWC=去耦带行距(电容含上下符号跨度~60,需≥76 防相邻符号叠压)
 	const isPass = d => /^[CRL]/.test(d) || /^Y/.test(d);
 	const isDecoup = d => { const c = compByDes.get(d); return /^C/.test(d) && c && (c.pins || []).length === 2 && c.pins.every(p => { const nn = netOf(`${d}.${p.num}`); return nn && (nn.class === 'power' || nn.class === 'ground'); }); };
 	// 引脚真实边:优先合法 p.side,否则按【到 bbox 四边的最近距离】判定(aspect-aware,对高/宽 IC 都对;
@@ -121,35 +121,47 @@ export function layoutClusterTemplate(anchor, members, ctx) {
 	const sigFlag = (net, x, y, s) => s === 'left' ? { kind: 'sig', net, x, y, textX: x, textY: y, rot: 180, alignMode: 8 }
 		: s === 'right' ? { kind: 'sig', net, x, y, textX: x, textY: y, rot: 0, alignMode: 6 }
 		: { kind: 'sig', net, x, y, textX: x, textY: y, rot: s === 'top' ? 90 : 270, alignMode: 2 };
+	const pgCount = {};   // 每边电源/地 flag 计数,用于交错(相邻同边电源/地脚 flag 叠压时错开)。
 	for (const p of ic.pins) {
 		const nn = netOf(`${anchor}.${p.num}`);
 		if (!nn) continue;
 		const s = sideOf(p), [dx, dy] = dirOf(s), lr = (s === 'left' || s === 'right');
 		const ex = p.x + dx * STUB, ey = p.y + dy * STUB;
 		if (nn.class === 'signal') {
-			// 内联串联/上拉电阻:仅左右脚(竖直内联复杂,顶/底脚直接给标签)。
-			const series = lr ? members.find(d => d !== anchor && !used.has(d) && isPass(d) && !isDecoup(d) && (() => { const c = compByDes.get(d); if ((c.pins || []).length !== 2) return false; const nets = c.pins.map(pp => netOf(`${d}.${pp.num}`)); return nets.some(x => x && x.name === nn.name) && nets.some(x => x && x.name !== nn.name); })()) : null;
-			if (series) {
-				const c = compByDes.get(series);
-				const tp = c.pins.find(pp => { const x = netOf(`${series}.${pp.num}`); return x && x.name === nn.name; });
-				const op = c.pins.find(pp => pp !== tp);
-				const on = netOf(`${series}.${op.num}`);
-				const rx = p.x + dx * (STUB + PASS / 2);
-				out.components.push({ designator: series, x: rx, y: ey, rotation: 0, mirror: false, bbox: { minX: rx - PASS / 2, minY: ey - 6, maxX: rx + PASS / 2, maxY: ey + 6 }, pins: [{ num: tp.num, x: rx - dx * PASS / 2, y: ey }, { num: op.num, x: rx + dx * PASS / 2, y: ey }] });
-				out.placements.push({ designator: series, x: rx, y: ey, rot: 0, mirror: false });
-				out.wires.push({ net: nn.name, line: [p.x, p.y, rx - dx * PASS / 2, ey] });
-				const ax = rx + dx * (PASS / 2 + STUB);
-				out.wires.push({ net: on ? on.name : '', line: [rx + dx * PASS / 2, ey, ax, ey] });
-				if (on && (on.class === 'power' || on.class === 'ground')) out.netflags.push({ kind: on.class === 'ground' ? 'gnd' : 'power', net: on.name, x: ax, y: ey, rot: 0 });
-				else out.netflags.push(sigFlag(on ? on.name : '', ax, ey, s));
-				used.add(series);
+			// 该信号脚连接的簇内非去耦 2 脚无源件(串联/上拉/分压/RC);仅左右脚内联(顶/底脚给标签)。
+			// 多件同脚(如反馈分压 R1→VOUT + R2→GND)用【节点 rail】:脚→节点,各件竖直分支,均接节点(=同电气节点)。
+			const conns = lr ? members.filter(d => d !== anchor && !used.has(d) && isPass(d) && !isDecoup(d) && (() => { const c = compByDes.get(d); if ((c.pins || []).length !== 2) return false; const nets = c.pins.map(pp => netOf(`${d}.${pp.num}`)); return nets.some(x => x && x.name === nn.name) && nets.some(x => x && x.name !== nn.name); })()) : [];
+			if (conns.length) {
+				const nodeX = p.x + dx * STUB;
+				out.wires.push({ net: nn.name, line: [p.x, p.y, nodeX, ey] });
+				conns.forEach((series, i) => {
+					const ry = ey + i * 34;
+					if (i > 0) out.wires.push({ net: nn.name, line: [nodeX, ey, nodeX, ry] });   // 沿 rail 下延到本件行
+					const c = compByDes.get(series);
+					const tp = c.pins.find(pp => { const x = netOf(`${series}.${pp.num}`); return x && x.name === nn.name; });
+					const op = c.pins.find(pp => pp !== tp);
+					const on = netOf(`${series}.${op.num}`);
+					const rx = nodeX + dx * (6 + PASS / 2);
+					out.components.push({ designator: series, x: rx, y: ry, rotation: 0, mirror: false, bbox: { minX: rx - PASS / 2, minY: ry - 6, maxX: rx + PASS / 2, maxY: ry + 6 }, pins: [{ num: tp.num, x: rx - dx * PASS / 2, y: ry }, { num: op.num, x: rx + dx * PASS / 2, y: ry }] });
+					out.placements.push({ designator: series, x: rx, y: ry, rot: 0, mirror: false });
+					out.wires.push({ net: nn.name, line: [nodeX, ry, rx - dx * PASS / 2, ry] });
+					const ax = rx + dx * (PASS / 2 + STUB);
+					out.wires.push({ net: on ? on.name : '', line: [rx + dx * PASS / 2, ry, ax, ry] });
+					if (on && (on.class === 'power' || on.class === 'ground')) out.netflags.push({ kind: on.class === 'ground' ? 'gnd' : 'power', net: on.name, x: ax, y: ry, rot: 0 });
+					else out.netflags.push(sigFlag(on ? on.name : '', ax, ry, s));
+					used.add(series);
+				});
 				continue;
 			}
 			out.wires.push({ net: nn.name, line: [p.x, p.y, ex, ey] });
 			out.netflags.push(sigFlag(nn.name, ex, ey, s));
 		} else {
-			out.wires.push({ net: nn.name, line: [p.x, p.y, ex, ey] });
-			out.netflags.push({ kind: nn.class === 'ground' ? 'gnd' : 'power', net: nn.name, x: ex, y: ey, rot: 0 });
+			// 电源/地脚:flag 外延;相邻同边电源/地脚交错外延距离(28),避免 flag 符号叠压。
+			const pc = (pgCount[s] = (pgCount[s] || 0) + 1);
+			const esc = STUB + ((pc - 1) % 2) * 28;
+			const fx2 = p.x + dx * esc, fy2 = p.y + dy * esc;
+			out.wires.push({ net: nn.name, line: [p.x, p.y, fx2, fy2] });
+			out.netflags.push({ kind: nn.class === 'ground' ? 'gnd' : 'power', net: nn.name, x: fx2, y: fy2, rot: 0 });
 		}
 	}
 	// 去耦电容:专用竖直去耦带,放在 IC 块【最左侧】(避开所有信号标签),各 [VDD]—C—[GND]。
@@ -184,7 +196,8 @@ export function layoutClusterTemplate(anchor, members, ctx) {
 		const dx0 = fx - bx, dy0 = fy - byy;
 		out.components.push({ ...lp, x: bx + dx0, y: byy + dy0, bbox: lp.bbox ? { minX: lp.bbox.minX + dx0, minY: lp.bbox.minY + dy0, maxX: lp.bbox.maxX + dx0, maxY: lp.bbox.maxY + dy0 } : { minX: fx - 8, minY: fy - 8, maxX: fx + 8, maxY: fy + 8 }, pins: (lp.pins || []).map(p => ({ ...p, x: p.x + dx0, y: p.y + dy0 })) });
 		out.placements.push({ designator: d, x: bx + dx0, y: byy + dy0, rot: lp.rotation || 0, mirror: !!lp.mirror });
-		for (const p of (lp.pins || [])) { const nn = netOf(`${d}.${p.num}`); if (!nn) continue; const px = p.x + dx0, py = p.y + dy0; if (nn.class === 'ground') out.netflags.push({ kind: 'gnd', net: nn.name, x: px, y: py + 16, rot: 0 }); else if (nn.class === 'power') out.netflags.push({ kind: 'power', net: nn.name, x: px, y: py - 16, rot: 0 }); else out.netflags.push({ kind: 'sig', net: nn.name, x: px + 20, y: py, textX: px + 20, textY: py, rot: 0, alignMode: 6 }); }
+		// 各脚带网标/flag 且【连线连到脚】(否则标签离脚无线=真实断连)。
+		for (const p of (lp.pins || [])) { const nn = netOf(`${d}.${p.num}`); if (!nn) continue; const px = p.x + dx0, py = p.y + dy0; if (nn.class === 'ground') { out.netflags.push({ kind: 'gnd', net: nn.name, x: px, y: py + 16, rot: 0 }); out.wires.push({ net: nn.name, line: [px, py, px, py + 16] }); } else if (nn.class === 'power') { out.netflags.push({ kind: 'power', net: nn.name, x: px, y: py - 16, rot: 0 }); out.wires.push({ net: nn.name, line: [px, py, px, py - 16] }); } else { out.netflags.push({ kind: 'sig', net: nn.name, x: px + 20, y: py, textX: px + 20, textY: py, rot: 0, alignMode: 6 }); out.wires.push({ net: nn.name, line: [px, py, px + 20, py] }); } }
 		used.add(d); fx += 100;
 	}
 	return out;
