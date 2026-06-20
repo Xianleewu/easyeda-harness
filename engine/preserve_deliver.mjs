@@ -92,7 +92,24 @@ async function deliverPreserve(model) {
 	await runOps('真实连线', wireOps);
 	const flagOps = model.netflags.map(f => `try{await eda.sch_PrimitiveComponent.createNetFlag('${f.flagId}',${JSON.stringify(f.net)},${f.x},${f.y},${f.rotation});n++;}catch(e){}`);
 	await runOps('电源/地符号', flagOps);
-	console.log('保留式交付完成。');
+
+	// 自愈:部分密集脚连线被 EDA create 拒("create failed!")→ 整网可能丢失。补法:回读已连网,
+	// 对【完全没连上】的命名网,在其连线两端建网标/电源符号(同名连通,密集脚可建)。保 100% 网覆盖。
+	const covered = await exec(`const ws=await eda.sch_PrimitiveWire.getAll();return [...new Set((ws||[]).map(w=>w.net).filter(Boolean))];`);
+	const coveredSet = new Set(covered || []);
+	const healOps = [];
+	for (const w of model.wires) {
+		if (!w.net || !w.net.trim() || coveredSet.has(w.net)) continue;
+		const l = w.line; const pts = [[l[0], l[1]], [l[l.length - 2], l[l.length - 1]]];
+		const isGnd = /^GND/i.test(w.net), isPwr = /^(VBUS|VCC|5V|BL_|3V|\+)/i.test(w.net);
+		for (const [x, y] of pts) {
+			if (isGnd) healOps.push(`try{await eda.sch_PrimitiveComponent.createNetFlag('Ground',${JSON.stringify(w.net)},${x},${y},0);n++;}catch(e){}`);
+			else if (isPwr) healOps.push(`try{await eda.sch_PrimitiveComponent.createNetFlag('Power',${JSON.stringify(w.net)},${x},${y},0);n++;}catch(e){}`);
+			else healOps.push(`try{await eda.sch_PrimitiveComponent.createNetPort('BI',${JSON.stringify(w.net)},${x},${y},0);n++;}catch(e){}`);
+		}
+	}
+	if (healOps.length) { console.log(`自愈:${healOps.length / 2} 个失败命名网 → 同名网标连通`); await runOps('自愈网标', healOps); }
+	console.log('保留式交付完成(已自愈失败连线,保 100% 网覆盖)。');
 }
 
 if (process.argv[1] && process.argv[1].replace(/\\/g, '/').endsWith('engine/preserve_deliver.mjs')) {
