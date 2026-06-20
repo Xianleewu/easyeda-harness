@@ -111,3 +111,29 @@ test('generateLayout 模板布局:不掉件、去耦电容入图、零浮空', a
 	for (const c of cc.components) { if (!(c.pins || []).some(p => near(p.x, p.y, wends, 6) || near(p.x, p.y, labels, 10))) floating++; }
 	assert.equal(floating, 0, '零浮空件');
 });
+
+// 四边脚 IC(电源顶/地底/信号左右):side-aware 判边——按到 bbox 四边最近距离,而非 |dx|/|dy|
+// (后者对高 IC 的右侧上部脚误判成 top → 内联失效掉 fallback 浮空)。验证不掉件、零浮空。
+test('generateLayout 模板布局:四边脚 IC 正确判边、不掉件、零浮空', async () => {
+	const x = 500, y = 500, hw = 80, hh = 80;
+	const pins = [
+		{ num: '1', name: 'VDD', x: x - 20, y: y - hh, side: 'top' }, { num: '2', name: 'GND', x: x - 20, y: y + hh, side: 'bottom' },
+		{ num: '3', name: 'SCL', x: x - hw, y: y - 40 }, { num: '4', name: 'SDA', x: x - hw, y: y - 20 },   // 左(无 side 字段→按边推断)
+		{ num: '5', name: 'INT', x: x + hw, y: y - 40 }, { num: '6', name: 'EN', x: x + hw, y: y + 40 },     // 右
+	];
+	const U1 = { designator: 'U1', x, y, rotation: 0, mirror: false, bbox: { minX: x - hw, minY: y - hh, maxX: x + hw, maxY: y + hh }, pins };
+	const C1 = { designator: 'C1', x: 300, y: 300, rotation: 0, mirror: false, bbox: { minX: 285, minY: 295, maxX: 315, maxY: 305 }, pins: [{ num: '1', x: 285, y: 300 }, { num: '2', x: 315, y: 300 }] };
+	const pin = (c, n) => { const p = c.pins.find(pp => pp.num === String(n)); return [p.x, p.y]; };
+	const W = (net, a, b) => ({ net, line: [a[0], a[1], b[0], b[1]] });
+	const snap = {
+		components: [U1, C1],
+		wires: [W('VDD', pin(U1, 1), pin(C1, 1)), W('SCL', pin(U1, 3), pin(U1, 3)), W('SDA', pin(U1, 4), pin(U1, 4))],
+		netflags: [{ net: 'GND', symbol: 'Ground-GND', x: pin(U1, 2)[0], y: pin(U1, 2)[1] }, { net: 'GND', symbol: 'Ground-GND', x: pin(C1, 2)[0], y: pin(C1, 2)[1] }],
+	};
+	const r = await generateLayout(snap, { scale: false });
+	assert.equal(r.stats.placements, 2, '不掉件(IC+去耦电容)');
+	assert.ok(r.model.components.some(c => c.designator === 'C1'), 'C1 去耦入图');
+	// 顶部 VDD 脚被识别为 power(side 推断正确)→ 有 power flag
+	assert.ok((r.model.netflags || []).some(f => f.kind === 'power' && f.net === 'VDD'), 'VDD 顶部脚→power flag');
+	assert.ok((r.model.netflags || []).some(f => f.kind === 'gnd'), 'GND 底部脚→gnd flag');
+});

@@ -105,56 +105,73 @@ export function layoutClusterTemplate(anchor, members, ctx) {
 	const netOf = ref => pinNet.get(ref);
 	const ic = withLocalPins(compByDes.get(anchor));
 	const cx = ic.x != null ? ic.x : (ic.bbox ? (ic.bbox.minX + ic.bbox.maxX) / 2 : 0);
+	const cy = ic.y != null ? ic.y : (ic.bbox ? (ic.bbox.minY + ic.bbox.maxY) / 2 : 0);
 	const out = { components: [{ ...ic }], wires: [], netflags: [], placements: [{ designator: anchor, x: ic.x, y: ic.y, rot: ic.rotation || 0, mirror: !!ic.mirror }] };
 	const used = new Set([anchor]);
-	const STUB = 30, PASS = 40, GAPC = 26, ROWC = 70, FLAGV = 18;
+	const STUB = 30, PASS = 40, ROWC = 70, FLAGV = 18;
 	const isPass = d => /^[CRL]/.test(d) || /^Y/.test(d);
 	const isDecoup = d => { const c = compByDes.get(d); return /^C/.test(d) && c && (c.pins || []).length === 2 && c.pins.every(p => { const nn = netOf(`${d}.${p.num}`); return nn && (nn.class === 'power' || nn.class === 'ground'); }); };
+	// 引脚真实边:优先合法 p.side,否则按【到 bbox 四边的最近距离】判定(aspect-aware,对高/宽 IC 都对;
+	// 早先用 |dx|/|dy| 对高 IC 的右侧上部脚会误判成 top → 内联失效掉到 fallback 浮空,2026-06-20 修)。
+	const bb = ic.bbox || { minX: cx, maxX: cx, minY: cy, maxY: cy };
+	const inferEdge = p => { const dL = Math.abs(p.x - bb.minX), dR = Math.abs(p.x - bb.maxX), dT = Math.abs(p.y - bb.minY), dB = Math.abs(p.y - bb.maxY); const m = Math.min(dL, dR, dT, dB); return m === dL ? 'left' : m === dR ? 'right' : m === dT ? 'top' : 'bottom'; };
+	const sideOf = p => { const s = (p.side || '').toString().toLowerCase(); return /^l/.test(s) ? 'left' : /^r/.test(s) ? 'right' : /^t/.test(s) ? 'top' : /^b/.test(s) ? 'bottom' : inferEdge(p); };
+	const dirOf = s => s === 'left' ? [-1, 0] : s === 'right' ? [1, 0] : s === 'top' ? [0, -1] : [0, 1];
+	// 信号网标按边朝向(rot/alignMode 对齐 elk_layout 约定:左180/8、右0/6、上90/2、下270/2)。
+	const sigFlag = (net, x, y, s) => s === 'left' ? { kind: 'sig', net, x, y, textX: x, textY: y, rot: 180, alignMode: 8 }
+		: s === 'right' ? { kind: 'sig', net, x, y, textX: x, textY: y, rot: 0, alignMode: 6 }
+		: { kind: 'sig', net, x, y, textX: x, textY: y, rot: s === 'top' ? 90 : 270, alignMode: 2 };
 	for (const p of ic.pins) {
 		const nn = netOf(`${anchor}.${p.num}`);
 		if (!nn) continue;
-		const left = p.x < cx, dir = left ? -1 : 1;
-		const ex = p.x + dir * STUB, ey = p.y;
+		const s = sideOf(p), [dx, dy] = dirOf(s), lr = (s === 'left' || s === 'right');
+		const ex = p.x + dx * STUB, ey = p.y + dy * STUB;
 		if (nn.class === 'signal') {
-			const series = members.find(d => d !== anchor && !used.has(d) && isPass(d) && !isDecoup(d) && (() => { const c = compByDes.get(d); if ((c.pins || []).length !== 2) return false; const nets = c.pins.map(pp => netOf(`${d}.${pp.num}`)); return nets.some(x => x && x.name === nn.name) && nets.some(x => x && x.name !== nn.name); })());
+			// 内联串联/上拉电阻:仅左右脚(竖直内联复杂,顶/底脚直接给标签)。
+			const series = lr ? members.find(d => d !== anchor && !used.has(d) && isPass(d) && !isDecoup(d) && (() => { const c = compByDes.get(d); if ((c.pins || []).length !== 2) return false; const nets = c.pins.map(pp => netOf(`${d}.${pp.num}`)); return nets.some(x => x && x.name === nn.name) && nets.some(x => x && x.name !== nn.name); })()) : null;
 			if (series) {
 				const c = compByDes.get(series);
 				const tp = c.pins.find(pp => { const x = netOf(`${series}.${pp.num}`); return x && x.name === nn.name; });
 				const op = c.pins.find(pp => pp !== tp);
 				const on = netOf(`${series}.${op.num}`);
-				const rx = p.x + dir * (STUB + PASS / 2);
-				out.components.push({ designator: series, x: rx, y: ey, rotation: 0, mirror: false, bbox: { minX: rx - PASS / 2, minY: ey - 6, maxX: rx + PASS / 2, maxY: ey + 6 }, pins: [{ num: tp.num, x: rx - dir * PASS / 2, y: ey }, { num: op.num, x: rx + dir * PASS / 2, y: ey }] });
+				const rx = p.x + dx * (STUB + PASS / 2);
+				out.components.push({ designator: series, x: rx, y: ey, rotation: 0, mirror: false, bbox: { minX: rx - PASS / 2, minY: ey - 6, maxX: rx + PASS / 2, maxY: ey + 6 }, pins: [{ num: tp.num, x: rx - dx * PASS / 2, y: ey }, { num: op.num, x: rx + dx * PASS / 2, y: ey }] });
 				out.placements.push({ designator: series, x: rx, y: ey, rot: 0, mirror: false });
-				out.wires.push({ net: nn.name, line: [p.x, p.y, rx - dir * PASS / 2, ey] });
-				const ax = rx + dir * (PASS / 2 + STUB);
-				out.wires.push({ net: on ? on.name : '', line: [rx + dir * PASS / 2, ey, ax, ey] });
+				out.wires.push({ net: nn.name, line: [p.x, p.y, rx - dx * PASS / 2, ey] });
+				const ax = rx + dx * (PASS / 2 + STUB);
+				out.wires.push({ net: on ? on.name : '', line: [rx + dx * PASS / 2, ey, ax, ey] });
 				if (on && (on.class === 'power' || on.class === 'ground')) out.netflags.push({ kind: on.class === 'ground' ? 'gnd' : 'power', net: on.name, x: ax, y: ey, rot: 0 });
-				else out.netflags.push({ kind: 'sig', net: on ? on.name : '', x: ax, y: ey, textX: ax, textY: ey, rot: left ? 180 : 0, alignMode: left ? 8 : 6 });
+				else out.netflags.push(sigFlag(on ? on.name : '', ax, ey, s));
 				used.add(series);
 				continue;
 			}
 			out.wires.push({ net: nn.name, line: [p.x, p.y, ex, ey] });
-			out.netflags.push({ kind: 'sig', net: nn.name, x: ex, y: ey, textX: ex, textY: ey, rot: left ? 180 : 0, alignMode: left ? 8 : 6 });
+			out.netflags.push(sigFlag(nn.name, ex, ey, s));
 		} else {
 			out.wires.push({ net: nn.name, line: [p.x, p.y, ex, ey] });
 			out.netflags.push({ kind: nn.class === 'ground' ? 'gnd' : 'power', net: nn.name, x: ex, y: ey, rot: 0 });
-			if (nn.class === 'power') {
-				const caps = members.filter(d => d !== anchor && !used.has(d) && isDecoup(d));
-				let by = ey + GAPC;
-				for (const d of caps) {
-					const c = compByDes.get(d);
-					const p1 = c.pins[0], p2 = c.pins[1];
-					const n1 = netOf(`${d}.${p1.num}`), n2 = netOf(`${d}.${p2.num}`);
-					const pwrNum = (n1 && n1.class === 'power') ? p1.num : p2.num, pwrName = (n1 && n1.class === 'power') ? n1.name : (n2 ? n2.name : nn.name);
-					const gndNum = pwrNum === p1.num ? p2.num : p1.num, gndName = (netOf(`${d}.${gndNum}`) || {}).name || 'GND';
-					const dx = ex + dir * 30, top = by, bot = by + 24;
-					out.components.push({ designator: d, x: dx, y: (top + bot) / 2, rotation: 90, mirror: false, bbox: { minX: dx - 8, minY: top, maxX: dx + 8, maxY: bot }, pins: [{ num: pwrNum, x: dx, y: top }, { num: gndNum, x: dx, y: bot }] });
-					out.placements.push({ designator: d, x: dx, y: (top + bot) / 2, rot: 90, mirror: false });
-					out.netflags.push({ kind: 'power', net: pwrName, x: dx, y: top - FLAGV, rot: 0 }); out.wires.push({ net: pwrName, line: [dx, top, dx, top - FLAGV] });
-					out.netflags.push({ kind: 'gnd', net: gndName, x: dx, y: bot + FLAGV, rot: 0 }); out.wires.push({ net: gndName, line: [dx, bot, dx, bot + FLAGV] });
-					used.add(d); by += ROWC;
-				}
-			}
+		}
+	}
+	// 去耦电容:专用竖直去耦带,放在 IC 块【最左侧】(避开所有信号标签),各 [VDD]—C—[GND]。
+	// 不再贴具体电源脚(四边脚 IC 的顶部电源脚会与左侧信号标签冲突)——独立去耦列是通用商业惯例。
+	const caps = members.filter(d => d !== anchor && !used.has(d) && isDecoup(d));
+	if (caps.length) {
+		let minX = ic.bbox ? ic.bbox.minX : cx;
+		for (const f of out.netflags) minX = Math.min(minX, f.x);
+		for (const c of out.components) if (c.bbox) minX = Math.min(minX, c.bbox.minX);
+		const bx = minX - 80; let by = (ic.bbox ? ic.bbox.minY : cy) + 10;
+		for (const d of caps) {
+			const c = compByDes.get(d);
+			const p1 = c.pins[0], p2 = c.pins[1];
+			const n1 = netOf(`${d}.${p1.num}`), n2 = netOf(`${d}.${p2.num}`);
+			const pwrNum = (n1 && n1.class === 'power') ? p1.num : p2.num, pwrName = (n1 && n1.class === 'power') ? n1.name : (n2 ? n2.name : 'VDD');
+			const gndNum = pwrNum === p1.num ? p2.num : p1.num, gndName = (netOf(`${d}.${gndNum}`) || {}).name || 'GND';
+			const top = by, bot = by + 24;
+			out.components.push({ designator: d, x: bx, y: (top + bot) / 2, rotation: 90, mirror: false, bbox: { minX: bx - 8, minY: top, maxX: bx + 8, maxY: bot }, pins: [{ num: pwrNum, x: bx, y: top }, { num: gndNum, x: bx, y: bot }] });
+			out.placements.push({ designator: d, x: bx, y: (top + bot) / 2, rot: 90, mirror: false });
+			out.netflags.push({ kind: 'power', net: pwrName, x: bx, y: top - FLAGV, rot: 0 }); out.wires.push({ net: pwrName, line: [bx, top, bx, top - FLAGV] });
+			out.netflags.push({ kind: 'gnd', net: gndName, x: bx, y: bot + FLAGV, rot: 0 }); out.wires.push({ net: gndName, line: [bx, bot, bx, bot + FLAGV] });
+			used.add(d); by += ROWC;
 		}
 	}
 	// fallback:任何未放置的簇成员(防掉件)→ IC 下方一排,各脚带网标/flag。
