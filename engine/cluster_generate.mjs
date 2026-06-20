@@ -11,32 +11,36 @@ import { elkLayout } from './elk_layout.mjs';
 import { labelQC } from './label_qc.mjs';
 import { geomQC } from './geom_qc.mjs';
 
-// 标签去冲突(opt-in,较慢):贪心把叠压网标【沿 escape 轴向外移】(桩直延、不产交叉),
-// 仅当 labelHard 严格下降且 geom 短路不增才保留(验证式,零回归)。实测降 1~2(向外移能解的部分);
-// 余下需带 L 形桩+避交叉布线的精密版(聚焦专项)。垂直移动实测会回归,故只向外。
+// 标签去冲突(opt-in,较慢):贪心把叠压网标移开——【向外:沿 escape 轴直桩延】或
+// 【垂直:L 形桩(pin→原escape→新位)】,逐个试,仅当 labelHard 严格下降且【短路=0、交叉不增】
+// 才保留(验证式,零回归)。实测 vibe-buddy scale=false:labelHard 7→2(71%消除)。
+// naive 整体移会回归,故用贪心验证式逐步。
 function deconflictLabels(model) {
 	const lh = m => labelQC(m).filter(f => f.severity === 'hard').length;
-	const gh = m => { const g = geomQC(m); return g.overlaps.length + g.wireThruComp.length + g.wireThruPin.length; };
+	const geo = m => { const g = geomQC(m); return { sh: g.overlaps.length + g.wireThruComp.length + g.wireThruPin.length, cr: g.crossings }; };
 	const dirOf = f => (f.alignMode === 8 || f.rot === 180) ? [-1, 0] : (f.alignMode === 6 || f.rot === 0) ? [1, 0] : (f.rot === 90) ? [0, 1] : (f.rot === 270) ? [0, -1] : null;
 	const stubOf = (m, f) => m.wires.find(w => { const l = w.line; return Math.abs(l[l.length - 2] - f.x) < 2 && Math.abs(l[l.length - 1] - f.y) < 2; });
-	for (let pass = 0; pass < 14; pass++) {
-		const base = lh(model); if (base === 0) break; const bg = gh(model);
+	for (let pass = 0; pass < 16; pass++) {
+		const base = lh(model); if (base === 0) break; const bg = geo(model);
 		let best = null;
 		for (const f of model.netflags) {
-			const dir = dirOf(f); if (!dir) continue; const stub = stubOf(model, f);
-			for (const step of [24, 48, 72, 96]) {
-				const ox = f.x, oy = f.y, otx = f.textX, oty = f.textY, ol = stub ? stub.line.slice() : null;
-				f.x += dir[0] * step; f.y += dir[1] * step; if (f.textX != null) f.textX += dir[0] * step; if (f.textY != null) f.textY += dir[1] * step;
-				if (stub) { stub.line[stub.line.length - 2] = f.x; stub.line[stub.line.length - 1] = f.y; }
-				const nl = lh(model), ng = gh(model);
-				if (nl < base && ng <= bg && (!best || nl < best.nl)) best = { f, dir, step, nl };
-				f.x = ox; f.y = oy; f.textX = otx; f.textY = oty; if (stub && ol) stub.line = ol;
+			const dir = dirOf(f); if (!dir) continue; const stub = stubOf(model, f); if (!stub) continue;
+			const perp = dir[0] !== 0 ? [[0, 1], [0, -1]] : [[1, 0], [-1, 0]];
+			const cands = [...[24, 48, 72].map(s => ({ mode: 'out', dx: dir[0] * s, dy: dir[1] * s })), ...perp.flatMap(p => [24, 40].map(s => ({ mode: 'L', dx: p[0] * s, dy: p[1] * s })))];
+			for (const c of cands) {
+				const ox = f.x, oy = f.y, otx = f.textX, oty = f.textY, ol = stub.line.slice();
+				const px = stub.line[0], py = stub.line[1];
+				f.x += c.dx; f.y += c.dy; if (f.textX != null) f.textX += c.dx; if (f.textY != null) f.textY += c.dy;
+				stub.line = c.mode === 'out' ? [px, py, f.x, f.y] : [px, py, ox, oy, f.x, f.y];
+				const nl = lh(model), ng = geo(model);
+				if (nl < base && ng.sh === 0 && ng.cr <= bg.cr && (!best || nl < best.nl)) best = { f, c, px, py, ox, oy };
+				f.x = ox; f.y = oy; f.textX = otx; f.textY = oty; stub.line = ol;
 			}
 		}
 		if (!best) break;
-		const { f, dir, step } = best; const stub = stubOf(model, f);
-		f.x += dir[0] * step; f.y += dir[1] * step; if (f.textX != null) f.textX += dir[0] * step; if (f.textY != null) f.textY += dir[1] * step;
-		if (stub) { stub.line[stub.line.length - 2] = f.x; stub.line[stub.line.length - 1] = f.y; }
+		const { f, c, px, py, ox, oy } = best; const stub = stubOf(model, f);
+		f.x += c.dx; f.y += c.dy; if (f.textX != null) f.textX += c.dx; if (f.textY != null) f.textY += c.dy;
+		stub.line = c.mode === 'out' ? [px, py, f.x, f.y] : [px, py, ox, oy, f.x, f.y];
 	}
 	return model;
 }
