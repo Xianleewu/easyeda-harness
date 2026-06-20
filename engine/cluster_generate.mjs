@@ -130,7 +130,7 @@ export async function deliverGenerated(snap, opts = {}) {
 	const sleep = ms => new Promise(r => setTimeout(r, ms));
 	const exec = async js => { for (let t = 0; t < 6; t++) { try { return (await executeCode(js, { timeoutMs: 90000 })).result; } catch (e) { if (!/disconnect|timed out/i.test(e.message)) { console.error('  非连接错:', e.message.slice(0, 70)); return null; } await sleep(2500); } } return null; };
 	const runOps = async (label, ops, batch = 15) => { let done = 0; for (let i = 0; i < ops.length; i += batch) { await exec(`let n=0;\n${ops.slice(i, i + batch).join('\n')}\nreturn{n};`); done += Math.min(batch, ops.length - i); process.stdout.write(`\r  ${label}: ${done}/${ops.length}`); } console.log(' ✓'); };
-	const cg = await generateLayout(snap, { ...opts, scale: false });   // live 投递 scale=false 保脚位
+	const cg = await generateLayout(snap, { ...opts, scale: false, deconflict: opts.deconflict !== false });   // live 投递 scale=false 保脚位,默认去冲突
 	if (!cg) { console.error('无 IC 锚点,无法生成'); return null; }
 	console.log('cluster 生成模块图投递:', JSON.stringify(cg.stats));
 	const cur = await exec(`const cs=await eda.sch_PrimitiveComponent.getAll();return cs.map(c=>({id:c.primitiveId||c.id,des:c.designator}));`);
