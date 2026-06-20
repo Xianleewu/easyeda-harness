@@ -241,7 +241,7 @@ export async function generateLayout(snap, opts = {}) {
 	for (const s of subs) {
 		if (curX > 0 && curX + s.w > MAXW) { curY += rowH + PAD; curX = 0; rowH = 0; }
 		const ox = curX - s.bb.minX, oy = curY + TITLE - s.bb.minY;
-		for (const c of s.model.components) out.components.push({ ...c, bbox: { minX: c.bbox.minX + ox, minY: c.bbox.minY + oy, maxX: c.bbox.maxX + ox, maxY: c.bbox.maxY + oy }, pins: (c.pins || []).map(p => ({ ...p, x: p.x + ox, y: p.y + oy })) });
+		for (const c of s.model.components) out.components.push({ ...c, x: (c.x ?? 0) + ox, y: (c.y ?? 0) + oy, bbox: { minX: c.bbox.minX + ox, minY: c.bbox.minY + oy, maxX: c.bbox.maxX + ox, maxY: c.bbox.maxY + oy }, pins: (c.pins || []).map(p => ({ ...p, x: p.x + ox, y: p.y + oy })) });   // x/y 也偏移(否则件位与 bbox/脚错位)
 		for (const w of s.model.wires) out.wires.push({ net: w.net, line: w.line.map((v, k) => k % 2 === 0 ? v + ox : v + oy) });
 		for (const f of s.model.netflags) out.netflags.push({ ...f, x: f.x + ox, y: f.y + oy, textX: (f.textX || f.x) + ox, textY: (f.textY || f.y) + oy });
 		for (const pl of (s.model.placements || [])) placements.push({ ...pl, x: pl.x + ox, y: pl.y + oy });
