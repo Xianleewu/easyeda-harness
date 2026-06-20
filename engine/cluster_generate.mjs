@@ -203,26 +203,45 @@ export function layoutClusterTemplate(anchor, members, ctx, depth = 0) {
 	// 不贴具体电源脚(四边脚 IC 顶部电源脚会与侧边信号标签冲突)——独立去耦列是通用商业惯例。
 	const caps = members.filter(d => d !== anchor && !used.has(d) && isDecoup(d));
 	if (caps.length) {
-		// 选信号更少的水平侧放带:左信号脚多→放右侧空白处,否则放左侧(默认)。
-		let leftSig = 0, rightSig = 0;
-		for (const p of ic.pins) { const nn = netOf(`${anchor}.${p.num}`); if (!nn || nn.class !== 'signal') continue; const s = sideOf(p); if (s === 'left') leftSig++; else if (s === 'right') rightSig++; }
-		const onRight = leftSig > rightSig;
-		let edge = ic.bbox ? (onRight ? ic.bbox.maxX : ic.bbox.minX) : cx;
-		for (const f of out.netflags) edge = onRight ? Math.max(edge, f.x) : Math.min(edge, f.x);
-		for (const c of out.components) if (c.bbox) edge = onRight ? Math.max(edge, c.bbox.maxX) : Math.min(edge, c.bbox.minX);
-		const bx = onRight ? edge + 80 : edge - 80; let by = (ic.bbox ? ic.bbox.minY : cy) + 10;
-		for (const d of caps) {
-			const c = compByDes.get(d);
-			const p1 = c.pins[0], p2 = c.pins[1];
-			const n1 = netOf(`${d}.${p1.num}`), n2 = netOf(`${d}.${p2.num}`);
-			const pwrNum = (n1 && n1.class === 'power') ? p1.num : p2.num, pwrName = (n1 && n1.class === 'power') ? n1.name : (n2 ? n2.name : 'VDD');
-			const gndNum = pwrNum === p1.num ? p2.num : p1.num, gndName = (netOf(`${d}.${gndNum}`) || {}).name || 'GND';
-			const top = by, bot = by + 24;
-			out.components.push({ designator: d, x: bx, y: (top + bot) / 2, rotation: 90, mirror: false, bbox: { minX: bx - 8, minY: top, maxX: bx + 8, maxY: bot }, pins: [{ num: pwrNum, x: bx, y: top }, { num: gndNum, x: bx, y: bot }] });
-			out.placements.push({ designator: d, x: bx, y: (top + bot) / 2, rot: 90, mirror: false });
-			out.netflags.push({ kind: 'power', net: pwrName, x: bx, y: top - FLAGV, rot: 0 }); out.wires.push({ net: pwrName, line: [bx, top, bx, top - FLAGV] });
-			out.netflags.push({ kind: 'gnd', net: gndName, x: bx, y: bot + FLAGV, rot: 0 }); out.wires.push({ net: gndName, line: [bx, bot, bx, bot + FLAGV] });
-			used.add(d); by += ROWC;
+		// 每件电源/地脚名解析(去重共享)。
+		const capInfo = d => { const c = compByDes.get(d); const p1 = c.pins[0], p2 = c.pins[1]; const n1 = netOf(`${d}.${p1.num}`), n2 = netOf(`${d}.${p2.num}`); const pwrNum = (n1 && n1.class === 'power') ? p1.num : p2.num; const pwrName = (n1 && n1.class === 'power') ? n1.name : (n2 ? n2.name : 'VDD'); const gndNum = pwrNum === p1.num ? p2.num : p1.num; const gndName = (netOf(`${d}.${gndNum}`) || {}).name || 'GND'; return { pwrNum, pwrName, gndNum, gndName }; };
+		// 门控:左右两侧都拥挤(内联件把侧去耦带推远→稀疏)、IC 下方无电源脚、无 fallback 子电路占用下方时,
+		// 改放【IC 正下方水平去耦排】(buck/LDO 类两侧都有内联件的板紧贴 IC)。仅此窄条件触发,其余拓扑走原侧带(零改动)。
+		let leftExt = bb.minX, rightExt = bb.maxX;
+		for (const f of out.netflags) { if (f.x < bb.minX) leftExt = Math.min(leftExt, f.x); if (f.x > bb.maxX) rightExt = Math.max(rightExt, f.x); }
+		for (const c of out.components) { if (c.designator === anchor || !c.bbox) continue; if (c.bbox.minX < bb.minX) leftExt = Math.min(leftExt, c.bbox.minX); if (c.bbox.maxX > bb.maxX) rightExt = Math.max(rightExt, c.bbox.maxX); }
+		const bothCrowded = (bb.minX - leftExt) > 50 && (rightExt - bb.maxX) > 50;
+		const hasBottomPin = ic.pins.some(p => sideOf(p) === 'bottom');
+		const remPreview = members.filter(d => !used.has(d) && !isDecoup(d) && compByDes.get(d));
+		if (bothCrowded && !hasBottomPin && remPreview.length === 0) {
+			const HSP = 56, rowW = (caps.length - 1) * HSP, startX = cx - rowW / 2, cyc = bb.maxY + 62;
+			for (let i = 0; i < caps.length; i++) {
+				const d = caps[i], { pwrNum, pwrName, gndNum, gndName } = capInfo(d);
+				const bx = startX + i * HSP, top = cyc - 12, bot = cyc + 12;
+				out.components.push({ designator: d, x: bx, y: cyc, rotation: 90, mirror: false, bbox: { minX: bx - 8, minY: top, maxX: bx + 8, maxY: bot }, pins: [{ num: pwrNum, x: bx, y: top }, { num: gndNum, x: bx, y: bot }] });
+				out.placements.push({ designator: d, x: bx, y: cyc, rot: 90, mirror: false });
+				out.netflags.push({ kind: 'power', net: pwrName, x: bx, y: top - FLAGV, rot: 0 }); out.wires.push({ net: pwrName, line: [bx, top, bx, top - FLAGV] });
+				out.netflags.push({ kind: 'gnd', net: gndName, x: bx, y: bot + FLAGV, rot: 0 }); out.wires.push({ net: gndName, line: [bx, bot, bx, bot + FLAGV] });
+				used.add(d);
+			}
+		} else {
+			// 默认:专用竖直去耦带在信号更少的一侧(原逻辑,行为不变)。
+			let leftSig = 0, rightSig = 0;
+			for (const p of ic.pins) { const nn = netOf(`${anchor}.${p.num}`); if (!nn || nn.class !== 'signal') continue; const s = sideOf(p); if (s === 'left') leftSig++; else if (s === 'right') rightSig++; }
+			const onRight = leftSig > rightSig;
+			let edge = ic.bbox ? (onRight ? ic.bbox.maxX : ic.bbox.minX) : cx;
+			for (const f of out.netflags) edge = onRight ? Math.max(edge, f.x) : Math.min(edge, f.x);
+			for (const c of out.components) if (c.bbox) edge = onRight ? Math.max(edge, c.bbox.maxX) : Math.min(edge, c.bbox.minX);
+			const bx = onRight ? edge + 80 : edge - 80; let by = (ic.bbox ? ic.bbox.minY : cy) + 10;
+			for (const d of caps) {
+				const { pwrNum, pwrName, gndNum, gndName } = capInfo(d);
+				const top = by, bot = by + 24;
+				out.components.push({ designator: d, x: bx, y: (top + bot) / 2, rotation: 90, mirror: false, bbox: { minX: bx - 8, minY: top, maxX: bx + 8, maxY: bot }, pins: [{ num: pwrNum, x: bx, y: top }, { num: gndNum, x: bx, y: bot }] });
+				out.placements.push({ designator: d, x: bx, y: (top + bot) / 2, rot: 90, mirror: false });
+				out.netflags.push({ kind: 'power', net: pwrName, x: bx, y: top - FLAGV, rot: 0 }); out.wires.push({ net: pwrName, line: [bx, top, bx, top - FLAGV] });
+				out.netflags.push({ kind: 'gnd', net: gndName, x: bx, y: bot + FLAGV, rot: 0 }); out.wires.push({ net: gndName, line: [bx, bot, bx, bot + FLAGV] });
+				used.add(d); by += ROWC;
+			}
 		}
 	}
 	// fallback = 离散子电路:剩余未放置成员按【共享网连通】分组,每组以最高脚件为锚【递归模板布局】
