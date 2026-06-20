@@ -438,7 +438,8 @@ export function renderSheetOutput(snapshot, outPng = DEFAULT_OUT, opts = {}) {
 		pushText(out, textBoxes, { x: sheetPx.x + sheetPx.width - 14, y: gy, text: row, fontSize: 10, fill: '#222222', role: 'sheet-grid' });
 	}
 
-	const moduleRegions = inferModuleRegions(snapshot, opts.moduleRegionPad ?? 28);
+	// opts.moduleRegions:外部直接提供模块区(用于生成路径自定义簇,绕开 aihwdebugger 专属注册表)。
+	const moduleRegions = opts.moduleRegions || inferModuleRegions(snapshot, opts.moduleRegionPad ?? 28);
 	const electricalBoxes = [];
 	for (const c of snapshot?.components || []) electricalBoxes.push(normalizeBox(c.bbox));
 	for (const f of snapshot?.netflags || []) electricalBoxes.push(normalizeBox(f.bbox));
