@@ -7,7 +7,7 @@ const R = {
 	180: (x, y) => [-x, -y],
 };
 const Rinv = { 0: R[0], 90: R[270], 270: R[90], 180: R[180] };
-const norm = r => ((Math.round(r / 90) * 90) % 360 + 360) % 360;
+const norm = r => ((Math.round((r || 0) / 90) * 90) % 360 + 360) % 360;   // r||0 防御:缺/NaN rotation→0(无旋转即0,免 Rinv[NaN] 崩)
 
 // 由当前 world 引脚反推本地偏移
 export function toLocal(world, origin, rot, mirror) {

@@ -236,3 +236,15 @@ test('generateLayout 模板布局:多子系统集成板全管线干净', async (
 	let floating = 0; for (const c of cc.components) { if (!(c.pins || []).some(p => near(p.x, p.y, wends, 6) || near(p.x, p.y, labels, 10))) floating++; }
 	assert.equal(floating, 0, '集成板零浮空'); assert.equal(g.overlaps.length, 0, '零叠压'); assert.equal(g.crossings, 0, '零交叉'); assert.equal(lh, 0, '集成板零硬标签');
 });
+
+// 健壮性:不完整输入(件缺 rotation、无 IC 锚点、空板)优雅处理,不崩溃。
+test('generateLayout 健壮性:缺 rotation / 无锚点 / 空板不崩溃', async () => {
+	// 件缺 rotation 字段(早先 norm(undefined)→Rinv[NaN] 崩):应优雅产出
+	const r1 = await generateLayout({ components: [{ designator: 'U1', x: 0, y: 0, bbox: { minX: -20, minY: -20, maxX: 20, maxY: 20 }, pins: [{ num: '1', x: -20, y: 0 }] }], wires: [], netflags: [] });
+	assert.ok(r1 && r1.stats.placements === 1, '缺 rotation 的单 IC 优雅产出(不崩)');
+	// 无 IC 锚点(纯无源件):返回 null
+	const two = (d, x, y) => ({ designator: d, x, y, rotation: 0, mirror: false, bbox: { minX: x - 15, minY: y - 5, maxX: x + 15, maxY: y + 5 }, pins: [{ num: '1', x: x - 15, y }, { num: '2', x: x + 15, y }] });
+	assert.equal(await generateLayout({ components: [two('R1', 0, 0), two('R2', 50, 0)], wires: [], netflags: [] }), null, '无 IC 锚点返回 null');
+	// 空板:返回 null
+	assert.equal(await generateLayout({ components: [], wires: [], netflags: [] }), null, '空板返回 null');
+});
