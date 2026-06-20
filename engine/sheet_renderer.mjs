@@ -295,7 +295,7 @@ function inferSheetBox(snapshot) {
 		}
 		if (xs.length) boxes.push({ minX: Math.min(...xs), minY: Math.min(...ys), maxX: Math.max(...xs), maxY: Math.max(...ys) });
 	}
-	return expand(union(boxes), 100);
+	return expand(union(boxes) || { minX: 0, minY: 0, maxX: 800, maxY: 600 }, 100);   // 空内容→默认图纸框(免 expand(null) 崩)
 }
 
 function inferTitleBlock(snapshot, sheetBox) {
