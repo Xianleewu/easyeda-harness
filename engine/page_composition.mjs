@@ -194,7 +194,7 @@ export function auditPageComposition(snap, opts = {}) {
 		const contentSize = boxSize(contentBox);
 		const aspect = contentSize.width / Math.max(1, contentSize.height);
 		const minAspect = opts.minContentAspect ?? 1.45;
-		const maxAspect = opts.maxContentAspect ?? 2.5;
+		const maxAspect = opts.maxContentAspect ?? 2.35;
 		if (aspect < minAspect || aspect > maxAspect) {
 			hard(findings, 'P5-page-aspect-balance',
 				`Module bounding page aspect is outside the reference-readable range: ${round2(aspect)} not in [${minAspect}, ${maxAspect}]`,
