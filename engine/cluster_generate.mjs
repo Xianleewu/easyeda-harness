@@ -21,9 +21,13 @@ function deconflictLabels(model) {
 	const dirOf = f => (f.alignMode === 8 || f.rot === 180) ? [-1, 0] : (f.alignMode === 6 || f.rot === 0) ? [1, 0] : (f.rot === 90) ? [0, 1] : (f.rot === 270) ? [0, -1] : null;
 	const stubOf = (m, f) => m.wires.find(w => { const l = w.line; return Math.abs(l[l.length - 2] - f.x) < 2 && Math.abs(l[l.length - 1] - f.y) < 2; });
 	for (let pass = 0; pass < 16; pass++) {
-		const base = lh(model); if (base === 0) break; const bg = geo(model);
+		const hard = labelQC(model).filter(f => f.severity === 'hard');
+		const base = hard.length; if (base === 0) break; const bg = geo(model);
+		// 性能:只对【参与叠压的网】的网标试移(非全部 85),~10x 加速、效果不变。
+		const hot = new Set(hard.flatMap(f => Array.isArray(f.where) ? f.where : (f.where && f.where.net ? [f.where.net] : [])));
 		let best = null;
 		for (const f of model.netflags) {
+			if (!hot.has(f.net)) continue;
 			const dir = dirOf(f); if (!dir) continue; const stub = stubOf(model, f); if (!stub) continue;
 			const perp = dir[0] !== 0 ? [[0, 1], [0, -1]] : [[1, 0], [-1, 0]];
 			const cands = [...[24, 48, 72].map(s => ({ mode: 'out', dx: dir[0] * s, dy: dir[1] * s })), ...perp.flatMap(p => [24, 40].map(s => ({ mode: 'L', dx: p[0] * s, dy: p[1] * s })))];
