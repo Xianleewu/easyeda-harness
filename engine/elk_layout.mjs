@@ -112,7 +112,7 @@ function buildGraph(snapshot, logical, byDes, roles, scale = true, powerEdges = 
 	return { graph: { id: 'root', layoutOptions: { ...DEFAULT_OPTS }, children, edges }, meta };
 }
 
-export async function elkLayout({ snapshot, logical, byDes, elk = new ELK(), layoutOptions = {}, scale = true, powerEdges = false }) {
+export async function elkLayout({ snapshot, logical, byDes, elk = new ELK(), layoutOptions = {}, scale = true, powerEdges = false, maxWire = null }) {
 	const roles = pinRoles(logical);
 	const { graph, meta } = buildGraph(snapshot, logical, byDes, roles, scale, powerEdges);
 	Object.assign(graph.layoutOptions, layoutOptions);
@@ -157,7 +157,7 @@ export async function elkLayout({ snapshot, logical, byDes, elk = new ELK(), lay
 	// 长线还会横穿其他标签=L4)。保电气完整(同名标签 EDA 连通)。任一段触发则全网回退,避免半连。
 	// 导线长上限:>此值的网回退标签。ELK_MAX_WIRE=0 → 全多脚网转标签(live 投递用:EDA 必合并相接
 	// 路由线成乱序折线,改全网标=全短桩,无相接路由线=无乱)。PNG 渲染默认 560(留本地真实连线)。
-	const MAX_WIRE = process.env.ELK_MAX_WIRE != null ? Number(process.env.ELK_MAX_WIRE) : 560;
+	const MAX_WIRE = maxWire != null ? maxWire : (process.env.ELK_MAX_WIRE != null ? Number(process.env.ELK_MAX_WIRE) : 560);
 	const failedNets = new Set();
 	routed.forEach((r, i) => {
 		if (!r.path) { failedNets.add(segs[i].net); return; }
