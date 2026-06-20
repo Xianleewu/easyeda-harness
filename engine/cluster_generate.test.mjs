@@ -174,3 +174,32 @@ test('generateLayout 模板布局:密集总线(多并行跨簇信号)标签不�
 	const g = geomQC(r.model), lh = labelQC(r.model).filter(f => f.severity === 'hard').length;
 	assert.equal(g.overlaps.length, 0, '总线零叠压'); assert.equal(g.crossings, 0, '总线零交叉'); assert.equal(lh, 0, '密集总线标签零叠压');
 });
+
+// 离散子电路:三极管驱动级(Q1 三极管 B/C/E + 集电极 LED 负载,无 IC 锚点)。
+// 递归子电路布局:剩余件按共享网分组,以最高脚件(Q1)为锚成块,四方向内联(LED 在 C 顶脚竖直内联)。
+test('generateLayout 模板布局:离散三极管级(递归子电路)零浮空零叠压', async () => {
+	const ic = (des, x, y, pins) => ({ designator: des, x, y, rotation: 0, mirror: false, bbox: { minX: x - 40, minY: y - pins.length * 10, maxX: x + 40, maxY: y + pins.length * 10 }, pins: pins.map((p, i) => ({ num: String(i + 1), name: p.n, x: p.s === 'L' ? x - 40 : x + 40, y: y - pins.length * 10 + i * 20 + 10, side: p.s === 'L' ? 'left' : 'right' })) });
+	const two = (des, x, y) => ({ designator: des, x, y, rotation: 0, mirror: false, bbox: { minX: x - 15, minY: y - 5, maxX: x + 15, maxY: y + 5 }, pins: [{ num: '1', x: x - 15, y }, { num: '2', x: x + 15, y }] });
+	const Q1 = { designator: 'Q1', x: 600, y: 400, rotation: 0, mirror: false, bbox: { minX: 585, minY: 380, maxX: 615, maxY: 420 }, pins: [{ num: '1', name: 'B', x: 585, y: 400, side: 'left' }, { num: '2', name: 'C', x: 605, y: 380, side: 'top' }, { num: '3', name: 'E', x: 605, y: 420, side: 'bottom' }] };
+	const U1 = ic('U1', 300, 400, [{ n: 'VDD', s: 'L' }, { n: 'GND', s: 'L' }, { n: 'GPIO_DRV', s: 'R' }]);
+	const comps = [U1, Q1, two('R1', 470, 410), two('LED1', 650, 300), two('C1', 150, 330)];
+	const pin = (d, n) => { const c = comps.find(x => x.designator === d); const p = c.pins.find(pp => pp.name === n || pp.num === String(n)); return [p.x, p.y]; };
+	const W = (net, a, b) => ({ net, line: [a[0], a[1], b[0], b[1]] });
+	const snap = {
+		components: comps,
+		wires: [W('VDD', pin('U1', 'VDD'), pin('C1', 1)), W('GPIO_DRV', pin('U1', 'GPIO_DRV'), pin('R1', 1)), W('Q_BASE', pin('R1', 2), pin('Q1', 'B')), W('Q_COL', pin('Q1', 'C'), pin('LED1', 1))],
+		netflags: [{ net: 'GND', symbol: 'Ground-GND', x: pin('U1', 'GND')[0], y: pin('U1', 'GND')[1] }, { net: 'GND', symbol: 'Ground-GND', x: pin('C1', 2)[0], y: pin('C1', 2)[1] }, { net: 'GND', symbol: 'Ground-GND', x: pin('Q1', 'E')[0], y: pin('Q1', 'E')[1] }, { net: 'VCC', symbol: 'Power', x: pin('LED1', 2)[0], y: pin('LED1', 2)[1] }],
+	};
+	const r = await generateLayout(snap, { scale: false, deconflict: true });
+	assert.equal(r.stats.placements, comps.length, '不掉件(含三极管Q1+LED1)');
+	for (const d of ['Q1', 'LED1']) assert.ok(r.model.components.some(c => c.designator === d), `${d} 入图`);
+	const g = geomQC(r.model), lh = labelQC(r.model).filter(f => f.severity === 'hard').length;
+	// 零浮空:每件至少一脚接线/标签
+	const cc = withLocalPins({ components: r.model.components });
+	const wends = r.model.wires.flatMap(w => { const l = w.line; return [[l[0], l[1]], [l[l.length - 2], l[l.length - 1]]]; });
+	const labels = (r.model.netflags || []).map(f => [f.x, f.y]);
+	const near = (px, py, pts, t) => pts.some(e => Math.abs(e[0] - px) < t && Math.abs(e[1] - py) < t);
+	let floating = 0; for (const c of cc.components) { if (!(c.pins || []).some(p => near(p.x, p.y, wends, 6) || near(p.x, p.y, labels, 10))) floating++; }
+	assert.equal(floating, 0, '离散级零浮空');
+	assert.equal(g.overlaps.length, 0, '零叠压'); assert.equal(g.crossings, 0, '零交叉'); assert.equal(lh, 0, '离散级零硬标签(不再fallback汤)');
+});

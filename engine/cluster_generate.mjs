@@ -100,7 +100,7 @@ export function clusterComponents(snap, logical) {
 // 串联/上拉电阻内联在信号脚外、再接对端网标/flag,去耦电容在电源脚旁成竖直去耦带([VDD]—C—[GND])。
 // ELK 不懂"去耦贴电源脚",无源件经高扇出电源网/跨簇标签→无簇内边→散布成空旷大框(实证 gen_netlist vs gen_placer)。
 // 返回 {components,wires,netflags,placements}(局部坐标;placements 供 live 投递移件)。fallback 保证不掉件。
-export function layoutClusterTemplate(anchor, members, ctx) {
+export function layoutClusterTemplate(anchor, members, ctx, depth = 0) {
 	const { compByDes, pinNet } = ctx;
 	const netOf = ref => pinNet.get(ref);
 	const ic = withLocalPins(compByDes.get(anchor));
@@ -128,27 +128,30 @@ export function layoutClusterTemplate(anchor, members, ctx) {
 		const s = sideOf(p), [dx, dy] = dirOf(s), lr = (s === 'left' || s === 'right');
 		const ex = p.x + dx * STUB, ey = p.y + dy * STUB;
 		if (nn.class === 'signal') {
-			// 该信号脚连接的簇内非去耦 2 脚无源件(串联/上拉/分压/RC);仅左右脚内联(顶/底脚给标签)。
-			// 多件同脚(如反馈分压 R1→VOUT + R2→GND)用【节点 rail】:脚→节点,各件竖直分支,均接节点(=同电气节点)。
-			const conns = lr ? members.filter(d => d !== anchor && !used.has(d) && isPass(d) && !isDecoup(d) && (() => { const c = compByDes.get(d); if ((c.pins || []).length !== 2) return false; const nets = c.pins.map(pp => netOf(`${d}.${pp.num}`)); return nets.some(x => x && x.name === nn.name) && nets.some(x => x && x.name !== nn.name); })()) : [];
+			// 该信号脚连接的簇内非去耦 2 脚无源件(串联/上拉/分压/RC),四方向均内联(顶/底脚竖直放置)。
+			// 多件同脚(如反馈分压 R1→VOUT + R2→GND)用【节点 rail】:脚→节点,各件沿垂直方向分支,均接节点(=同电气节点)。
+			const conns = members.filter(d => d !== anchor && !used.has(d) && isPass(d) && !isDecoup(d) && (() => { const c = compByDes.get(d); if ((c.pins || []).length !== 2) return false; const nets = c.pins.map(pp => netOf(`${d}.${pp.num}`)); return nets.some(x => x && x.name === nn.name) && nets.some(x => x && x.name !== nn.name); })());
 			if (conns.length) {
-				const nodeX = p.x + dx * STUB;
-				out.wires.push({ net: nn.name, line: [p.x, p.y, nodeX, ey] });
+				const nodeX = p.x + dx * STUB, nodeY = p.y + dy * STUB;
+				const perpX = dy === 0 ? 0 : 1, perpY = dy === 0 ? 1 : 0;   // rail 方向(水平脚→向下,竖直脚→向右)
+				const vert = dy !== 0;
+				out.wires.push({ net: nn.name, line: [p.x, p.y, nodeX, nodeY] });
 				conns.forEach((series, i) => {
-					const ry = ey + i * 34;
-					if (i > 0) out.wires.push({ net: nn.name, line: [nodeX, ey, nodeX, ry] });   // 沿 rail 下延到本件行
+					const railX = nodeX + perpX * i * 34, railY = nodeY + perpY * i * 34;
+					if (i > 0) out.wires.push({ net: nn.name, line: [nodeX, nodeY, railX, railY] });   // 沿 rail 延到本件行
 					const c = compByDes.get(series);
 					const tp = c.pins.find(pp => { const x = netOf(`${series}.${pp.num}`); return x && x.name === nn.name; });
 					const op = c.pins.find(pp => pp !== tp);
 					const on = netOf(`${series}.${op.num}`);
-					const rx = nodeX + dx * (6 + PASS / 2);
-					out.components.push({ designator: series, x: rx, y: ry, rotation: 0, mirror: false, bbox: { minX: rx - PASS / 2, minY: ry - 6, maxX: rx + PASS / 2, maxY: ry + 6 }, pins: [{ num: tp.num, x: rx - dx * PASS / 2, y: ry }, { num: op.num, x: rx + dx * PASS / 2, y: ry }] });
-					out.placements.push({ designator: series, x: rx, y: ry, rot: 0, mirror: false });
-					out.wires.push({ net: nn.name, line: [nodeX, ry, rx - dx * PASS / 2, ry] });
-					const ax = rx + dx * (PASS / 2 + STUB);
-					out.wires.push({ net: on ? on.name : '', line: [rx + dx * PASS / 2, ry, ax, ry] });
-					if (on && (on.class === 'power' || on.class === 'ground')) out.netflags.push({ kind: on.class === 'ground' ? 'gnd' : 'power', net: on.name, x: ax, y: ry, rot: 0 });
-					else out.netflags.push(sigFlag(on ? on.name : '', ax, ry, s));
+					const ccx = railX + dx * (6 + PASS / 2), ccy = railY + dy * (6 + PASS / 2);
+					const innerX = railX + dx * 6, innerY = railY + dy * 6, outerX = railX + dx * (6 + PASS), outerY = railY + dy * (6 + PASS);
+					out.components.push({ designator: series, x: ccx, y: ccy, rotation: vert ? 90 : 0, mirror: false, bbox: vert ? { minX: ccx - 6, minY: ccy - PASS / 2, maxX: ccx + 6, maxY: ccy + PASS / 2 } : { minX: ccx - PASS / 2, minY: ccy - 6, maxX: ccx + PASS / 2, maxY: ccy + 6 }, pins: [{ num: tp.num, x: innerX, y: innerY }, { num: op.num, x: outerX, y: outerY }] });
+					out.placements.push({ designator: series, x: ccx, y: ccy, rot: vert ? 90 : 0, mirror: false });
+					out.wires.push({ net: nn.name, line: [railX, railY, innerX, innerY] });
+					const ax = outerX + dx * STUB, ay = outerY + dy * STUB;
+					out.wires.push({ net: on ? on.name : '', line: [outerX, outerY, ax, ay] });
+					if (on && (on.class === 'power' || on.class === 'ground')) out.netflags.push({ kind: on.class === 'ground' ? 'gnd' : 'power', net: on.name, x: ax, y: ay, rot: 0 });
+					else out.netflags.push(sigFlag(on ? on.name : '', ax, ay, s));
 					used.add(series);
 				});
 				continue;
@@ -190,19 +193,43 @@ export function layoutClusterTemplate(anchor, members, ctx) {
 			used.add(d); by += ROWC;
 		}
 	}
-	// fallback:任何未放置的簇成员(防掉件)→ IC 下方一排,各脚带网标/flag。
-	let fx = cx - 60; const fy = (ic.bbox ? ic.bbox.maxY : (ic.y || 0)) + 90;
-	for (const d of members) {
-		if (used.has(d)) { continue; }
-		const c = compByDes.get(d); if (!c) { used.add(d); continue; }
-		const lp = withLocalPins(c);
-		const bx = lp.x != null ? lp.x : cx, byy = lp.y != null ? lp.y : 0;
-		const dx0 = fx - bx, dy0 = fy - byy;
-		out.components.push({ ...lp, x: bx + dx0, y: byy + dy0, bbox: lp.bbox ? { minX: lp.bbox.minX + dx0, minY: lp.bbox.minY + dy0, maxX: lp.bbox.maxX + dx0, maxY: lp.bbox.maxY + dy0 } : { minX: fx - 8, minY: fy - 8, maxX: fx + 8, maxY: fy + 8 }, pins: (lp.pins || []).map(p => ({ ...p, x: p.x + dx0, y: p.y + dy0 })) });
+	// fallback = 离散子电路:剩余未放置成员按【共享网连通】分组,每组以最高脚件为锚【递归模板布局】
+	// (离散三极管级等正确成块);depth≥1 不再递归(防无限),退化为逐件带连线网标。
+	const rem = members.filter(d => !used.has(d) && compByDes.get(d));
+	let fx0 = cx - 60; const fy0 = (ic.bbox ? ic.bbox.maxY : (ic.y || 0)) + 100;
+	const dumpOne = (d, fx) => {   // 逐件带连线网标(退化路径)
+		const lp = withLocalPins(compByDes.get(d));
+		const bx = lp.x != null ? lp.x : cx, byy = lp.y != null ? lp.y : 0, dx0 = fx - bx, dy0 = fy0 - byy;
+		out.components.push({ ...lp, x: bx + dx0, y: byy + dy0, bbox: lp.bbox ? { minX: lp.bbox.minX + dx0, minY: lp.bbox.minY + dy0, maxX: lp.bbox.maxX + dx0, maxY: lp.bbox.maxY + dy0 } : { minX: fx - 8, minY: fy0 - 8, maxX: fx + 8, maxY: fy0 + 8 }, pins: (lp.pins || []).map(p => ({ ...p, x: p.x + dx0, y: p.y + dy0 })) });
 		out.placements.push({ designator: d, x: bx + dx0, y: byy + dy0, rot: lp.rotation || 0, mirror: !!lp.mirror });
-		// 各脚带网标/flag 且【连线连到脚】(否则标签离脚无线=真实断连)。
 		for (const p of (lp.pins || [])) { const nn = netOf(`${d}.${p.num}`); if (!nn) continue; const px = p.x + dx0, py = p.y + dy0; if (nn.class === 'ground') { out.netflags.push({ kind: 'gnd', net: nn.name, x: px, y: py + 16, rot: 0 }); out.wires.push({ net: nn.name, line: [px, py, px, py + 16] }); } else if (nn.class === 'power') { out.netflags.push({ kind: 'power', net: nn.name, x: px, y: py - 16, rot: 0 }); out.wires.push({ net: nn.name, line: [px, py, px, py - 16] }); } else { out.netflags.push({ kind: 'sig', net: nn.name, x: px + 20, y: py, textX: px + 20, textY: py, rot: 0, alignMode: 6 }); out.wires.push({ net: nn.name, line: [px, py, px + 20, py] }); } }
-		used.add(d); fx += 100;
+		used.add(d);
+	};
+	if (rem.length && depth < 1) {
+		// 共享网连通分组(并查集)
+		const par = new Map(rem.map(d => [d, d]));
+		const find = a => { while (par.get(a) !== a) { par.set(a, par.get(par.get(a))); a = par.get(a); } return a; };
+		const net2 = new Map();
+		for (const d of rem) for (const p of (compByDes.get(d).pins || [])) { const nn = netOf(`${d}.${p.num}`); if (!nn) continue; if (!net2.has(nn.name)) net2.set(nn.name, []); net2.get(nn.name).push(d); }
+		for (const ds of net2.values()) for (let i = 1; i < ds.length; i++) par.set(find(ds[0]), find(ds[i]));
+		const groups = new Map();
+		for (const d of rem) { const r = find(d); if (!groups.has(r)) groups.set(r, []); groups.get(r).push(d); }
+		for (const grp of groups.values()) {
+			const subAnchor = grp.slice().sort((a, b) => (compByDes.get(b).pins?.length || 0) - (compByDes.get(a).pins?.length || 0))[0];
+			const sub = layoutClusterTemplate(subAnchor, grp, ctx, depth + 1);   // 递归:子电路以最高脚件为锚成块
+			let bb = { minX: 1e9, minY: 1e9, maxX: -1e9, maxY: -1e9 };
+			for (const c of sub.components) if (c.bbox) { bb.minX = Math.min(bb.minX, c.bbox.minX); bb.minY = Math.min(bb.minY, c.bbox.minY); bb.maxX = Math.max(bb.maxX, c.bbox.maxX); bb.maxY = Math.max(bb.maxY, c.bbox.maxY); }
+			for (const f of sub.netflags) { bb.minX = Math.min(bb.minX, f.x - 20); bb.maxX = Math.max(bb.maxX, f.x + 20); bb.minY = Math.min(bb.minY, f.y - 10); bb.maxY = Math.max(bb.maxY, f.y + 10); }
+			const dox = fx0 - bb.minX, doy = fy0 - bb.minY;
+			for (const c of sub.components) out.components.push({ ...c, x: (c.x ?? 0) + dox, y: (c.y ?? 0) + doy, bbox: { minX: c.bbox.minX + dox, minY: c.bbox.minY + doy, maxX: c.bbox.maxX + dox, maxY: c.bbox.maxY + doy }, pins: (c.pins || []).map(p => ({ ...p, x: p.x + dox, y: p.y + doy })) });
+			for (const w of sub.wires) out.wires.push({ net: w.net, line: w.line.map((v, k) => k % 2 === 0 ? v + dox : v + doy) });
+			for (const f of sub.netflags) out.netflags.push({ ...f, x: f.x + dox, y: f.y + doy, textX: (f.textX ?? f.x) + dox, textY: (f.textY ?? f.y) + doy });
+			for (const pl of (sub.placements || [])) out.placements.push({ ...pl, x: pl.x + dox, y: pl.y + doy });
+			grp.forEach(d => used.add(d));
+			fx0 += (bb.maxX - bb.minX) + 90;
+		}
+	} else {
+		for (const d of rem) { dumpOne(d, fx0); fx0 += 100; }
 	}
 	return out;
 }
