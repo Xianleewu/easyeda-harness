@@ -259,7 +259,24 @@ export async function generateLayout(snap, opts = {}) {
 		for (const f of (m.netflags || [])) { bb.minX = Math.min(bb.minX, f.x - 26); bb.maxX = Math.max(bb.maxX, f.x + 26); bb.minY = Math.min(bb.minY, f.y - 12); bb.maxY = Math.max(bb.maxY, f.y + 12); }   // 框含标签
 		subs.push({ anchor, model: m, bb, w: bb.maxX - bb.minX, h: bb.maxY - bb.minY, count: members.length });
 	}
-	subs.sort((a, b) => b.h - a.h);
+	// 块排序:连接性优先(共享网多的块相邻=信号流更连贯),而非单纯按高度。贪心:从最多连接的块起,
+	// 每次接【与上一个块共享网最多】的块;无共享则接与已放置块共享最多的。门不受排序影响(块间 PAD 隔开)。
+	if (opts.layout !== 'elk' && subs.length > 2) {
+		const clusterOf = new Map();
+		for (const [anchor, members] of cluster) for (const d of members) clusterOf.set(d, anchor);
+		const anchorNets = new Map(), netAnchors = new Map();
+		for (const n of logical.nets) { const as = new Set(); for (const ref of n.pins) { const a = clusterOf.get(ref.slice(0, ref.lastIndexOf('.'))); if (a) as.add(a); } netAnchors.set(n.name, as); for (const a of as) { if (!anchorNets.has(a)) anchorNets.set(a, new Set()); anchorNets.get(a).add(n.name); } }
+		const shared = (a, b) => { let w = 0; for (const net of (anchorNets.get(a) || [])) { const ans = netAnchors.get(net); if (ans && ans.has(b) && a !== b) w++; } return w; };
+		const anchors = subs.map(s => s.anchor);
+		let start = anchors[0], bestC = -1;
+		for (const a of anchors) { let c = 0; for (const b of anchors) c += shared(a, b); if (c > bestC) { bestC = c; start = a; } }
+		const ordered = [start], rem = new Set(anchors); rem.delete(start);
+		while (rem.size) { const last = ordered[ordered.length - 1]; let next = null, bw = -1; for (const a of rem) { const w = shared(last, a); if (w > bw) { bw = w; next = a; } } if (bw <= 0) { for (const a of rem) { let w = 0; for (const p of ordered) w += shared(p, a); if (w > bw) { bw = w; next = a; } } } if (!next) next = [...rem][0]; ordered.push(next); rem.delete(next); }
+		const oi = new Map(ordered.map((a, i) => [a, i]));
+		subs.sort((a, b) => oi.get(a.anchor) - oi.get(b.anchor));
+	} else {
+		subs.sort((a, b) => b.h - a.h);
+	}
 	const MAXW = opts.maxWidth || 2600, PAD = 130, TITLE = 48;
 	let curX = 0, curY = 0, rowH = 0;
 	const out = { components: [], wires: [], netflags: [], rectangles: [], texts: [] };
