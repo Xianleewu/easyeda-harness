@@ -1,7 +1,8 @@
 // cluster_generate 单测:干净网表构建 + 功能聚类(纯函数)。
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { buildCleanLogical, clusterComponents, generateLayout } from './cluster_generate.mjs';
+import { buildCleanLogical, clusterComponents, generateLayout, layoutClusterTemplate } from './cluster_generate.mjs';
+import { withLocalPins } from './transform.mjs';
 
 // 合成快照:U1.1-C1.1 经有名线 SIG;C1.2 经 GND 标接地;U1.2 仅接无名线(NC,应不入网)。
 const snap = {
@@ -73,4 +74,40 @@ test('generateLayout 通用性:全新合成板产功能块、有真实连线', a
 	assert.ok(r.stats.clusters >= 2, `形成 ≥2 功能块(实 ${r.stats?.clusters})`);
 	assert.ok(r.stats.wires > 0, '有真实连线');
 	assert.ok(r.stats.nets >= 4, 'SCL/SDA/VCC/GND 等网提取正确');
+});
+
+// 模板布局(默认):schematic-aware 放置——不掉件、去耦电容入图、每件至少一脚接线/标签(无浮空)。
+test('generateLayout 模板布局:不掉件、去耦电容入图、零浮空', async () => {
+	const ic = (des, x, y, pins) => ({ designator: des, x, y, rotation: 0, mirror: false, bbox: { minX: x - 30, minY: y - pins.length * 10, maxX: x + 30, maxY: y + pins.length * 10 }, pins: pins.map((p, i) => ({ num: String(i + 1), name: p.n, x: p.s === 'L' ? x - 30 : x + 30, y: y - pins.length * 10 + i * 20 + 10 })) });
+	const rc = (des, x, y) => ({ designator: des, x, y, rotation: 0, mirror: false, bbox: { minX: x - 15, minY: y - 5, maxX: x + 15, maxY: y + 5 }, pins: [{ num: '1', x: x - 15, y }, { num: '2', x: x + 15, y }] });
+	const comps = [
+		ic('U1', 200, 300, [{ n: 'VDD', s: 'L' }, { n: 'GND', s: 'L' }, { n: 'SCL', s: 'R' }, { n: 'SDA', s: 'R' }]),
+		rc('C1', 150, 420), rc('C2', 150, 450),   // 去耦电容(VDD/GND)
+		rc('R1', 400, 280),                          // SCL 上拉到 VDD
+	];
+	const pin = (d, n) => { const c = comps.find(x => x.designator === d); return [c.pins[n - 1].x, c.pins[n - 1].y]; };
+	const W = (net, a, b) => ({ net, line: [a[0], a[1], b[0], b[1]] });
+	const wires = [
+		W('VDD', pin('U1', 1), pin('C1', 1)), W('GND', pin('U1', 2), pin('C1', 2)),
+		W('VDD', pin('C2', 1), pin('U1', 1)), W('GND', pin('C2', 2), pin('U1', 2)),
+		W('SCL', pin('U1', 3), pin('R1', 1)), W('VDD', pin('R1', 2), pin('U1', 1)),
+	];
+	const snap = { components: comps, wires, netflags: [] };
+	const r = await generateLayout(snap, { scale: false });
+	// 不掉件:placements 覆盖所有件
+	assert.equal(r.stats.placements, comps.length, `不掉件(${r.stats.placements}/${comps.length})`);
+	assert.equal(r.model.components.length, comps.length, '模型含全部件');
+	// 去耦电容 + 上拉都在图中
+	for (const d of ['C1', 'C2', 'R1']) assert.ok(r.model.components.some(c => c.designator === d), `${d} 入图`);
+	// VDD 被正确分类为 power(早先正则漏 VDD 的回归防护)
+	const lg = buildCleanLogical(snap);
+	assert.equal(lg.nets.find(n => n.name === 'VDD')?.class, 'power', 'VDD 是 power');
+	// 零浮空:每件至少一脚落在某线端点或标签
+	const cc = withLocalPins({ components: r.model.components });
+	const wends = r.model.wires.flatMap(w => { const l = w.line; return [[l[0], l[1]], [l[l.length - 2], l[l.length - 1]]]; });
+	const labels = (r.model.netflags || []).map(f => [f.x, f.y]);
+	const near = (px, py, pts, t) => pts.some(e => Math.abs(e[0] - px) < t && Math.abs(e[1] - py) < t);
+	let floating = 0;
+	for (const c of cc.components) { if (!(c.pins || []).some(p => near(p.x, p.y, wends, 6) || near(p.x, p.y, labels, 10))) floating++; }
+	assert.equal(floating, 0, '零浮空件');
 });

@@ -61,7 +61,12 @@ export function buildCleanLogical(snap, tol = 5) {
 	const addPinNet = (net, x, y) => { for (const p of pinAt) if (near(x, y, p.x, p.y)) { if (!netPins.has(net)) netPins.set(net, new Set()); netPins.get(net).add(p.ref); } };
 	for (const w of wires) { if (!w.net || !w.net.trim()) continue; const l = w.line || []; for (let i = 0; i + 1 < l.length; i += 2) addPinNet(w.net, l[i], l[i + 1]); }
 	for (const f of flags) { if (f.net) addPinNet(f.net, f.x, f.y); }
-	const classOf = n => /^GND/i.test(n) ? 'ground' : /^(VBUS|VCC|5V|3V|BL_|\+)/i.test(n) ? 'power' : 'signal';
+	// 电源/地网分类:地名(GND/VSS/AGND/DGND/PGND);电源含常见命名轨(VCC/VDD/VBUS/VIN/VOUT/
+	// VBAT/VSYS/AVDD/DVDD/VDDA…)、+ 前缀、及电压数字模式(5V/3V3/1V8/12V)。VDD 是最常见电源名之一,
+	// 早先正则漏了它 → VDD 被当信号 → 其去耦电容不被识别而掉件(2026-06-20 修)。
+	const classOf = n => /^(GND|VSS|AGND|DGND|PGND)/i.test(n) ? 'ground'
+		: (/^(VBUS|VCC|VDD|VIN|VOUT|VBAT|VSYS|VPP|VEE|AVDD|DVDD|VDDA|VAA|BL_|\+)/i.test(n) || /^\d+V/i.test(n)) ? 'power'
+		: 'signal';
 	const nets = [...netPins.entries()].map(([name, pins]) => ({ name, class: classOf(name), pins: [...pins] }));
 	return { nets };
 }
@@ -91,20 +96,106 @@ export function clusterComponents(snap, logical) {
 	return cluster;
 }
 
-// 生成:每簇内 elkLayout(簇内信号→线、跨簇→标签),shelf-packing 排布,产模型 + moduleRegions(带框标题)。
+// 确定性 schematic-aware 簇布局(2026-06-20 突破,远胜 ELK 图布局):IC 居中,信号脚→网标(左进右出),
+// 串联/上拉电阻内联在信号脚外、再接对端网标/flag,去耦电容在电源脚旁成竖直去耦带([VDD]—C—[GND])。
+// ELK 不懂"去耦贴电源脚",无源件经高扇出电源网/跨簇标签→无簇内边→散布成空旷大框(实证 gen_netlist vs gen_placer)。
+// 返回 {components,wires,netflags,placements}(局部坐标;placements 供 live 投递移件)。fallback 保证不掉件。
+export function layoutClusterTemplate(anchor, members, ctx) {
+	const { compByDes, pinNet } = ctx;
+	const netOf = ref => pinNet.get(ref);
+	const ic = withLocalPins(compByDes.get(anchor));
+	const cx = ic.x != null ? ic.x : (ic.bbox ? (ic.bbox.minX + ic.bbox.maxX) / 2 : 0);
+	const out = { components: [{ ...ic }], wires: [], netflags: [], placements: [{ designator: anchor, x: ic.x, y: ic.y, rot: ic.rotation || 0, mirror: !!ic.mirror }] };
+	const used = new Set([anchor]);
+	const STUB = 30, PASS = 40, GAPC = 26, ROWC = 70, FLAGV = 18;
+	const isPass = d => /^[CRL]/.test(d) || /^Y/.test(d);
+	const isDecoup = d => { const c = compByDes.get(d); return /^C/.test(d) && c && (c.pins || []).length === 2 && c.pins.every(p => { const nn = netOf(`${d}.${p.num}`); return nn && (nn.class === 'power' || nn.class === 'ground'); }); };
+	for (const p of ic.pins) {
+		const nn = netOf(`${anchor}.${p.num}`);
+		if (!nn) continue;
+		const left = p.x < cx, dir = left ? -1 : 1;
+		const ex = p.x + dir * STUB, ey = p.y;
+		if (nn.class === 'signal') {
+			const series = members.find(d => d !== anchor && !used.has(d) && isPass(d) && !isDecoup(d) && (() => { const c = compByDes.get(d); if ((c.pins || []).length !== 2) return false; const nets = c.pins.map(pp => netOf(`${d}.${pp.num}`)); return nets.some(x => x && x.name === nn.name) && nets.some(x => x && x.name !== nn.name); })());
+			if (series) {
+				const c = compByDes.get(series);
+				const tp = c.pins.find(pp => { const x = netOf(`${series}.${pp.num}`); return x && x.name === nn.name; });
+				const op = c.pins.find(pp => pp !== tp);
+				const on = netOf(`${series}.${op.num}`);
+				const rx = p.x + dir * (STUB + PASS / 2);
+				out.components.push({ designator: series, x: rx, y: ey, rotation: 0, mirror: false, bbox: { minX: rx - PASS / 2, minY: ey - 6, maxX: rx + PASS / 2, maxY: ey + 6 }, pins: [{ num: tp.num, x: rx - dir * PASS / 2, y: ey }, { num: op.num, x: rx + dir * PASS / 2, y: ey }] });
+				out.placements.push({ designator: series, x: rx, y: ey, rot: 0, mirror: false });
+				out.wires.push({ net: nn.name, line: [p.x, p.y, rx - dir * PASS / 2, ey] });
+				const ax = rx + dir * (PASS / 2 + STUB);
+				out.wires.push({ net: on ? on.name : '', line: [rx + dir * PASS / 2, ey, ax, ey] });
+				if (on && (on.class === 'power' || on.class === 'ground')) out.netflags.push({ kind: on.class === 'ground' ? 'gnd' : 'power', net: on.name, x: ax, y: ey, rot: 0 });
+				else out.netflags.push({ kind: 'sig', net: on ? on.name : '', x: ax, y: ey, textX: ax, textY: ey, rot: left ? 180 : 0, alignMode: left ? 8 : 6 });
+				used.add(series);
+				continue;
+			}
+			out.wires.push({ net: nn.name, line: [p.x, p.y, ex, ey] });
+			out.netflags.push({ kind: 'sig', net: nn.name, x: ex, y: ey, textX: ex, textY: ey, rot: left ? 180 : 0, alignMode: left ? 8 : 6 });
+		} else {
+			out.wires.push({ net: nn.name, line: [p.x, p.y, ex, ey] });
+			out.netflags.push({ kind: nn.class === 'ground' ? 'gnd' : 'power', net: nn.name, x: ex, y: ey, rot: 0 });
+			if (nn.class === 'power') {
+				const caps = members.filter(d => d !== anchor && !used.has(d) && isDecoup(d));
+				let by = ey + GAPC;
+				for (const d of caps) {
+					const c = compByDes.get(d);
+					const p1 = c.pins[0], p2 = c.pins[1];
+					const n1 = netOf(`${d}.${p1.num}`), n2 = netOf(`${d}.${p2.num}`);
+					const pwrNum = (n1 && n1.class === 'power') ? p1.num : p2.num, pwrName = (n1 && n1.class === 'power') ? n1.name : (n2 ? n2.name : nn.name);
+					const gndNum = pwrNum === p1.num ? p2.num : p1.num, gndName = (netOf(`${d}.${gndNum}`) || {}).name || 'GND';
+					const dx = ex + dir * 30, top = by, bot = by + 24;
+					out.components.push({ designator: d, x: dx, y: (top + bot) / 2, rotation: 90, mirror: false, bbox: { minX: dx - 8, minY: top, maxX: dx + 8, maxY: bot }, pins: [{ num: pwrNum, x: dx, y: top }, { num: gndNum, x: dx, y: bot }] });
+					out.placements.push({ designator: d, x: dx, y: (top + bot) / 2, rot: 90, mirror: false });
+					out.netflags.push({ kind: 'power', net: pwrName, x: dx, y: top - FLAGV, rot: 0 }); out.wires.push({ net: pwrName, line: [dx, top, dx, top - FLAGV] });
+					out.netflags.push({ kind: 'gnd', net: gndName, x: dx, y: bot + FLAGV, rot: 0 }); out.wires.push({ net: gndName, line: [dx, bot, dx, bot + FLAGV] });
+					used.add(d); by += ROWC;
+				}
+			}
+		}
+	}
+	// fallback:任何未放置的簇成员(防掉件)→ IC 下方一排,各脚带网标/flag。
+	let fx = cx - 60; const fy = (ic.bbox ? ic.bbox.maxY : (ic.y || 0)) + 90;
+	for (const d of members) {
+		if (used.has(d)) { continue; }
+		const c = compByDes.get(d); if (!c) { used.add(d); continue; }
+		const lp = withLocalPins(c);
+		const bx = lp.x != null ? lp.x : cx, byy = lp.y != null ? lp.y : 0;
+		const dx0 = fx - bx, dy0 = fy - byy;
+		out.components.push({ ...lp, x: bx + dx0, y: byy + dy0, bbox: lp.bbox ? { minX: lp.bbox.minX + dx0, minY: lp.bbox.minY + dy0, maxX: lp.bbox.maxX + dx0, maxY: lp.bbox.maxY + dy0 } : { minX: fx - 8, minY: fy - 8, maxX: fx + 8, maxY: fy + 8 }, pins: (lp.pins || []).map(p => ({ ...p, x: p.x + dx0, y: p.y + dy0 })) });
+		out.placements.push({ designator: d, x: bx + dx0, y: byy + dy0, rot: lp.rotation || 0, mirror: !!lp.mirror });
+		for (const p of (lp.pins || [])) { const nn = netOf(`${d}.${p.num}`); if (!nn) continue; const px = p.x + dx0, py = p.y + dy0; if (nn.class === 'ground') out.netflags.push({ kind: 'gnd', net: nn.name, x: px, y: py + 16, rot: 0 }); else if (nn.class === 'power') out.netflags.push({ kind: 'power', net: nn.name, x: px, y: py - 16, rot: 0 }); else out.netflags.push({ kind: 'sig', net: nn.name, x: px + 20, y: py, textX: px + 20, textY: py, rot: 0, alignMode: 6 }); }
+		used.add(d); fx += 100;
+	}
+	return out;
+}
+
+// 生成:每簇 schematic-aware 模板布局(默认)或 elkLayout(opts.layout==='elk'),shelf-packing 排布,产模型 + moduleRegions(带框标题)。
 export async function generateLayout(snap, opts = {}) {
 	const logical = buildCleanLogical(snap);
 	const cluster = clusterComponents(snap, logical);
 	if (!cluster) return null;
 	const compByDes = new Map((snap.components || []).map(c => [c.designator, c]));
+	const pinNet = new Map();
+	for (const n of logical.nets) for (const ref of n.pins) pinNet.set(ref, n);
+	const ctx = { compByDes, pinNet, logical };
 	const subs = [];
 	for (const [anchor, members] of cluster) {
-		const mset = new Set(members);
-		const subComps = members.map(d => compByDes.get(d)).filter(Boolean);
-		const subLogical = { nets: logical.nets.map(n => ({ ...n, pins: n.pins.filter(p => mset.has(p.slice(0, p.lastIndexOf('.')))) })).filter(n => n.pins.length >= 1) };
-		const byDes = new Map(subComps.map(c => [c.designator, withLocalPins(c)]));
-		const m = await elkLayout({ snapshot: { ...snap, components: subComps }, logical: subLogical, byDes, scale: opts.scale !== false, powerEdges: true, layoutOptions: opts.layoutOptions || {}, maxWire: opts.maxWire || 320 });
+		let m;
+		if (opts.layout === 'elk') {
+			const mset = new Set(members);
+			const subComps = members.map(d => compByDes.get(d)).filter(Boolean);
+			const subLogical = { nets: logical.nets.map(n => ({ ...n, pins: n.pins.filter(p => mset.has(p.slice(0, p.lastIndexOf('.')))) })).filter(n => n.pins.length >= 1) };
+			const byDes = new Map(subComps.map(c => [c.designator, withLocalPins(c)]));
+			m = await elkLayout({ snapshot: { ...snap, components: subComps }, logical: subLogical, byDes, scale: opts.scale !== false, powerEdges: true, layoutOptions: opts.layoutOptions || {}, maxWire: opts.maxWire || 320 });
+		} else {
+			m = layoutClusterTemplate(anchor, members, ctx);   // 默认:schematic-aware 模板布局(商业级)
+		}
 		const bb = m.components.reduce((a, c) => ({ minX: Math.min(a.minX, c.bbox.minX), minY: Math.min(a.minY, c.bbox.minY), maxX: Math.max(a.maxX, c.bbox.maxX), maxY: Math.max(a.maxY, c.bbox.maxY) }), { minX: 1e9, minY: 1e9, maxX: -1e9, maxY: -1e9 });
+		for (const f of (m.netflags || [])) { bb.minX = Math.min(bb.minX, f.x - 26); bb.maxX = Math.max(bb.maxX, f.x + 26); bb.minY = Math.min(bb.minY, f.y - 12); bb.maxY = Math.max(bb.maxY, f.y + 12); }   // 框含标签
 		subs.push({ anchor, model: m, bb, w: bb.maxX - bb.minX, h: bb.maxY - bb.minY, count: members.length });
 	}
 	subs.sort((a, b) => b.h - a.h);
