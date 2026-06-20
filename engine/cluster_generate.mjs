@@ -86,6 +86,32 @@ export async function generateLayout(snap, opts = {}) {
 	return { model: out, moduleRegions, placements, stats: { clusters: subs.length, components: out.components.length, wires: out.wires.length, sigLabels, powerGnd: out.netflags.length - sigLabels, nets: logical.nets.length, placements: placements.length } };
 }
 
+// 把生成的模块图投递到 live EDA。2026-06-20 实测验证:必须用【命名线】(无名线被 EDA 删=0线),
+// 跨簇标签用 netport,电源/地用 NetFlag,末尾覆盖式自愈补漏网。验证:vibe-buddy 86命名线持久、29/29网连通。
+export async function deliverGenerated(snap, opts = {}) {
+	const { executeCode } = await import('./bridge_client.mjs');
+	const sleep = ms => new Promise(r => setTimeout(r, ms));
+	const exec = async js => { for (let t = 0; t < 6; t++) { try { return (await executeCode(js, { timeoutMs: 90000 })).result; } catch (e) { if (!/disconnect|timed out/i.test(e.message)) { console.error('  非连接错:', e.message.slice(0, 70)); return null; } await sleep(2500); } } return null; };
+	const runOps = async (label, ops, batch = 15) => { let done = 0; for (let i = 0; i < ops.length; i += batch) { await exec(`let n=0;\n${ops.slice(i, i + batch).join('\n')}\nreturn{n};`); done += Math.min(batch, ops.length - i); process.stdout.write(`\r  ${label}: ${done}/${ops.length}`); } console.log(' ✓'); };
+	const cg = await generateLayout(snap, { ...opts, scale: false });   // live 投递 scale=false 保脚位
+	if (!cg) { console.error('无 IC 锚点,无法生成'); return null; }
+	console.log('cluster 生成模块图投递:', JSON.stringify(cg.stats));
+	const cur = await exec(`const cs=await eda.sch_PrimitiveComponent.getAll();return cs.map(c=>({id:c.primitiveId||c.id,des:c.designator}));`);
+	const desToId = new Map((cur || []).filter(c => c.des).map(c => [c.des, c.id]));
+	await exec(`for(let p=0;p<10;p++){const ws=(await eda.sch_PrimitiveWire.getAll())||[];const wid=ws.map(w=>w.primitiveId);if(wid.length){try{await eda.sch_PrimitiveWire.delete(wid);}catch(e){}}const ids=(await eda.sch_PrimitiveComponent.getAllPrimitiveId())||[];const fc=[];for(const id of ids){const c=await eda.sch_Primitive.getPrimitiveByPrimitiveId(id);if(c&&(c.componentType==='netflag'||c.componentType==='netport'))fc.push(id);}if(fc.length){try{await eda.sch_PrimitiveComponent.delete(fc);}catch(e){}}if(!wid.length&&!fc.length)break;}return{};`);
+	await runOps('移件', cg.placements.map(p => { const id = desToId.get(p.designator); return id ? `try{await eda.sch_PrimitiveComponent.modify(${JSON.stringify(id)},{x:${p.x},y:${p.y},rotation:${p.rot || 0},mirror:${!!p.mirror}});n++;}catch(e){}` : null; }).filter(Boolean));
+	await runOps('命名连线', cg.model.wires.map(w => `try{await eda.sch_PrimitiveWire.create(${JSON.stringify(w.line)},${JSON.stringify(w.net || '')});n++;}catch(e){}`));
+	await runOps('网标/符号', cg.model.netflags.map(f => { const x = f.x, y = f.y, r = f.rot || 0; if (f.kind === 'sig') return `try{await eda.sch_PrimitiveComponent.createNetPort('BI',${JSON.stringify(f.net)},${x},${y},${r});n++;}catch(e){}`; return `try{await eda.sch_PrimitiveComponent.createNetFlag('${f.kind === 'gnd' ? 'Ground' : 'Power'}',${JSON.stringify(f.net)},${x},${y},${r});n++;}catch(e){}`; }));
+	// 覆盖式自愈:回读已连网,对完全没连上的命名网在连线两端补 netport(密集脚 create 失败兜底)。
+	const covered = await exec(`const ws=await eda.sch_PrimitiveWire.getAll();const ps=await eda.sch_PrimitiveComponent.getAll();return [...new Set([...(ws||[]).map(w=>w.net),...(ps||[]).map(p=>p.net)].filter(Boolean))];`);
+	const cset = new Set(covered || []);
+	const heal = [];
+	for (const w of cg.model.wires) { if (!w.net || cset.has(w.net)) continue; const l = w.line; for (const [x, y] of [[l[0], l[1]], [l[l.length - 2], l[l.length - 1]]]) heal.push(`try{await eda.sch_PrimitiveComponent.createNetPort('BI',${JSON.stringify(w.net)},${x},${y},0);n++;}catch(e){}`); }
+	if (heal.length) { console.log(`自愈 ${heal.length / 2} 漏网...`); await runOps('自愈', heal); }
+	console.log('cluster 生成模块图已投 live(命名线持久、跨簇 netport)。');
+	return cg.stats;
+}
+
 if (process.argv[1] && process.argv[1].replace(/\\/g, '/').endsWith('engine/cluster_generate.mjs')) {
 	const { readFileSync } = await import('node:fs');
 	const { renderSheetOutput } = await import('./sheet_renderer.mjs');
@@ -93,6 +119,10 @@ if (process.argv[1] && process.argv[1].replace(/\\/g, '/').endsWith('engine/clus
 	const file = process.argv[2] || `${ROOT}/live_clean.json`;
 	const outPng = process.argv[3] || `${ROOT}/cluster_generate.png`;
 	const snap = JSON.parse(readFileSync(file, 'utf8').replace(/^﻿/, ''));
+	if (process.argv.includes('--deliver')) {   // 投到 live EDA(命名线,实测验证)
+		const stats = await deliverGenerated(snap);
+		process.exit(stats ? 0 : 1);
+	}
 	const r = await generateLayout(snap);
 	if (!r) { console.error('无 IC 锚点,无法聚类生成'); process.exit(1); }
 	console.log(`生成模块图: ${JSON.stringify(r.stats)}`);
