@@ -8,6 +8,38 @@
 // buildCleanLogical 只从【有名连线 + 电源/地标】匹配引脚构网 → 精确网表、NC脚不标。
 import { withLocalPins } from './transform.mjs';
 import { elkLayout } from './elk_layout.mjs';
+import { labelQC } from './label_qc.mjs';
+import { geomQC } from './geom_qc.mjs';
+
+// 标签去冲突(opt-in,较慢):贪心把叠压网标【沿 escape 轴向外移】(桩直延、不产交叉),
+// 仅当 labelHard 严格下降且 geom 短路不增才保留(验证式,零回归)。实测降 1~2(向外移能解的部分);
+// 余下需带 L 形桩+避交叉布线的精密版(聚焦专项)。垂直移动实测会回归,故只向外。
+function deconflictLabels(model) {
+	const lh = m => labelQC(m).filter(f => f.severity === 'hard').length;
+	const gh = m => { const g = geomQC(m); return g.overlaps.length + g.wireThruComp.length + g.wireThruPin.length; };
+	const dirOf = f => (f.alignMode === 8 || f.rot === 180) ? [-1, 0] : (f.alignMode === 6 || f.rot === 0) ? [1, 0] : (f.rot === 90) ? [0, 1] : (f.rot === 270) ? [0, -1] : null;
+	const stubOf = (m, f) => m.wires.find(w => { const l = w.line; return Math.abs(l[l.length - 2] - f.x) < 2 && Math.abs(l[l.length - 1] - f.y) < 2; });
+	for (let pass = 0; pass < 14; pass++) {
+		const base = lh(model); if (base === 0) break; const bg = gh(model);
+		let best = null;
+		for (const f of model.netflags) {
+			const dir = dirOf(f); if (!dir) continue; const stub = stubOf(model, f);
+			for (const step of [24, 48, 72, 96]) {
+				const ox = f.x, oy = f.y, otx = f.textX, oty = f.textY, ol = stub ? stub.line.slice() : null;
+				f.x += dir[0] * step; f.y += dir[1] * step; if (f.textX != null) f.textX += dir[0] * step; if (f.textY != null) f.textY += dir[1] * step;
+				if (stub) { stub.line[stub.line.length - 2] = f.x; stub.line[stub.line.length - 1] = f.y; }
+				const nl = lh(model), ng = gh(model);
+				if (nl < base && ng <= bg && (!best || nl < best.nl)) best = { f, dir, step, nl };
+				f.x = ox; f.y = oy; f.textX = otx; f.textY = oty; if (stub && ol) stub.line = ol;
+			}
+		}
+		if (!best) break;
+		const { f, dir, step } = best; const stub = stubOf(model, f);
+		f.x += dir[0] * step; f.y += dir[1] * step; if (f.textX != null) f.textX += dir[0] * step; if (f.textY != null) f.textY += dir[1] * step;
+		if (stub) { stub.line[stub.line.length - 2] = f.x; stub.line[stub.line.length - 1] = f.y; }
+	}
+	return model;
+}
 
 // 从快照的有名连线 + 电源/地标构建干净逻辑网表(引脚按坐标匹配连线顶点/标位)。
 // NC 脚(不在任何有名网)不入网 → 生成时不标注(避免标签汤)。
@@ -82,6 +114,7 @@ export async function generateLayout(snap, opts = {}) {
 		moduleRegions.push({ name: s.anchor, title: `${s.anchor} (${s.count})`, box: { minX: curX - 12, minY: curY + TITLE - 8, maxX: curX + s.w + 12, maxY: curY + TITLE + s.h + 10 }, parts: s.count });
 		curX += s.w + PAD; rowH = Math.max(rowH, TITLE + s.h);
 	}
+	if (opts.deconflict) deconflictLabels(out);   // opt-in 标签去冲突(验证式向外移,零回归)
 	const sigLabels = out.netflags.filter(f => f.kind === 'sig').length;
 	return { model: out, moduleRegions, placements, stats: { clusters: subs.length, components: out.components.length, wires: out.wires.length, sigLabels, powerGnd: out.netflags.length - sigLabels, nets: logical.nets.length, placements: placements.length } };
 }
