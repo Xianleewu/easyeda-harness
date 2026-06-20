@@ -163,6 +163,16 @@ async function apply() {
 	}
 	console.log(`2) 布局质量差(${assess.reasons.join('; ') || 'forced'})或强制生成 → 合成路径...`);
 
+	// ★PLEXUS_LAYOUT=cluster:裸网表→功能块商业模块图(cluster_generate.deliverGenerated,
+	// 命名线+netport+去冲突,实测验证 labelHard=0、29/29网、live持久)。见记忆 tool-degrades-good-layouts。
+	if ((process.env.PLEXUS_LAYOUT || '').toLowerCase() === 'cluster') {
+		const { deliverGenerated } = await import('./cluster_generate.mjs');
+		const stats = await deliverGenerated(local);
+		if (!stats) { console.error('fail-closed:cluster 生成失败(无 IC 锚点?)'); process.exit(1); }
+		console.log('cluster 生成模块图已投 live(干净商业模块图)。还原:node engine/plexus_apply_live.mjs --undo');
+		return;
+	}
+
 	// PLEXUS_LAYOUT=elk:用 elkjs 自动布局(紧凑+真实连线,商用可读),scale=false 保符号原尺寸→脚接得上。
 	const useElk = (process.env.PLEXUS_LAYOUT || '').toLowerCase() === 'elk';
 	let r;
