@@ -255,3 +255,23 @@ test('renderSheetOutput 健壮性:空模型/单件不崩', () => {
 	assert.doesNotThrow(() => renderSheetOutput({ components: [], wires: [], netflags: [] }, '/tmp/test_render_empty.png', {}), '空模型不崩');
 	assert.doesNotThrow(() => renderSheetOutput({ components: [{ designator: 'U1', x: 0, y: 0, rotation: 0, mirror: false, bbox: { minX: -20, minY: -20, maxX: 20, maxY: 20 }, pins: [{ num: '1', x: -20, y: 0 }] }], wires: [], netflags: [] }, '/tmp/test_render_single.png', {}), '单件不崩');
 });
+
+// 密集电源flag合并成轨(consolidateRails):多上拉到VDD的far flag堆叠→合并,减叠压、不增交叉。
+test('generateLayout: 密集上拉far flag合并成轨', async () => {
+	const sigs = ['S0', 'S1', 'S2', 'S3', 'S4'];
+	const pins = [{ n: 'VDD', s: 'L' }, { n: 'GND', s: 'L' }, ...sigs.map(n => ({ n, s: 'R' }))];
+	const U1 = { designator: 'U1', x: 400, y: 400, rotation: 0, mirror: false, bbox: { minX: 360, minY: 400 - pins.length * 10, maxX: 440, maxY: 400 + pins.length * 10 }, pins: pins.map((p, i) => ({ num: String(i + 1), name: p.n, x: p.s === 'L' ? 360 : 440, y: 400 - pins.length * 10 + i * 20 + 10, side: p.s === 'L' ? 'left' : 'right' })) };
+	const rc = (des, x, y) => ({ designator: des, x, y, rotation: 0, mirror: false, bbox: { minX: x - 15, minY: y - 5, maxX: x + 15, maxY: y + 5 }, pins: [{ num: '1', x: x - 15, y }, { num: '2', x: x + 15, y }] });
+	const comps = [U1, ...sigs.map((s, i) => rc('R' + (i + 1), 600, 360 + i * 20))];
+	const pin = (d, n) => { const c = comps.find(x => x.designator === d); const p = c.pins.find(pp => pp.name === n || pp.num === String(n)); return [p.x, p.y]; };
+	const W = (net, a, b) => ({ net, line: [a[0], a[1], b[0], b[1]] });
+	const wires = sigs.flatMap((s, i) => [W(s, pin('U1', s), pin('R' + (i + 1), 1)), W('VDD', pin('R' + (i + 1), 2), pin('U1', 'VDD'))]);
+	const snap = { components: comps, wires, netflags: [{ net: 'GND', symbol: 'Ground-GND', x: pin('U1', 'GND')[0], y: pin('U1', 'GND')[1] }] };
+	const r = await generateLayout(snap, { scale: false, deconflict: true });
+	assert.equal(r.stats.placements, comps.length, '不掉件');
+	// 5个上拉的VDD far flag应被合并成轨(VDD power flag 远少于 5)
+	const vddPower = (r.model.netflags || []).filter(f => f.net === 'VDD' && f.kind === 'power').length;
+	assert.ok(vddPower <= 2, `密集VDD far flag合并(实 ${vddPower}≤2)`);
+	const g = geomQC(r.model), lh = labelQC(r.model).filter(f => f.severity === 'hard').length;
+	assert.equal(g.crossings, 0, '轨不增交叉'); assert.equal(g.overlaps.length, 0, '零叠压'); assert.ok(lh <= 1, `labelHard低(实 ${lh})`);
+});
