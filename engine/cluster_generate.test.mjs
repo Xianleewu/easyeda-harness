@@ -198,6 +198,29 @@ test('generateLayout 模板布局:buck稀疏块去耦电容贴IC(下方水平排
 	assert.ok(caps.every(c => c.y < icC.bbox.minY || c.y > icC.bbox.maxY), '去耦电容在IC上/下方(水平排)');
 });
 
+// 选侧:某侧信号少但有内联件(运放 IN 侧 R_FB/R_IN)→ 去耦带应按实际内容延伸放【更空侧】,
+// 而非按信号数放到拥挤侧。左侧信号少(1)却有内联 R_IN,右侧 2 信号无内联 → 电容应在右(更空)。
+test('generateLayout 模板布局:去耦带按实际内容选更空侧(非信号数,修运放误判)', async () => {
+	const ic = (des, x, y, pins) => ({ designator: des, x, y, rotation: 0, mirror: false, bbox: { minX: x - 40, minY: y - pins.length * 10, maxX: x + 40, maxY: y + pins.length * 10 }, pins: pins.map((p, i) => ({ num: String(i + 1), name: p.n, x: p.s === 'L' ? x - 40 : x + 40, y: y - pins.length * 10 + i * 20 + 10, side: p.s === 'L' ? 'left' : 'right' })) });
+	const two = (des, x, y) => ({ designator: des, x, y, rotation: 0, mirror: false, bbox: { minX: x - 15, minY: y - 5, maxX: x + 15, maxY: y + 5 }, pins: [{ num: '1', x: x - 15, y }, { num: '2', x: x + 15, y }] });
+	// 左:VCC/GND/IN(1信号,有内联R_IN);右:OUT1/OUT2(2信号,无内联)。signal-count 会选左(拥挤)。
+	const U1 = ic('U1', 500, 400, [{ n: 'VCC', s: 'L' }, { n: 'GND', s: 'L' }, { n: 'IN', s: 'L' }, { n: 'OUT1', s: 'R' }, { n: 'OUT2', s: 'R' }]);
+	const comps = [U1, two('R_IN', 380, 430), two('C1', 300, 250), two('C2', 340, 250)];
+	const pin = (d, n) => { const c = comps.find(x => x.designator === d); const p = c.pins.find(pp => pp.name === n || pp.num === String(n)); return [p.x, p.y]; };
+	const W = (net, a, b) => ({ net, line: [a[0], a[1], b[0], b[1]] });
+	const snap = {
+		components: comps,
+		wires: [W('IN', pin('R_IN', 2), pin('U1', 'IN')), W('SIG', pin('R_IN', 1), pin('R_IN', 1)), W('VCC', pin('U1', 'VCC'), pin('C1', 1)), W('VCC', pin('C2', 1), pin('U1', 'VCC')), W('OUT1', pin('U1', 'OUT1'), pin('U1', 'OUT1')), W('OUT2', pin('U1', 'OUT2'), pin('U1', 'OUT2'))],
+		netflags: [{ net: 'GND', symbol: 'Ground-GND', x: pin('U1', 'GND')[0], y: pin('U1', 'GND')[1] }, { net: 'GND', symbol: 'Ground-GND', x: pin('C1', 2)[0], y: pin('C1', 2)[1] }, { net: 'GND', symbol: 'Ground-GND', x: pin('C2', 2)[0], y: pin('C2', 2)[1] }, { net: 'SIG', symbol: '', x: pin('R_IN', 1)[0], y: pin('R_IN', 1)[1] }],
+	};
+	const r = await generateLayout(snap, { scale: false, deconflict: true });
+	const g = geomQC(r.model);
+	assert.equal(g.overlaps.length, 0, '零叠压'); assert.equal(g.crossings, 0, '零交叉');
+	const icC = r.model.components.find(c => c.designator === 'U1');
+	const caps = r.model.components.filter(c => /^C/.test(c.designator));
+	assert.ok(caps.length === 2 && caps.every(c => c.x > icC.bbox.maxX), '去耦电容在更空的右侧(非信号少但拥挤的左侧)');
+});
+
 // 总线拓扑:两 IC 间多条并行跨簇信号(D0-D7+A0-A7+WE+OE),压测标签密度不叠压。
 test('generateLayout 模板布局:密集总线(多并行跨簇信号)标签不叠压', async () => {
 	const data = ['D0', 'D1', 'D2', 'D3', 'D4', 'D5', 'D6', 'D7'], addr = ['A0', 'A1', 'A2', 'A3', 'A4', 'A5', 'A6', 'A7'];
