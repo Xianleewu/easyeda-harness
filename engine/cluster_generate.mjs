@@ -21,7 +21,12 @@ function deconflictLabels(model) {
 	const geo = m => { const g = geomQC(m); return { sh: g.overlaps.length + g.wireThruComp.length + g.wireThruPin.length, cr: g.crossings }; };
 	const dirOf = f => (f.alignMode === 8 || f.rot === 180) ? [-1, 0] : (f.alignMode === 6 || f.rot === 0) ? [1, 0] : (f.rot === 90) ? [0, 1] : (f.rot === 270) ? [0, -1] : null;
 	const stubOf = (m, f) => m.wires.find(w => { const l = w.line; return Math.abs(l[l.length - 2] - f.x) < 2 && Math.abs(l[l.length - 1] - f.y) < 2; });
-	for (let pass = 0; pass < 16; pass++) {
+	// 每 pass 1 个移动;`!best break` 在收敛(无改善)时退出。早退优化后每 pass 很快,上限放宽到 60
+	// 让多叠压板(如 58件板 22 叠压)解更多(实测 22→9)。评估预算封顶超大板时间(中小板早收敛不触及):
+	// labelQC 调用计数 > 预算则停,确定性(同输入同结果),避免超大板 deconflict 过久。
+	let evals = 0; const EVAL_BUDGET = 2200;
+	for (let pass = 0; pass < 60; pass++) {
+		if (evals > EVAL_BUDGET) break;
 		const hard = labelQC(model).filter(f => f.severity === 'hard');
 		const base = hard.length; if (base === 0) break; const bg = geo(model);
 		// 性能:只对【参与叠压的网】的网标试移(非全部 85),~10x 加速、效果不变。
@@ -41,7 +46,7 @@ function deconflictLabels(model) {
 				const px = stub.line[0], py = stub.line[1];
 				f.x += c.dx; f.y += c.dy; if (f.textX != null) f.textX += c.dx; if (f.textY != null) f.textY += c.dy;
 				stub.line = c.mode === 'out' ? [px, py, f.x, f.y] : [px, py, ox, oy, f.x, f.y];
-				const nl = lh(model);
+				const nl = lh(model); evals++;
 				let ok = false;
 				if (nl < base) { const ng = geo(model); ok = ng.sh === 0 && ng.cr <= bg.cr; }
 				f.x = ox; f.y = oy; f.textX = otx; f.textY = oty; stub.line = ol;
