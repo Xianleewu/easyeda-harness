@@ -42,7 +42,7 @@ function pinRoles(logical) {
 }
 
 // 构建 ELK 图:节点 = 件体 + 各侧 label/符号留白;端口 FIXED_POS 落件体边;signal 多脚网→edge(仅指导分层)。
-function buildGraph(snapshot, logical, byDes, roles, scale = true) {
+function buildGraph(snapshot, logical, byDes, roles, scale = true, powerEdges = false) {
 	const children = [];
 	const meta = new Map();   // designator → {lb, pad, compW, compH}
 	for (const c of snapshot.components) {
@@ -101,12 +101,20 @@ function buildGraph(snapshot, logical, byDes, roles, scale = true) {
 		const ps = (n.pins || []).map(s => { const d = s.lastIndexOf('.'); return portId(s.slice(0, d), s.slice(d + 1)); }).filter(id => meta.has(id.split('::')[0]));
 		for (let i = 1; i < ps.length; i++) edges.push({ id: `e${ei++}`, sources: [ps[0]], targets: [ps[i]] });
 	}
+	// powerEdges(簇内布局用):把电源/地网也作弱边,使去耦电容向 IC 聚拢(不参与布线,仅指导放置)。
+	if (powerEdges) {
+		for (const n of (logical.nets || [])) {
+			if (n.class !== 'power' && n.class !== 'ground') continue;
+			const ps = (n.pins || []).map(s => { const d = s.lastIndexOf('.'); return portId(s.slice(0, d), s.slice(d + 1)); }).filter(id => meta.has(id.split('::')[0]));
+			for (let i = 1; i < ps.length; i++) edges.push({ id: `e${ei++}`, sources: [ps[0]], targets: [ps[i]] });
+		}
+	}
 	return { graph: { id: 'root', layoutOptions: { ...DEFAULT_OPTS }, children, edges }, meta };
 }
 
-export async function elkLayout({ snapshot, logical, byDes, elk = new ELK(), layoutOptions = {}, scale = true }) {
+export async function elkLayout({ snapshot, logical, byDes, elk = new ELK(), layoutOptions = {}, scale = true, powerEdges = false }) {
 	const roles = pinRoles(logical);
-	const { graph, meta } = buildGraph(snapshot, logical, byDes, roles, scale);
+	const { graph, meta } = buildGraph(snapshot, logical, byDes, roles, scale, powerEdges);
 	Object.assign(graph.layoutOptions, layoutOptions);
 	const res = await elk.layout(graph);
 

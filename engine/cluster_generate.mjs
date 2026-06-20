@@ -62,7 +62,7 @@ export async function generateLayout(snap, opts = {}) {
 		const subComps = members.map(d => compByDes.get(d)).filter(Boolean);
 		const subLogical = { nets: logical.nets.map(n => ({ ...n, pins: n.pins.filter(p => mset.has(p.slice(0, p.lastIndexOf('.')))) })).filter(n => n.pins.length >= 1) };
 		const byDes = new Map(subComps.map(c => [c.designator, withLocalPins(c)]));
-		const m = await elkLayout({ snapshot: { ...snap, components: subComps }, logical: subLogical, byDes, scale: true });
+		const m = await elkLayout({ snapshot: { ...snap, components: subComps }, logical: subLogical, byDes, scale: true, powerEdges: true });
 		const bb = m.components.reduce((a, c) => ({ minX: Math.min(a.minX, c.bbox.minX), minY: Math.min(a.minY, c.bbox.minY), maxX: Math.max(a.maxX, c.bbox.maxX), maxY: Math.max(a.maxY, c.bbox.maxY) }), { minX: 1e9, minY: 1e9, maxX: -1e9, maxY: -1e9 });
 		subs.push({ anchor, model: m, bb, w: bb.maxX - bb.minX, h: bb.maxY - bb.minY, count: members.length });
 	}
