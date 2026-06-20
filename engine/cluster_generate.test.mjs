@@ -159,3 +159,18 @@ test('generateLayout 模板布局:反馈分压(多无源件同脚)节点rail、�
 	const g = geomQC(r.model), lh = labelQC(r.model).filter(f => f.severity === 'hard').length;
 	assert.equal(g.overlaps.length, 0, '零叠压'); assert.equal(g.crossings, 0, '零交叉'); assert.equal(lh, 0, '零硬标签');
 });
+
+// 总线拓扑:两 IC 间多条并行跨簇信号(D0-D7+A0-A7+WE+OE),压测标签密度不叠压。
+test('generateLayout 模板布局:密集总线(多并行跨簇信号)标签不叠压', async () => {
+	const data = ['D0', 'D1', 'D2', 'D3', 'D4', 'D5', 'D6', 'D7'], addr = ['A0', 'A1', 'A2', 'A3', 'A4', 'A5', 'A6', 'A7'];
+	const ic = (des, x, side) => { const pins = [{ n: 'VDD', s: 'L' }, { n: 'GND', s: 'L' }, ...data.map(n => ({ n, s: side })), ...addr.map(n => ({ n, s: side }))]; return { designator: des, x, y: 500, rotation: 0, mirror: false, bbox: { minX: x - 50, minY: 500 - pins.length * 10 - 5, maxX: x + 50, maxY: 500 + pins.length * 10 + 5 }, pins: pins.map((p, i) => ({ num: String(i + 1), name: p.n, x: p.s === 'L' ? x - 50 : x + 50, y: 500 - pins.length * 10 + i * 20 + 10, side: p.s === 'L' ? 'left' : 'right' })) }; };
+	const U1 = ic('U1', 300, 'R'), U2 = ic('U2', 1000, 'L');
+	const pinByName = (c, n) => { const p = c.pins.find(pp => pp.name === n); return [p.x, p.y]; };
+	const W = (net, a, b) => ({ net, line: [a[0], a[1], b[0], b[1]] });
+	const wires = [...data, ...addr].map(n => W(n, pinByName(U1, n), pinByName(U2, n)));
+	const snap = { components: [U1, U2], wires, netflags: [{ net: 'GND', symbol: 'Ground-GND', x: pinByName(U1, 'GND')[0], y: pinByName(U1, 'GND')[1] }, { net: 'GND', symbol: 'Ground-GND', x: pinByName(U2, 'GND')[0], y: pinByName(U2, 'GND')[1] }] };
+	const r = await generateLayout(snap, { scale: false, deconflict: true });
+	assert.ok(r.stats.clusters >= 2, '两 IC 成两簇');
+	const g = geomQC(r.model), lh = labelQC(r.model).filter(f => f.severity === 'hard').length;
+	assert.equal(g.overlaps.length, 0, '总线零叠压'); assert.equal(g.crossings, 0, '总线零交叉'); assert.equal(lh, 0, '密集总线标签零叠压');
+});
