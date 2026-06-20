@@ -59,6 +59,13 @@ export function buildPreserveModel(snap) {
 	return { components, wires, netflags };
 }
 
+// createNetFlag 的旋转约定是镜像的:输入 R → 快照回读为 (360-R)%360(90↔270 互换,0/180 不变)。
+// 所以要让重建符号的【朝向】与设计者捕获的快照旋转一致,必须传 (360 - snapRot) % 360,
+// 否则 90°/270° 符号会被翻转 180° → bbox 朝向反、压住相邻件(实测 +5V 压 C17/C18/C19)。
+export function netflagCreateRotation(snapRot) {
+	return (360 - ((snapRot || 0) % 360)) % 360;
+}
+
 async function deliverPreserve(model) {
 	const { executeCode } = await import('./bridge_client.mjs');
 	const exec = async js => {
@@ -90,7 +97,7 @@ async function deliverPreserve(model) {
 	await runOps('件保留位', moveOps);
 	const wireOps = model.wires.map(w => `try{await eda.sch_PrimitiveWire.create(${JSON.stringify(w.line)},${JSON.stringify(w.net)});n++;}catch(e){}`);
 	await runOps('真实连线', wireOps);
-	const flagOps = model.netflags.map(f => `try{await eda.sch_PrimitiveComponent.createNetFlag('${f.flagId}',${JSON.stringify(f.net)},${f.x},${f.y},${f.rotation});n++;}catch(e){}`);
+	const flagOps = model.netflags.map(f => `try{await eda.sch_PrimitiveComponent.createNetFlag('${f.flagId}',${JSON.stringify(f.net)},${f.x},${f.y},${netflagCreateRotation(f.rotation)});n++;}catch(e){}`);
 	await runOps('电源/地符号', flagOps);
 
 	// 自愈:部分密集脚连线被 EDA create 拒("create failed!")→ 整网可能丢失。补法:回读已连网,

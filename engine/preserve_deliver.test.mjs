@@ -1,7 +1,7 @@
 // preserve_deliver 单测:布局质量检测 + 保留模型构建(纯函数)。
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { assessLayout, buildPreserveModel } from './preserve_deliver.mjs';
+import { assessLayout, buildPreserveModel, netflagCreateRotation } from './preserve_deliver.mjs';
 
 // 好布局:真实连线为主(wireRatio 高)、件分散有坐标、电容贴近 IC。
 const goodSnap = {
@@ -59,4 +59,16 @@ test('buildPreserveModel 保留件位、映射电源/地符号', () => {
 	assert.equal(m.wires[0].net, 'VCC');
 	assert.equal(m.netflags[0].flagId, 'Ground');
 	assert.equal(m.netflags[1].flagId, 'Power');
+});
+
+// createNetFlag 旋转镜像约定补偿:90↔270 互换,0/180 不变。
+// 实测真实 bug:直接传 270 → 符号被翻转为 90 → +5V 符号 bbox 朝左压住 C17/C18/C19。
+test('netflagCreateRotation 补偿镜像约定(90↔270,0/180不变)', () => {
+	assert.equal(netflagCreateRotation(0), 0);
+	assert.equal(netflagCreateRotation(90), 270);
+	assert.equal(netflagCreateRotation(180), 180);
+	assert.equal(netflagCreateRotation(270), 90);
+	// 容错:undefined/越界归一
+	assert.equal(netflagCreateRotation(undefined), 0);
+	assert.equal(netflagCreateRotation(450), 270); // 450%360=90 → 270
 });
