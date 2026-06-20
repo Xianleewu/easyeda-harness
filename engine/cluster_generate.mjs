@@ -164,14 +164,18 @@ export function layoutClusterTemplate(anchor, members, ctx) {
 			out.netflags.push({ kind: nn.class === 'ground' ? 'gnd' : 'power', net: nn.name, x: fx2, y: fy2, rot: 0 });
 		}
 	}
-	// 去耦电容:专用竖直去耦带,放在 IC 块【最左侧】(避开所有信号标签),各 [VDD]—C—[GND]。
-	// 不再贴具体电源脚(四边脚 IC 的顶部电源脚会与左侧信号标签冲突)——独立去耦列是通用商业惯例。
+	// 去耦电容:专用竖直去耦带,放在 IC 块【信号更少的一侧】(避开信号标签、更紧凑),各 [VDD]—C—[GND]。
+	// 不贴具体电源脚(四边脚 IC 顶部电源脚会与侧边信号标签冲突)——独立去耦列是通用商业惯例。
 	const caps = members.filter(d => d !== anchor && !used.has(d) && isDecoup(d));
 	if (caps.length) {
-		let minX = ic.bbox ? ic.bbox.minX : cx;
-		for (const f of out.netflags) minX = Math.min(minX, f.x);
-		for (const c of out.components) if (c.bbox) minX = Math.min(minX, c.bbox.minX);
-		const bx = minX - 80; let by = (ic.bbox ? ic.bbox.minY : cy) + 10;
+		// 选信号更少的水平侧放带:左信号脚多→放右侧空白处,否则放左侧(默认)。
+		let leftSig = 0, rightSig = 0;
+		for (const p of ic.pins) { const nn = netOf(`${anchor}.${p.num}`); if (!nn || nn.class !== 'signal') continue; const s = sideOf(p); if (s === 'left') leftSig++; else if (s === 'right') rightSig++; }
+		const onRight = leftSig > rightSig;
+		let edge = ic.bbox ? (onRight ? ic.bbox.maxX : ic.bbox.minX) : cx;
+		for (const f of out.netflags) edge = onRight ? Math.max(edge, f.x) : Math.min(edge, f.x);
+		for (const c of out.components) if (c.bbox) edge = onRight ? Math.max(edge, c.bbox.maxX) : Math.min(edge, c.bbox.minX);
+		const bx = onRight ? edge + 80 : edge - 80; let by = (ic.bbox ? ic.bbox.minY : cy) + 10;
 		for (const d of caps) {
 			const c = compByDes.get(d);
 			const p1 = c.pins[0], p2 = c.pins[1];
