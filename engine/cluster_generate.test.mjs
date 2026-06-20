@@ -1,7 +1,7 @@
 // cluster_generate 单测:干净网表构建 + 功能聚类(纯函数)。
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { buildCleanLogical, clusterComponents } from './cluster_generate.mjs';
+import { buildCleanLogical, clusterComponents, generateLayout } from './cluster_generate.mjs';
 
 // 合成快照:U1.1-C1.1 经有名线 SIG;C1.2 经 GND 标接地;U1.2 仅接无名线(NC,应不入网)。
 const snap = {
@@ -49,4 +49,28 @@ test('clusterComponents:无源件归到共享 signal 网的 IC', () => {
 test('clusterComponents:无 IC 锚点返回 null', () => {
 	const cl = clusterComponents({ components: [{ designator: 'R1', pins: [] }] }, { nets: [] });
 	assert.equal(cl, null);
+});
+
+// 通用性:全新合成板(非 vibe-buddy)也能产功能块模块图。
+test('generateLayout 通用性:全新合成板产功能块、有真实连线', async () => {
+	const ic = (des, x, y, pins) => ({ designator: des, x, y, rotation: 0, mirror: false, bbox: { minX: x - 30, minY: y - pins.length * 10, maxX: x + 30, maxY: y + pins.length * 10 }, pins: pins.map((p, i) => ({ num: String(i + 1), name: p.n, x: p.s === 'L' ? x - 30 : x + 30, y: y - pins.length * 10 + i * 20 + 10 })) });
+	const rc = (des, x, y) => ({ designator: des, x, y, rotation: 0, mirror: false, bbox: { minX: x - 15, minY: y - 5, maxX: x + 15, maxY: y + 5 }, pins: [{ num: '1', x: x - 15, y }, { num: '2', x: x + 15, y }] });
+	const comps = [
+		ic('U1', 200, 300, [{ n: 'VCC', s: 'L' }, { n: 'GND', s: 'L' }, { n: 'SCL', s: 'R' }, { n: 'SDA', s: 'R' }]),
+		ic('U2', 700, 250, [{ n: 'VCC', s: 'L' }, { n: 'GND', s: 'L' }, { n: 'SCL', s: 'L' }, { n: 'SDA', s: 'L' }]),
+		rc('C1', 150, 400), rc('C2', 650, 380), rc('R1', 400, 250),
+	];
+	const pin = (d, n) => { const c = comps.find(x => x.designator === d); return [c.pins[n - 1].x, c.pins[n - 1].y]; };
+	const W = (net, a, b) => ({ net, line: [a[0], a[1], b[0], b[1]] });
+	const wires = [
+		W('VCC', pin('U1', 1), pin('C1', 1)), W('GND', pin('U1', 2), pin('C1', 2)),
+		W('VCC', pin('U2', 1), pin('C2', 1)), W('GND', pin('U2', 2), pin('C2', 2)),
+		W('SCL', pin('U1', 3), pin('R1', 1)), W('SCL', pin('R1', 2), pin('U2', 3)),
+		W('SDA', pin('U1', 4), pin('U2', 4)),
+	];
+	const r = await generateLayout({ components: comps, wires, netflags: [] }, { scale: true });
+	assert.ok(r, '产出模型');
+	assert.ok(r.stats.clusters >= 2, `形成 ≥2 功能块(实 ${r.stats?.clusters})`);
+	assert.ok(r.stats.wires > 0, '有真实连线');
+	assert.ok(r.stats.nets >= 4, 'SCL/SDA/VCC/GND 等网提取正确');
 });
