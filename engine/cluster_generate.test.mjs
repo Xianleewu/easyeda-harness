@@ -161,6 +161,43 @@ test('generateLayout 模板布局:反馈分压(多无源件同脚)节点rail、�
 	assert.equal(g.overlaps.length, 0, '零叠压'); assert.equal(g.crossings, 0, '零交叉'); assert.equal(lh, 0, '零硬标签');
 });
 
+// buck/LDO 稀疏块:两侧都有内联件(分压 R 在 FB 左、电感 L 在 SW 右),去耦电容
+// 原放远侧带→稀疏;门控改放 IC 下方水平排(贴 IC)。验证触发+零回归。
+test('generateLayout 模板布局:buck稀疏块去耦电容贴IC(下方水平排)、零回归', async () => {
+	const ic = (des, x, y, pins) => ({ designator: des, x, y, rotation: 0, mirror: false, bbox: { minX: x - 40, minY: y - pins.length * 10, maxX: x + 40, maxY: y + pins.length * 10 }, pins: pins.map((p, i) => ({ num: String(i + 1), name: p.n, x: p.s === 'L' ? x - 40 : x + 40, y: y - pins.length * 10 + i * 20 + 10, side: p.s === 'L' ? 'left' : 'right' })) });
+	const two = (des, x, y) => ({ designator: des, x, y, rotation: 0, mirror: false, bbox: { minX: x - 15, minY: y - 5, maxX: x + 15, maxY: y + 5 }, pins: [{ num: '1', x: x - 15, y }, { num: '2', x: x + 15, y }] });
+	const U1 = ic('U1', 500, 400, [{ n: 'VIN', s: 'L' }, { n: 'EN', s: 'L' }, { n: 'FB', s: 'L' }, { n: 'GND', s: 'L' }, { n: 'SW', s: 'R' }, { n: 'BST', s: 'R' }]);
+	const comps = [U1, two('R1', 350, 440), two('R2', 350, 470), two('L1', 650, 420), two('CIN', 280, 250), two('CIN2', 320, 250), two('COUT', 360, 250), two('COUT2', 400, 250)];
+	const pin = (d, n) => { const c = comps.find(x => x.designator === d); const p = c.pins.find(pp => pp.name === n || pp.num === String(n)); return [p.x, p.y]; };
+	const W = (net, a, b) => ({ net, line: [a[0], a[1], b[0], b[1]] });
+	const snap = {
+		components: comps,
+		wires: [
+			W('SW', pin('U1', 'SW'), pin('L1', 1)), W('VOUT', pin('L1', 2), pin('R1', 1)),
+			W('FB', pin('R1', 2), pin('U1', 'FB')), W('FB', pin('R2', 1), pin('U1', 'FB')),
+			W('VIN', pin('U1', 'VIN'), pin('CIN', 1)), W('VIN', pin('CIN2', 1), pin('U1', 'VIN')),
+			W('VOUT', pin('COUT', 1), pin('L1', 2)), W('VOUT', pin('COUT2', 1), pin('L1', 2)),
+		],
+		netflags: [
+			{ net: 'GND', symbol: 'Ground-GND', x: pin('U1', 'GND')[0], y: pin('U1', 'GND')[1] },
+			{ net: 'GND', symbol: 'Ground-GND', x: pin('R2', 2)[0], y: pin('R2', 2)[1] },
+			...['CIN', 'CIN2', 'COUT', 'COUT2'].map(d => ({ net: 'GND', symbol: 'Ground-GND', x: pin(d, 2)[0], y: pin(d, 2)[1] })),
+		],
+	};
+	const r = await generateLayout(snap, { scale: false, deconflict: true });
+	assert.equal(r.stats.placements, comps.length, 'buck不掉件');
+	const g = geomQC(r.model), lh = labelQC(r.model).filter(f => f.severity === 'hard').length;
+	assert.equal(g.overlaps.length, 0, 'buck零叠压'); assert.equal(g.crossings, 0, 'buck零交叉'); assert.equal(lh, 0, 'buck零硬标签');
+	// caps-below 触发:去耦电容横向贴 IC 中心(非远侧带)、且竖直分离于 IC(上/下方水平排)
+	const icC = r.model.components.find(c => c.designator === 'U1');
+	const icCx = (icC.bbox.minX + icC.bbox.maxX) / 2;
+	const caps = r.model.components.filter(c => /^C/.test(c.designator));
+	assert.equal(caps.length, 4, '4 去耦电容入图');
+	const maxDx = Math.max(...caps.map(c => Math.abs(c.x - icCx)));
+	assert.ok(maxDx < 140, `去耦电容横向贴IC中心(maxDx=${Math.round(maxDx)}<140,远侧带会远超)`);
+	assert.ok(caps.every(c => c.y < icC.bbox.minY || c.y > icC.bbox.maxY), '去耦电容在IC上/下方(水平排)');
+});
+
 // 总线拓扑:两 IC 间多条并行跨簇信号(D0-D7+A0-A7+WE+OE),压测标签密度不叠压。
 test('generateLayout 模板布局:密集总线(多并行跨簇信号)标签不叠压', async () => {
 	const data = ['D0', 'D1', 'D2', 'D3', 'D4', 'D5', 'D6', 'D7'], addr = ['A0', 'A1', 'A2', 'A3', 'A4', 'A5', 'A6', 'A7'];
