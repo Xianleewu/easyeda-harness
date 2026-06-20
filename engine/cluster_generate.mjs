@@ -225,14 +225,11 @@ export function layoutClusterTemplate(anchor, members, ctx, depth = 0) {
 				used.add(d);
 			}
 		} else {
-			// 默认:专用竖直去耦带在信号更少的一侧(原逻辑,行为不变)。
-			let leftSig = 0, rightSig = 0;
-			for (const p of ic.pins) { const nn = netOf(`${anchor}.${p.num}`); if (!nn || nn.class !== 'signal') continue; const s = sideOf(p); if (s === 'left') leftSig++; else if (s === 'right') rightSig++; }
-			const onRight = leftSig > rightSig;
-			let edge = ic.bbox ? (onRight ? ic.bbox.maxX : ic.bbox.minX) : cx;
-			for (const f of out.netflags) edge = onRight ? Math.max(edge, f.x) : Math.min(edge, f.x);
-			for (const c of out.components) if (c.bbox) edge = onRight ? Math.max(edge, c.bbox.maxX) : Math.min(edge, c.bbox.minX);
-			const bx = onRight ? edge + 80 : edge - 80; let by = (ic.bbox ? ic.bbox.minY : cy) + 10;
+			// 默认:专用竖直去耦带,放在【实际内容更空的一侧】(按内容延伸 leftExt/rightExt 判,而非
+			// 信号数——信号数对"少信号但多内联件"的侧会误判,如运放 R_FB/R_IN 在少信号侧把电容推远 550px;
+			// 实测见 opamp)。edge±80 放置口径不变,仅选侧改进=不引入新叠压(80px 仍越过该侧全部内容)。
+			const onRight = (rightExt - bb.maxX) <= (bb.minX - leftExt);
+			const bx = onRight ? rightExt + 80 : leftExt - 80; let by = (ic.bbox ? ic.bbox.minY : cy) + 10;
 			for (const d of caps) {
 				const { pwrNum, pwrName, gndNum, gndName } = capInfo(d);
 				const top = by, bot = by + 24;
