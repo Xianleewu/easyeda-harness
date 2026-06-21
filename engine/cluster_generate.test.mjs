@@ -198,14 +198,19 @@ test('generateLayout 模板布局:buck稀疏块去耦电容贴IC(下方水平排
 	assert.ok(caps.every(c => c.y < icC.bbox.minY || c.y > icC.bbox.maxY), '去耦电容在IC上/下方(水平排)');
 });
 
-// 选侧:某侧信号少但有内联件(运放 IN 侧 R_FB/R_IN)→ 去耦带应按实际内容延伸放【更空侧】,
-// 而非按信号数放到拥挤侧。左侧信号少(1)却有内联 R_IN,右侧 2 信号无内联 → 电容应在右(更空)。
+// 选侧(侧带路径,caps-below 被底部脚排除):某侧信号少但有内联件 → 去耦带按【实际内容延伸】
+// 放更空侧,非按信号数放到拥挤侧。左:VCC/IN(1信号+内联R_IN);右:OUT1/OUT2(2信号无内联);
+// 底部 GND 脚→排除 caps-below 走侧带。signal-count(左1<右2)会误选左(拥挤),内容延伸应选右(空)。
 test('generateLayout 模板布局:去耦带按实际内容选更空侧(非信号数,修运放误判)', async () => {
-	const ic = (des, x, y, pins) => ({ designator: des, x, y, rotation: 0, mirror: false, bbox: { minX: x - 40, minY: y - pins.length * 10, maxX: x + 40, maxY: y + pins.length * 10 }, pins: pins.map((p, i) => ({ num: String(i + 1), name: p.n, x: p.s === 'L' ? x - 40 : x + 40, y: y - pins.length * 10 + i * 20 + 10, side: p.s === 'L' ? 'left' : 'right' })) });
 	const two = (des, x, y) => ({ designator: des, x, y, rotation: 0, mirror: false, bbox: { minX: x - 15, minY: y - 5, maxX: x + 15, maxY: y + 5 }, pins: [{ num: '1', x: x - 15, y }, { num: '2', x: x + 15, y }] });
-	// 左:VCC/GND/IN(1信号,有内联R_IN);右:OUT1/OUT2(2信号,无内联)。signal-count 会选左(拥挤)。
-	const U1 = ic('U1', 500, 400, [{ n: 'VCC', s: 'L' }, { n: 'GND', s: 'L' }, { n: 'IN', s: 'L' }, { n: 'OUT1', s: 'R' }, { n: 'OUT2', s: 'R' }]);
-	const comps = [U1, two('R_IN', 380, 430), two('C1', 300, 250), two('C2', 340, 250)];
+	const U1 = { designator: 'U1', x: 500, y: 400, rotation: 0, mirror: false, bbox: { minX: 460, minY: 350, maxX: 540, maxY: 450 }, pins: [
+		{ num: '1', name: 'VCC', x: 460, y: 375, side: 'left' },
+		{ num: '2', name: 'IN', x: 460, y: 425, side: 'left' },
+		{ num: '3', name: 'OUT1', x: 540, y: 375, side: 'right' },
+		{ num: '4', name: 'OUT2', x: 540, y: 425, side: 'right' },
+		{ num: '5', name: 'GND', x: 500, y: 450, side: 'bottom' },
+	] };
+	const comps = [U1, two('R_IN', 380, 425), two('C1', 300, 250), two('C2', 340, 250)];
 	const pin = (d, n) => { const c = comps.find(x => x.designator === d); const p = c.pins.find(pp => pp.name === n || pp.num === String(n)); return [p.x, p.y]; };
 	const W = (net, a, b) => ({ net, line: [a[0], a[1], b[0], b[1]] });
 	const snap = {

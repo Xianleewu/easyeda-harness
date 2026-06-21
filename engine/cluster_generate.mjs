@@ -210,7 +210,12 @@ export function layoutClusterTemplate(anchor, members, ctx, depth = 0) {
 		let leftExt = bb.minX, rightExt = bb.maxX;
 		for (const f of out.netflags) { if (f.x < bb.minX) leftExt = Math.min(leftExt, f.x); if (f.x > bb.maxX) rightExt = Math.max(rightExt, f.x); }
 		for (const c of out.components) { if (c.designator === anchor || !c.bbox) continue; if (c.bbox.minX < bb.minX) leftExt = Math.min(leftExt, c.bbox.minX); if (c.bbox.maxX > bb.maxX) rightExt = Math.max(rightExt, c.bbox.maxX); }
-		const bothCrowded = (bb.minX - leftExt) > 50 && (rightExt - bb.maxX) > 50;
+		// 门:【两侧都有信号脚】才下方排——此时无"纯电源侧"可干净贴电容,caps-below(~62)比侧带紧。
+		// 若一侧只有电源/地脚(如总线 IC 的 VDD/GND 侧、或信号全在一侧的小模块),该侧本就是贴电容好位置,
+		// 走侧带贴该空/电源侧更合理(总线 tall IC 电容贴电源侧 > 推到下方远离)。
+		let leftSigPin = false, rightSigPin = false;
+		for (const p of ic.pins) { const nnp = netOf(`${anchor}.${p.num}`); if (!nnp || nnp.class !== 'signal') continue; const sp = sideOf(p); if (sp === 'left') leftSigPin = true; else if (sp === 'right') rightSigPin = true; }
+		const bothCrowded = leftSigPin && rightSigPin;
 		const hasBottomPin = ic.pins.some(p => sideOf(p) === 'bottom');
 		const remPreview = members.filter(d => !used.has(d) && !isDecoup(d) && compByDes.get(d));
 		if (bothCrowded && !hasBottomPin && remPreview.length === 0) {
@@ -225,10 +230,10 @@ export function layoutClusterTemplate(anchor, members, ctx, depth = 0) {
 				used.add(d);
 			}
 		} else {
-			// 默认:专用竖直去耦带,放在【实际内容更空的一侧】(按内容延伸 leftExt/rightExt 判,而非
-			// 信号数——信号数对"少信号但多内联件"的侧会误判,如运放 R_FB/R_IN 在少信号侧把电容推远 550px;
-			// 实测见 opamp)。edge±80 放置口径不变,仅选侧改进=不引入新叠压(80px 仍越过该侧全部内容)。
-			const onRight = (rightExt - bb.maxX) <= (bb.minX - leftExt);
+			// 选侧:① 优先放【无信号脚的纯电源/空侧】(总线 IC 的 VDD/GND 侧、信号全在一侧的小模块的空侧)
+			// ——那是贴电容好位;② 两侧都有信号脚(被底部脚/fallback 排除 caps-below,如四边脚)则按【内容
+			// 更空侧】(内容延伸 leftExt/rightExt;修运放类"少信号但多内联"误判,signal-count 会把电容推远)。
+			const onRight = (rightSigPin && !leftSigPin) ? false : (leftSigPin && !rightSigPin) ? true : ((rightExt - bb.maxX) <= (bb.minX - leftExt));
 			const bx = onRight ? rightExt + 80 : leftExt - 80; let by = (ic.bbox ? ic.bbox.minY : cy) + 10;
 			for (const d of caps) {
 				const { pwrNum, pwrName, gndNum, gndName } = capInfo(d);
