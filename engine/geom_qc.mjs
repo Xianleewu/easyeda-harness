@@ -30,7 +30,14 @@ export function geomQC(model, opt = {}) {
 		return false;
 	};
 	const wireThruComp = [];
-	for (const s of segs) for (const c of comps) if (segInRect(s, c.bbox)) wireThruComp.push(`net=${s.net || ''} thru ${c.designator}`);
+	for (const s of segs) for (const c of comps) {
+		if (!segInRect(s, c.bbox)) continue;
+		// 排除连该件【自己脚】的线段:脚在体框外的件(电阻/电容等)连脚的内部线会穿体框,但 EDA 渲染时
+		// 符号盖住该线 = 非视觉缺陷(preserve 真实板大量此类,generate 板脚在bbox边不触发)。真穿(连别件、
+		// 段穿本件体)端点不在本件脚 → 仍报(如 fuzz 测的邻件脚穿入本件体)。
+		if ((c.pins || []).some(p => (Math.abs(s.a[0] - p.x) < 2 && Math.abs(s.a[1] - p.y) < 2) || (Math.abs(s.b[0] - p.x) < 2 && Math.abs(s.b[1] - p.y) < 2))) continue;
+		wireThruComp.push(`net=${s.net || ''} thru ${c.designator}`);
+	}
 
 	// 2b) 导线内部压到引脚（非端点）→ 短路外部脚:EDA 拒建此类线（wireThruComp 只查
 	//     本体 bbox,漏了伸出本体外的引脚;这是 live 写回丢线的真实根因）。
