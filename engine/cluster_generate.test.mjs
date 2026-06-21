@@ -241,6 +241,26 @@ test('generateLayout 模板布局:密集总线(多并行跨簇信号)标签不�
 	assert.equal(g.overlaps.length, 0, '总线零叠压'); assert.equal(g.crossings, 0, '总线零交叉'); assert.equal(lh, 0, '密集总线标签零叠压');
 });
 
+// 块排布:多模块板按 aspect 平衡换行(避免单行宽-短→渲染件小),且模块框两两不重叠。
+test('generateLayout 块排布:多模块平衡换行成多行、模块框不重叠', async () => {
+	const mk = (des, x) => ({ designator: des, x, y: 400, rotation: 0, mirror: false, bbox: { minX: x - 40, minY: 360, maxX: x + 40, maxY: 440 }, pins: [
+		{ num: '1', name: 'VDD', x: x - 40, y: 380, side: 'left' },
+		{ num: '2', name: 'GND', x: x - 40, y: 420, side: 'left' },
+		{ num: '3', name: `IO_${des}`, x: x + 40, y: 400, side: 'right' },
+	] });
+	const comps = ['U1', 'U2', 'U3', 'U4', 'U5', 'U6'].map((d, i) => mk(d, 300 + i * 200));
+	const snap = { components: comps, wires: [], netflags: comps.map(c => ({ net: 'GND', symbol: 'Ground-GND', x: c.pins[1].x, y: c.pins[1].y })) };
+	const r = await generateLayout(snap, { scale: false, deconflict: true });
+	const regs = r.moduleRegions || [];
+	assert.ok(regs.length >= 5, `多模块成多簇(${regs.length})`);
+	for (let i = 0; i < regs.length; i++) for (let j = i + 1; j < regs.length; j++) {
+		const a = regs[i].box, b = regs[j].box;
+		assert.ok(a.maxX <= b.minX || b.maxX <= a.minX || a.maxY <= b.minY || b.maxY <= a.minY, `模块框 ${regs[i].title}/${regs[j].title} 不重叠`);
+	}
+	const rows = new Set(regs.map(g => Math.round(g.box.minY / 60))).size;
+	assert.ok(rows >= 2, `多小模块平衡换行成多行(实 ${rows} 行,非宽-短单行)`);
+});
+
 // 离散子电路:三极管驱动级(Q1 三极管 B/C/E + 集电极 LED 负载,无 IC 锚点)。
 // 递归子电路布局:剩余件按共享网分组,以最高脚件(Q1)为锚成块,四方向内联(LED 在 C 顶脚竖直内联)。
 test('generateLayout 模板布局:离散三极管级(递归子电路)零浮空零叠压', async () => {
