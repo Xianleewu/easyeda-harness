@@ -86,6 +86,17 @@ test('endpointOnWire:线端点落在异网线内部(T 接)→ 报短路;同网�
 	assert.equal(same.endpointOnWire, 0, '同网分支是正常 junction');
 });
 
+test('wireThruComp:排除连本件自己脚的段(脚在体外),保留穿本件体的真穿', () => {
+	// R1 脚在体框外(905/945),体框 915-935(电阻/电容等真实件常见)。
+	const r1 = { designator: 'R1', bbox: box(915, 491, 935, 499), pins: [{ num: '1', x: 905, y: 495 }, { num: '2', x: 945, y: 495 }] };
+	// ① 连 R1 自己脚2(945)的段从体框内伸到脚 → 穿体框但端点在本件脚 → 误报已排除
+	const ownPin = geomQC({ components: [r1], netflags: [], wires: [{ net: 'A', line: [920, 495, 945, 495] }] });
+	assert.equal(ownPin.wireThruComp.length, 0, '连本件自己脚的段穿体框 = 误报已排除');
+	// ② 长线 y=493 横穿 R1 体框、端点(800/1000)远离 R1 脚、不经脚 → 真穿仍报
+	const realThru = geomQC({ components: [r1], netflags: [], wires: [{ net: 'B', line: [800, 493, 1000, 493] }] });
+	assert.ok(realThru.wireThruComp.length >= 1, '穿本件体且端点不在本件脚 = 真穿仍检测(防过度排除藏真穿)');
+});
+
 test('回归:既有字段仍在(含 collinear/endpointShort/endpointOnWire 短路家族)', () => {
 	const r = geomQC({ components: [], wires: [], netflags: [] });
 	assert.deepEqual(r.overlaps, []);
