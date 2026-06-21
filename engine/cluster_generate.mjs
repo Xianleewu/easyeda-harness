@@ -330,7 +330,13 @@ export async function generateLayout(snap, opts = {}) {
 	} else {
 		subs.sort((a, b) => b.h - a.h);
 	}
-	const MAXW = opts.maxWidth || 2600, PAD = 130, TITLE = 48;
+	const PAD = 130, TITLE = 48;
+	// 行宽:按目标 aspect 平衡换行(多模块单行=宽-短→渲染时件被缩小;平衡成接近 landscape sheet 让模块
+	// 渲染更大更易读)。保序 + PAD 不变 = 无叠压;单模块/总宽已小于 balancedW 的板不换行(行为不变)。
+	const totalW = subs.reduce((a, s) => a + s.w + PAD, 0);
+	const rowH0 = Math.max(...subs.map(s => s.h)) + TITLE + PAD;
+	const maxModW = Math.max(...subs.map(s => s.w));
+	const MAXW = opts.maxWidth || Math.min(2600, Math.max(Math.sqrt(1.6 * totalW * rowH0), maxModW + 1));
 	let curX = 0, curY = 0, rowH = 0;
 	const out = { components: [], wires: [], netflags: [], rectangles: [], texts: [] };
 	const moduleRegions = [];
