@@ -226,7 +226,9 @@ export function layoutClusterTemplate(anchor, members, ctx, depth = 0) {
 		const gapY = sideMin('L', 'R', 'y'), gapX = sideMin('T', 'B', 'x');
 		const sY = gapY < 20 ? 20 / gapY : 1, sX = gapX < 20 ? 20 / gapX : 1;
 		if (sY !== 1 || sX !== 1) {
-			for (const p of ic.pins) { p.x = cxc + (p.x - cxc) * sX; p.y = cyc + (p.y - cyc) * sY; }
+			// 按侧分轴展开:L/R 脚只竖直(sY,标签竖向留位),T/B 脚只水平(sX)——避免无谓的另一轴偏移,
+			// 使桥接线单轴短直、不跨他网(对角桥接 L-route 后会跨网短路)。存原始脚位 _ax/_ay 供投递桥接。
+			for (const p of ic.pins) { p._ax = p.x; p._ay = p.y; const s = sd(p); if (s === 'L' || s === 'R') p.y = cyc + (p.y - cyc) * sY; else p.x = cxc + (p.x - cxc) * sX; }
 			ic.bbox = { minX: cxc + (bb0.minX - cxc) * sX, maxX: cxc + (bb0.maxX - cxc) * sX, minY: cyc + (bb0.minY - cyc) * sY, maxY: cyc + (bb0.maxY - cyc) * sY };
 		}
 	}
@@ -387,6 +389,15 @@ export function layoutClusterTemplate(anchor, members, ctx, depth = 0) {
 		}
 	} else {
 		for (const d of rem) { dumpOne(d, fx0); fx0 += 100; }
+	}
+	// 脚展开桥接:逃逸建在【缩放脚位】,但 EDA 投递用符号【原始脚距】→ 实际脚差几 px 接不到逃逸(真连接 bug)。
+	// 加桥接短线从【原始脚位 _ax/_ay】连到【缩放脚位 x/y】(net 同脚网),投递后 EDA 实际脚经桥接连上逃逸。
+	// 修脚展开与投递的孪生冲突,连接精确;桥接是命名线(EDA 不删)。本地网由 routeLocalNets 处理,跳过。
+	for (const p of (ic.pins || [])) {
+		if (p._ax != null && (Math.abs(p._ax - p.x) > 0.5 || Math.abs(p._ay - p.y) > 0.5)) {
+			const nn = netOf(`${anchor}.${p.num}`);
+			if (nn && nn.class !== 'local') out.wires.push({ net: nn.name, line: [p._ax, p._ay, p.x, p.y] });
+		}
 	}
 	return out;
 }
