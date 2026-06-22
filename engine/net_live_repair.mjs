@@ -30,6 +30,33 @@ export function aggregateAuthNets(netlist) {
 	return nets;
 }
 
+// 投递后【独立会话】验证-修复环(可靠):取权威网表 + 重新快照(settled 板)→ planNetRepair → 补 netport,
+// 收敛到零真断裂或 maxIter 轮。须在【投递完成后】用 settled 板的快照调用(in-deliver 会话快照坐标滞后、
+// 会规划错位 netport 把网碎片化,故 deliverGenerated 内 faithRepair 应关、改由此函数投后修)。
+//   exec:  async js => result  (执行 EDA 端代码并返回 return 值)
+//   snapJs: 自包含快照脚本文本(snapshot2.js 内容)
+export async function verifyAndRepairLive(exec, snapJs, opts = {}) {
+	const nlText = await exec(`const f=await eda.sch_ManufactureData.getNetlistFile();return f?await f.text():null;`);
+	if (!nlText) return { converged: false, note: 'no-netlist' };
+	const netlist = JSON.parse(nlText);
+	let totalPlanned = 0, lastBroken = -1;
+	for (let iter = 0; iter < (opts.maxIter ?? 4); iter++) {
+		const liveSnap = await exec(snapJs);
+		if (!liveSnap) break;
+		const plan = planNetRepair(netlist, liveSnap);
+		lastBroken = plan.broken;
+		if (opts.onIter) opts.onIter(iter, plan);
+		if (!plan.ops.length) return { converged: true, broken: plan.broken, planned: totalPlanned };
+		totalPlanned += plan.planned;
+		const js = ['let n=0;', ...plan.ops.flatMap(op => [
+			`try{await eda.sch_PrimitiveWire.create(${JSON.stringify(op.wireLine)},${JSON.stringify(op.net)});n++;}catch(e){}`,
+			`try{await eda.sch_PrimitiveComponent.createNetPort('BI',${JSON.stringify(op.net)},${op.flagX},${op.flagY},0);n++;}catch(e){}`,
+		]), 'return{n};'].join('\n');
+		await exec(js);
+	}
+	return { converged: false, broken: lastBroken, planned: totalPlanned };
+}
+
 export function planNetRepair(netlist, snapshot, opts = {}) {
 	const TOL = opts.tol ?? 2.0, CLEAR = opts.clear ?? 12, BOXPAD = opts.boxPad ?? 8;
 	const comps = (snapshot && snapshot.components) || [];

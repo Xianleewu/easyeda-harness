@@ -43,7 +43,23 @@ async function main() {
 
 	if (cmd === 'deliver') {
 		const snap = loadSnap(args[0]);
-		await deliverGenerated(snap, { });
+		await deliverGenerated(snap, { faithRepair: false });   // in-deliver 修复关:其会话快照坐标滞后会规划错位 netport 碎片化网
+		// 投递后用独立子进程 \`repair-nets\` 做权威网表验证-修复(关注点分离 + 新进程开新 bridge 连接、规避
+		// deliver 长会话后可能的连接降级)。repair-nets 取【新鲜网表】对账,故不受布局变化致旧网表过时影响。
+		const { spawnSync } = await import('node:child_process');
+		spawnSync(process.execPath, [process.argv[1], 'repair-nets'], { stdio: 'inherit' });
+		return;
+	}
+
+	if (cmd === 'repair-nets') {
+		// 独立验证-修复:权威网表对账当前 live 板,给断裂网补命名 netport,收敛到零断裂(任意板通用)。
+		const { executeCode } = await import('../engine/bridge_client.mjs');
+		const { verifyAndRepairLive } = await import('../engine/net_live_repair.mjs');
+		const { readFileSync } = await import('node:fs');
+		const snapJs = readFileSync(new URL('../snapshot2.js', import.meta.url), 'utf8');
+		const exec = async js => (await executeCode(js, { timeoutMs: 90000 })).result;
+		const r = await verifyAndRepairLive(exec, snapJs, { onIter: (i, p) => console.log(`权威对账(轮${i + 1}): 真断裂网 ${p.broken}${p.ops.length ? `,补 ${p.planned} netport` : ' → 零断网 ✓'}`) });
+		console.log(r.converged ? '✅ 权威网表零断网' : `⚠️ 未完全收敛(剩 ${r.broken} 断裂)`);
 		return;
 	}
 
