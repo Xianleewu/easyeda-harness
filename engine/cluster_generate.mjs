@@ -245,7 +245,13 @@ export function layoutClusterTemplate(anchor, members, ctx, depth = 0) {
 	// 引脚真实边:优先合法 p.side,否则按【到 bbox 四边的最近距离】判定(aspect-aware,对高/宽 IC 都对;
 	// 早先用 |dx|/|dy| 对高 IC 的右侧上部脚会误判成 top → 内联失效掉到 fallback 浮空,2026-06-20 修)。
 	const bb = ic.bbox || { minX: cx, maxX: cx, minY: cy, maxY: cy };
-	const inferEdge = p => { const dL = Math.abs(p.x - bb.minX), dR = Math.abs(p.x - bb.maxX), dT = Math.abs(p.y - bb.minY), dB = Math.abs(p.y - bb.maxY); const m = Math.min(dL, dR, dT, dB); return m === dL ? 'left' : m === dR ? 'right' : m === dT ? 'top' : 'bottom'; };
+	// 归一化坐标(按 bbox 长宽比)定边:|nx|vs|ny| 各除以半宽/半高 → 高瘦 IC 的脚多归 L/R(标签向外平展、
+	// 不横压宽体),只有真正贴上/下边沿且居中的脚才 top/bottom。比"最近边距"对高/宽 IC 都稳(消 label-over-comp)。
+	const inferEdge = p => {
+		const w = (bb.maxX - bb.minX) || 1, h = (bb.maxY - bb.minY) || 1;
+		const nx = (p.x - (bb.minX + bb.maxX) / 2) / (w / 2), ny = (p.y - (bb.minY + bb.maxY) / 2) / (h / 2);
+		return Math.abs(nx) >= Math.abs(ny) ? (nx < 0 ? 'left' : 'right') : (ny < 0 ? 'top' : 'bottom');
+	};
 	const sideOf = p => { const s = (p.side || '').toString().toLowerCase(); return /^l/.test(s) ? 'left' : /^r/.test(s) ? 'right' : /^t/.test(s) ? 'top' : /^b/.test(s) ? 'bottom' : inferEdge(p); };
 	const dirOf = s => s === 'left' ? [-1, 0] : s === 'right' ? [1, 0] : s === 'top' ? [0, -1] : [0, 1];
 	// 信号网标按边朝向(rot/alignMode 对齐 elk_layout 约定:左180/8、右0/6、上90/2、下270/2)。
