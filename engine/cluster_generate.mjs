@@ -13,6 +13,7 @@ import { geomQC } from './geom_qc.mjs';
 import { netflagCreateRotation } from './preserve_deliver.mjs';
 import { recoverConnectivity } from './connectivity_recover.mjs';
 import { routeLocalNets } from './local_net_route.mjs';
+import { repairNetFaithfulness } from './net_faithfulness.mjs';
 
 // 电源/地轨合并:同 net 同 x 的【密集 flag 列】(连续间距≤34=堆叠,如多上拉到 VDD 的 far flag)→
 // 画竖直 rail 连接 + 仅保留首个 flag、移除其余(电气经 rail 同 net 连通)。间距大的(去耦带 ROWC 90)不动。
@@ -494,6 +495,12 @@ export async function generateLayout(snap, opts = {}) {
 	for (const c of out.components) { const v = valByDes.get(c.designator); if (v) c.value = v; }   // 解析真实器件名/值,替换 "={Value}" 坏模板串
 	if (opts.recover) routeLocalNets(out, logical.nets.filter(n => n.class === 'local'));   // P0:无名本地网簇内正交直连(重排后保连通,不打标签)
 	consolidateRails(out);   // 密集电源/地 flag 列(多上拉等)合并成轨,减叠压(clean 板无 dense 列故零回归)
+	// 通用网连通性修复:布局后若某逻辑网裂成多几何组(某组缺该网命名标签 → 真断网,如跨模块网仅一侧打标签),
+	// 给缺标签的组补命名标签做 EDA 名合并。锚在安全空位(不落 bbox/他网端点)→ 不短路;无安全位则跳过。
+	const faith = repairNetFaithfulness(out, logical.nets, {
+		lh: () => labelQC(out).filter(f => f.severity === 'hard').length,
+		geo: () => { const g = geomQC(out); return g.overlaps.length + g.wireThruComp.length + g.wireThruPin.length + g.collinear + g.endpointShort + g.endpointOnWire; },
+	});
 	// 吸【5 栅格】(商用 DR 对象对齐;消浮点累积误差):一致吸格保连通(脚与线端点同点同吸)。
 	// 在 deconflict/ortho 【前】吸——让它们在最终栅格上清理标签/走线,避免吸格后再引入冲突(吸格只动坐标,
 	// 不动 origin 归属;deconflict/ortho 只移标签/走线顶点,不动 component.x/y → origins 保持在格,offgrid=0)。
@@ -506,7 +513,7 @@ export async function generateLayout(snap, opts = {}) {
 	if (opts.deconflict !== false) deconflictLabels(out);   // 默认开:标签去冲突(验证式向外移,零回归;实测 labelHard 43→21)
 	if (opts.ortho || opts.recover) orthogonalizeWires(out);   // DR1:对角线段 → L 形正交(含 deconflict L桩产生的斜段)。recover 路径默认开(零回归:默认路径不触发)
 	const sigLabels = out.netflags.filter(f => f.kind === 'sig').length;
-	return { model: out, moduleRegions, placements, stats: { clusters: subs.length, components: out.components.length, wires: out.wires.length, sigLabels, powerGnd: out.netflags.length - sigLabels, nets: logical.nets.length, placements: placements.length } };
+	return { model: out, moduleRegions, placements, stats: { clusters: subs.length, components: out.components.length, wires: out.wires.length, sigLabels, powerGnd: out.netflags.length - sigLabels, nets: logical.nets.length, placements: placements.length, faith } };
 }
 
 // 把生成的模块图投递到 live EDA。2026-06-20 实测验证:必须用【命名线】(无名线被 EDA 删=0线),
