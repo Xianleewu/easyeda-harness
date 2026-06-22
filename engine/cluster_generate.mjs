@@ -549,7 +549,33 @@ export async function deliverGenerated(snap, opts = {}) {
 	// 投后导线正交化:EDA 创建/合并线时会把部分正交线弄成斜线(实测 6 条,违反 DR1)。读回所有线,
 	// 含斜线段者 → delete + 插 L 角点重建(实测 native 斜线 6→0、DRC warn 减)。模型本身 0 斜线,纯修 EDA 副产物。
 	await exec(`const ws=(await eda.sch_PrimitiveWire.getAll())||[];for(const w of ws){const l=w.line||w.points;if(!Array.isArray(l)||l.length<4)continue;let hd=false;const nl=[l[0],l[1]];for(let i=0;i+3<l.length;i+=2){const x1=l[i],y1=l[i+1],x2=l[i+2],y2=l[i+3];if(x1!==x2&&y1!==y2){hd=true;nl.push(x2,y1,x2,y2);}else{nl.push(x2,y2);}}if(hd){try{await eda.sch_PrimitiveWire.delete([w.primitiveId]);await eda.sch_PrimitiveWire.create(nl,w.net||'');}catch(e){}}}return{};`);
-	console.log('cluster 生成模块图已投 live(命名线持久、跨簇 netport、导线正交化)。');
+	// 投后用 EDA【权威网表】(getNetlistFile)真值对账,修真断裂网(某组缺命名标签 → 不连通)。
+	// 给缺标签的组补命名 netport(安全空位)→ EDA 名合并 → 零断网。通用,netlist 作真值传入,无特定电路内容。
+	if (opts.faithRepair !== false) {
+		try {
+			const { planNetRepair } = await import('./net_live_repair.mjs');
+			const { readFileSync } = await import('node:fs');
+			const snapJs = readFileSync(new URL('../snapshot2.js', import.meta.url), 'utf8');   // 自包含快照脚本(generic)
+			const nlText = await exec(`const f=await eda.sch_ManufactureData.getNetlistFile();return f?await f.text():null;`);
+			if (nlText) {
+				const netlist = JSON.parse(nlText);
+				// 收敛循环:重排/正交化后的板可能尚未 settle、单次快照含瞬态假断裂、且会漏判真断裂网。
+				// 每轮【重新快照(真值几何)→ planNetRepair → 补 netport】,直到零真断裂或 3 轮(防不收敛)。
+				for (let iter = 0; iter < 3; iter++) {
+					const liveSnap = await exec(snapJs);
+					if (!liveSnap) break;
+					const plan = planNetRepair(netlist, liveSnap);
+					console.log(`权威网表对账${iter ? `(轮${iter + 1})` : ''}:真断裂网 ${plan.broken}${plan.broken ? `,补 ${plan.planned} netport${plan.unsafe ? `,无安全位 ${plan.unsafe}` : ''}` : ' → 零断网 ✓'}`);
+					if (!plan.ops.length) break;
+					await runOps('断网修复', plan.ops.flatMap(op => [
+						`try{await eda.sch_PrimitiveWire.create(${JSON.stringify(op.wireLine)},${JSON.stringify(op.net)});n++;}catch(e){}`,
+						`try{await eda.sch_PrimitiveComponent.createNetPort('BI',${JSON.stringify(op.net)},${op.flagX},${op.flagY},${netflagCreateRotation(op.rot || 0)});n++;}catch(e){}`,
+					]));
+				}
+			}
+		} catch (e) { console.error('  网表修复跳过:', String(e).slice(0, 70)); }
+	}
+	console.log('cluster 生成模块图已投 live(命名线持久、跨簇 netport、导线正交化、权威网表零断网)。');
 	return cg.stats;
 }
 
