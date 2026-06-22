@@ -21,7 +21,8 @@ function lroute(x1, y1, x2, y2, segBad, inBox) {
 export function routeLocalNets(model, localNets, opts = {}) {
 	const WIRE_MAX = opts.wireMax ?? 200;   // 本地直连最长跨度;超过则改用命名标签对(商用远距连接标准,零 thru-pin/comp)
 	const pos = new Map(), compOf = new Map();
-	for (const c of (model.components || [])) for (const p of (c.pins || [])) if (p.x != null) { const ref = `${c.designator}.${p.num}`; pos.set(ref, { x: p.x, y: p.y }); compOf.set(ref, c); }
+	// 本地网用【EDA 实际脚位 _ax/_ay】(脚展开把 x/y 撑到缩放位、EDA 用符号原距 → 标签/直连建在 _ax/_ay 才接得上)。
+	for (const c of (model.components || [])) for (const p of (c.pins || [])) if (p.x != null) { const ref = `${c.designator}.${p.num}`; pos.set(ref, { x: p._ax ?? p.x, y: p._ay ?? p.y }); compOf.set(ref, c); }
 	const boxes = (model.components || []).map(c => c.bbox).filter(Boolean);
 	const M = 1;
 	const inBox = (x, y) => boxes.some(b => x > b.minX + M && x < b.maxX - M && y > b.minY + M && y < b.maxY - M);

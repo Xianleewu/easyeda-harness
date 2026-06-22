@@ -380,7 +380,7 @@ export function layoutClusterTemplate(anchor, members, ctx, depth = 0) {
 			const gw = bb.maxX - bb.minX, gh = bb.maxY - bb.minY;
 			if (fx0 > cx - 60 && fx0 + gw > wrapW) { fyRow += rowMaxH + 50; fx0 = cx - 60; rowMaxH = 0; }   // 换行
 			const dox = fx0 - bb.minX, doy = fyRow - bb.minY;
-			for (const c of sub.components) out.components.push({ ...c, x: (c.x ?? 0) + dox, y: (c.y ?? 0) + doy, bbox: { minX: c.bbox.minX + dox, minY: c.bbox.minY + doy, maxX: c.bbox.maxX + dox, maxY: c.bbox.maxY + doy }, pins: (c.pins || []).map(p => ({ ...p, x: p.x + dox, y: p.y + doy })) });
+			for (const c of sub.components) out.components.push({ ...c, x: (c.x ?? 0) + dox, y: (c.y ?? 0) + doy, bbox: { minX: c.bbox.minX + dox, minY: c.bbox.minY + doy, maxX: c.bbox.maxX + dox, maxY: c.bbox.maxY + doy }, pins: (c.pins || []).map(p => ({ ...p, x: p.x + dox, y: p.y + doy, _ax: (p._ax ?? p.x) + dox, _ay: (p._ay ?? p.y) + doy })) });
 			for (const w of sub.wires) out.wires.push({ net: w.net, line: w.line.map((v, k) => k % 2 === 0 ? v + dox : v + doy) });
 			for (const f of sub.netflags) out.netflags.push({ ...f, x: f.x + dox, y: f.y + doy, textX: (f.textX ?? f.x) + dox, textY: (f.textY ?? f.y) + doy });
 			for (const pl of (sub.placements || [])) out.placements.push({ ...pl, x: pl.x + dox, y: pl.y + doy });
@@ -482,7 +482,7 @@ export async function generateLayout(snap, opts = {}) {
 	for (const s of subs) {
 		const p = posOf.get(s);
 		const ox = p.x - s.bb.minX, oy = p.y + TITLE - s.bb.minY;
-		for (const c of s.model.components) out.components.push({ ...c, x: (c.x ?? 0) + ox, y: (c.y ?? 0) + oy, bbox: { minX: c.bbox.minX + ox, minY: c.bbox.minY + oy, maxX: c.bbox.maxX + ox, maxY: c.bbox.maxY + oy }, pins: (c.pins || []).map(p => ({ ...p, x: p.x + ox, y: p.y + oy })) });   // x/y 也偏移(否则件位与 bbox/脚错位)
+		for (const c of s.model.components) out.components.push({ ...c, x: (c.x ?? 0) + ox, y: (c.y ?? 0) + oy, bbox: { minX: c.bbox.minX + ox, minY: c.bbox.minY + oy, maxX: c.bbox.maxX + ox, maxY: c.bbox.maxY + oy }, pins: (c.pins || []).map(p => ({ ...p, x: p.x + ox, y: p.y + oy, _ax: (p._ax ?? p.x) + ox, _ay: (p._ay ?? p.y) + oy })) });   // x/y(展开脚)+ _ax/_ay(EDA 实际脚位)同步偏移
 		for (const w of s.model.wires) out.wires.push({ net: w.net, line: w.line.map((v, k) => k % 2 === 0 ? v + ox : v + oy) });
 		for (const f of s.model.netflags) out.netflags.push({ ...f, x: f.x + ox, y: f.y + oy, textX: (f.textX || f.x) + ox, textY: (f.textY || f.y) + oy });
 		for (const pl of (s.model.placements || [])) placements.push({ ...pl, x: pl.x + ox, y: pl.y + oy });
