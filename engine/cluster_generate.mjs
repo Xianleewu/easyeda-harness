@@ -524,7 +524,10 @@ export async function deliverGenerated(snap, opts = {}) {
 	const heal = [];
 	for (const w of cg.model.wires) { if (!w.net || cset.has(w.net)) continue; const l = w.line; for (const [x, y] of [[l[0], l[1]], [l[l.length - 2], l[l.length - 1]]]) heal.push(`try{await eda.sch_PrimitiveComponent.createNetPort('BI',${JSON.stringify(w.net)},${x},${y},0);n++;}catch(e){}`); }
 	if (heal.length) { console.log(`自愈 ${heal.length / 2} 漏网...`); await runOps('自愈', heal); }
-	console.log('cluster 生成模块图已投 live(命名线持久、跨簇 netport)。');
+	// 投后导线正交化:EDA 创建/合并线时会把部分正交线弄成斜线(实测 6 条,违反 DR1)。读回所有线,
+	// 含斜线段者 → delete + 插 L 角点重建(实测 native 斜线 6→0、DRC warn 减)。模型本身 0 斜线,纯修 EDA 副产物。
+	await exec(`const ws=(await eda.sch_PrimitiveWire.getAll())||[];for(const w of ws){const l=w.line||w.points;if(!Array.isArray(l)||l.length<4)continue;let hd=false;const nl=[l[0],l[1]];for(let i=0;i+3<l.length;i+=2){const x1=l[i],y1=l[i+1],x2=l[i+2],y2=l[i+3];if(x1!==x2&&y1!==y2){hd=true;nl.push(x2,y1,x2,y2);}else{nl.push(x2,y2);}}if(hd){try{await eda.sch_PrimitiveWire.delete([w.primitiveId]);await eda.sch_PrimitiveWire.create(nl,w.net||'');}catch(e){}}}return{};`);
+	console.log('cluster 生成模块图已投 live(命名线持久、跨簇 netport、导线正交化)。');
 	return cg.stats;
 }
 
