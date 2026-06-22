@@ -1,5 +1,7 @@
-// EDA 器件变换约定（经 R2/rot270、R4/rot90 实例标定）
-// world = origin + R(rot) * (mirror ? (-lx,ly) : (lx,ly))
+// EDA 器件变换约定（2026-06-22 实测全 8 帧标定:R1 在 rot{0,90,180,270}×mirror{0,1},getAllPinsByPrimitiveId 读真值）
+//   无镜像:world = origin + Rccw(rot) * (lx,ly)
+//   镜像  :world = origin + Rccw(360-rot) * (-lx, ly)   ← 镜像翻 X 后【CW 旋转】(镜像反转旋转方向,几何正确)
+// 早先只按非镜像实例标定 → 镜像件脚位算错(CCW 而非 CW)→ deliver 后镜像件连线全错位丢连。与 eda_transform.mjs 一致。
 const R = {
 	0: (x, y) => [x, y],
 	90: (x, y) => [-y, x],
@@ -9,16 +11,18 @@ const R = {
 const Rinv = { 0: R[0], 90: R[270], 270: R[90], 180: R[180] };
 const norm = r => ((Math.round((r || 0) / 90) * 90) % 360 + 360) % 360;   // r||0 防御:缺/NaN rotation→0(无旋转即0,免 Rinv[NaN] 崩)
 
-// 由当前 world 引脚反推本地偏移
+// 镜像时有效旋转 = 360-rot(CW),否则 = rot(CCW)。实测标定。
+const effRot = (rot, mirror) => mirror ? norm(360 - norm(rot)) : norm(rot);
+// 由当前 world 引脚反推本地偏移(toWorld 的逆:先去旋转 effRot 再去翻 X)
 export function toLocal(world, origin, rot, mirror) {
 	const dx = world[0] - origin[0], dy = world[1] - origin[1];
-	const [lx, ly] = Rinv[norm(rot)](dx, dy);
+	const [lx, ly] = Rinv[effRot(rot, mirror)](dx, dy);
 	return mirror ? [-lx, ly] : [lx, ly];
 }
-// 给定本地偏移 + 新朝向 -> 新 world
+// 给定本地偏移 + 新朝向 -> 新 world(先翻 X 再按 effRot 旋转)
 export function toWorld(local, origin, rot, mirror) {
 	const [mx, my] = mirror ? [-local[0], local[1]] : [local[0], local[1]];
-	const [rx, ry] = R[norm(rot)](mx, my);
+	const [rx, ry] = R[effRot(rot, mirror)](mx, my);
 	return [origin[0] + rx, origin[1] + ry];
 }
 // 给器件补充本地引脚偏移（基于当前朝向）
