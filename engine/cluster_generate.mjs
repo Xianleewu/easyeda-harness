@@ -48,8 +48,10 @@ function deconflictLabels(model) {
 	// 每 pass 1 个移动;`!best break` 在收敛(无改善)时退出。早退优化后每 pass 很快,上限放宽到 60
 	// 让多叠压板(如 58件板 22 叠压)解更多(实测 22→9)。评估预算封顶超大板时间(中小板早收敛不触及):
 	// labelQC 调用计数 > 预算则停,确定性(同输入同结果),避免超大板 deconflict 过久。
-	let evals = 0; const EVAL_BUDGET = 2200;
-	for (let pass = 0; pass < 60; pass++) {
+	// 预算/轮数按标签数缩放:小板早收敛、快;复杂板(密集标签)多算消更多冲突(实测某板 88→67)。
+	const nLabels = (model.netflags || []).length;
+	let evals = 0; const EVAL_BUDGET = Math.min(40000, Math.max(2200, nLabels * 280));
+	for (let pass = 0, maxPass = Math.min(500, Math.max(60, nLabels * 4)); pass < maxPass; pass++) {
 		if (evals > EVAL_BUDGET) break;
 		const hard = labelQC(model).filter(f => f.severity === 'hard');
 		const base = hard.length; if (base === 0) break; const bg = geo(model);
