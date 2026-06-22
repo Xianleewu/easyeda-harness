@@ -217,9 +217,13 @@ export function layoutClusterTemplate(anchor, members, ctx, depth = 0) {
 		const bb0 = ic.bbox, cxc = (bb0.minX + bb0.maxX) / 2, cyc = (bb0.minY + bb0.maxY) / 2;
 		const sd = p => { const dL = Math.abs(p.x - bb0.minX), dR = Math.abs(p.x - bb0.maxX), dT = Math.abs(p.y - bb0.minY), dB = Math.abs(p.y - bb0.maxY); const m = Math.min(dL, dR, dT, dB); return m === dL ? 'L' : m === dR ? 'R' : m === dT ? 'T' : 'B'; };
 		const minGap = (arr, ax) => { const v = arr.map(p => p[ax]).sort((a, b) => a - b); let g = 1e9; for (let i = 1; i < v.length; i++) if (v[i] - v[i - 1] > 0.5) g = Math.min(g, v[i] - v[i - 1]); return g; };
-		const lr = ic.pins.filter(p => { const s = sd(p); return s === 'L' || s === 'R'; });
-		const tb = ic.pins.filter(p => { const s = sd(p); return s === 'T' || s === 'B'; });
-		const gapY = lr.length > 1 ? minGap(lr, 'y') : 99, gapX = tb.length > 1 ? minGap(tb, 'x') : 99;
+		// 按【每一侧单独】算脚间距(早先把左右两列合并算→交错排针连接器如 FPC 的奇左偶右交错使 min=半距,
+		// 误触发缩放、把脚距撑成 2× → 投递时 EDA 用符号原距、线接不到脚差 10px=真连接 bug)。同列标签朝同方向、
+		// 才有叠压风险,故应按列(L/R 各自、T/B 各自)取 min,取两列较密者。
+		const sideMin = (side1, side2, ax) => Math.min(
+			ic.pins.filter(p => sd(p) === side1).length > 1 ? minGap(ic.pins.filter(p => sd(p) === side1), ax) : 99,
+			ic.pins.filter(p => sd(p) === side2).length > 1 ? minGap(ic.pins.filter(p => sd(p) === side2), ax) : 99);
+		const gapY = sideMin('L', 'R', 'y'), gapX = sideMin('T', 'B', 'x');
 		const sY = gapY < 20 ? 20 / gapY : 1, sX = gapX < 20 ? 20 / gapX : 1;
 		if (sY !== 1 || sX !== 1) {
 			for (const p of ic.pins) { p.x = cxc + (p.x - cxc) * sX; p.y = cyc + (p.y - cyc) * sY; }
