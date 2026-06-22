@@ -268,7 +268,9 @@ export function layoutClusterTemplate(anchor, members, ctx, depth = 0) {
 				// 多内联件(≥2)需 perp rail 竖直跨度 → 会穿过相邻信号的水平标桩+标签(同逃逸走廊)致短路/L4。
 				// 节点沿逃逸方向额外外推,使 rail 落在相邻信号标签左侧(走廊外)。单件(无 rail 跨度)不外推=零影响。
 				const railExtra = conns.length >= 2 ? 50 : 0;   // node-rail 外推:50 在不增短路前提下缩模块 50px(实测 100→50 短路3不变、span -50;=0 短路3→5 因 rail 穿标签)。原 100 为旧 netlist 调,偏大撑模块
-				const nodeX = p.x + dx * (STUB + railExtra), nodeY = p.y + dy * (STUB + railExtra);
+				const clrBody = dx > 0 ? bb.maxX - p.x : dx < 0 ? p.x - bb.minX : dy > 0 ? bb.maxY - p.y : p.y - bb.minY;
+				const stubEff = Math.max(STUB, clrBody + 14);   // 逃逸清出 IC 体(内嵌/近体脚的无源件不落体内)
+				const nodeX = p.x + dx * (stubEff + railExtra), nodeY = p.y + dy * (stubEff + railExtra);
 				const perpX = dy === 0 ? 0 : 1, perpY = dy === 0 ? 1 : 0;   // rail 方向(水平脚→向下,竖直脚→向右)
 				const vert = dy !== 0;
 				out.wires.push({ net: nn.name, line: [p.x, p.y, nodeX, nodeY] });
