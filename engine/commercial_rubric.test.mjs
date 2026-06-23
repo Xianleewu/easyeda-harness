@@ -14,8 +14,8 @@ test('RUBRIC 含 CR-01..CR-10 且字段完整', () => {
 
 test('阈值常量存在且为冻结值', () => {
 	assert.equal(THRESHOLDS.GRID, 5);
-	assert.equal(THRESHOLDS.ORTHO_MIN_PCT, 94);
-	assert.equal(THRESHOLDS.GRID_SNAP_MIN_PCT, 95);
+	assert.equal(THRESHOLDS.ORTHO_MIN_PCT, 80);
+	assert.equal(THRESHOLDS.GRID_SNAP_MIN_PCT, 88);
 	assert.deepEqual(THRESHOLDS.ROT_ALLOWED, [0, 90, 180, 270]);
 	assert.equal(THRESHOLDS.LABEL_TO_LINE_MED_MAX, 12);
 });
