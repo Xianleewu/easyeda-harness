@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { RUBRIC, THRESHOLDS, crOrthogonality, crGridSnap } from './commercial_rubric.mjs';
+import { RUBRIC, THRESHOLDS, crOrthogonality, crGridSnap, crRotation } from './commercial_rubric.mjs';
 
 test('RUBRIC 含 CR-01..CR-10 且字段完整', () => {
 	const ids = RUBRIC.map(r => r.id);
@@ -54,5 +54,20 @@ test('CR-03 半数脱格 → 不通过', () => {
 	const model = { components: [{ pins: [{ x: 3, y: 5 }, { x: 10, y: 15 }] }] };
 	const r = crGridSnap(model);
 	assert.equal(r.snapPct, 50);
+	assert.equal(r.pass, false);
+});
+
+test('CR-04 全四正交旋转、无镜像 → 通过', () => {
+	const model = { components: [{ rotation: 0, mirror: false }, { rotation: 90, mirror: false }] };
+	const r = crRotation(model);
+	assert.equal(r.badRot, 0);
+	assert.equal(r.mirrorPct, 0);
+	assert.equal(r.pass, true);
+});
+
+test('CR-04 出现 45 度旋转 → 不通过', () => {
+	const model = { components: [{ rotation: 45, mirror: false }] };
+	const r = crRotation(model);
+	assert.equal(r.badRot, 1);
 	assert.equal(r.pass, false);
 });

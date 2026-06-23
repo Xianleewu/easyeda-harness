@@ -55,3 +55,17 @@ export function crGridSnap(model) {
 	const snapPct = total ? +(on / total * 100).toFixed(1) : 100;
 	return { id: 'CR-03', pass: snapPct >= THRESHOLDS.GRID_SNAP_MIN_PCT, snapPct, total, on };
 }
+
+export function crRotation(model) {
+	const comps = model.components || [];
+	const rotDist = {};
+	let bad = 0, mir = 0;
+	for (const c of comps) {
+		const r = ((c.rotation || 0) % 360 + 360) % 360;
+		rotDist[r] = (rotDist[r] || 0) + 1;
+		if (!THRESHOLDS.ROT_ALLOWED.includes(r)) bad++;
+		if (c.mirror) mir++;
+	}
+	const mirrorPct = comps.length ? +(mir / comps.length * 100).toFixed(1) : 0;
+	return { id: 'CR-04', pass: bad === 0 && mirrorPct <= THRESHOLDS.MIRROR_MAX_PCT, rotDist, badRot: bad, mirrorPct };
+}
