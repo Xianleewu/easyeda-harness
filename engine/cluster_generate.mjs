@@ -15,6 +15,8 @@ import { recoverConnectivity } from './connectivity_recover.mjs';
 import { routeLocalNets } from './local_net_route.mjs';
 import { repairNetFaithfulness } from './net_faithfulness.mjs';
 import { directRouteClose } from './direct_route.mjs';
+import { connPlace } from './conn_place.mjs';
+import { mirrorModuleX } from './module_orient.mjs';
 
 // 电源/地轨合并:同 net 同 x 的【密集 flag 列】(连续间距≤34=堆叠,如多上拉到 VDD 的 far flag)→
 // 画竖直 rail 连接 + 仅保留首个 flag、移除其余(电气经 rail 同 net 连通)。间距大的(去耦带 ROWC 90)不动。
@@ -483,12 +485,19 @@ export async function generateLayout(snap, opts = {}) {
 	// ── BLF(bottom-left-fill)2D 装箱:每模块(按高降序)放到能放下且【顶最低】的 x,填补 row-packing 的垂直缝,
 	//    显著提升利用率(2.5%→~更高)。天际线 sky=[{x0,x1,y}],topAt 取区间最高 y,raise 抬升放置区间。
 	//    模块 s.w/s.h 已含逃逸标签 bbox,PAD 缝保证不叠压;保序遍历 subs 取 BLF 位,标题/区域随之。
-	const order = [...subs].sort((a, b) => b.h - a.h);
-	const sky = [{ x0: BASE, x1: BASE + MAXW, y: BASE }];
-	const topAt = (x0, x1) => { let m = BASE; for (const sg of sky) { if (sg.x1 <= x0 || sg.x0 >= x1) continue; m = Math.max(m, sg.y); } return m; };
-	const raise = (x0, x1, y) => { const ns = []; for (const sg of sky) { if (sg.x1 <= x0 || sg.x0 >= x1) { ns.push(sg); continue; } if (sg.x0 < x0) ns.push({ x0: sg.x0, x1: x0, y: sg.y }); if (sg.x1 > x1) ns.push({ x0: x1, x1: sg.x1, y: sg.y }); } ns.push({ x0, x1, y }); ns.sort((a, b) => a.x0 - b.x0); sky.length = 0; sky.push(...ns); };
 	const posOf = new Map();
-	for (const s of order) { const W = s.w + PAD, H = TITLE + s.h + PAD; let bx = BASE, by = Infinity; for (let x = BASE; x + W <= BASE + MAXW + 1; x += 10) { const y = topAt(x, x + W); if (y < by) { by = y; bx = x; } } if (!isFinite(by)) { bx = BASE; by = topAt(BASE, BASE + W); } posOf.set(s, { x: bx, y: by }); raise(bx, bx + W, by + H); }
+	if (opts.connPlace && subs.length > 1) {
+		// 连接驱动摆放:相连模块摆相邻 + 选朝向使共享脚面对面 → 跨模块连接短(可直连)。镜像绕 bb 中线、保 bb → 装配偏移仍有效。
+		const cpSubs = subs.map(s => ({ id: s.anchor, w: s.w, h: s.h + TITLE, pins: s.model.components.flatMap(c => (c.pins || []).filter(p => p.x != null).map(p => ({ ref: `${c.designator}.${p.num}`, x: (p._ax ?? p.x) - s.bb.minX, y: (p._ay ?? p.y) - s.bb.minY }))) }));
+		const cp = connPlace(cpSubs, logical.nets, { pad: PAD, base: BASE });
+		for (const s of subs) { const p = cp.get(s.anchor); posOf.set(s, { x: p.X, y: p.Y }); if (p.mir) mirrorModuleX(s.model, (s.bb.minX + s.bb.maxX) / 2); }
+	} else {
+		const order = [...subs].sort((a, b) => b.h - a.h);
+		const sky = [{ x0: BASE, x1: BASE + MAXW, y: BASE }];
+		const topAt = (x0, x1) => { let m = BASE; for (const sg of sky) { if (sg.x1 <= x0 || sg.x0 >= x1) continue; m = Math.max(m, sg.y); } return m; };
+		const raise = (x0, x1, y) => { const ns = []; for (const sg of sky) { if (sg.x1 <= x0 || sg.x0 >= x1) { ns.push(sg); continue; } if (sg.x0 < x0) ns.push({ x0: sg.x0, x1: x0, y: sg.y }); if (sg.x1 > x1) ns.push({ x0: x1, x1: sg.x1, y: sg.y }); } ns.push({ x0, x1, y }); ns.sort((a, b) => a.x0 - b.x0); sky.length = 0; sky.push(...ns); };
+		for (const s of order) { const W = s.w + PAD, H = TITLE + s.h + PAD; let bx = BASE, by = Infinity; for (let x = BASE; x + W <= BASE + MAXW + 1; x += 10) { const y = topAt(x, x + W); if (y < by) { by = y; bx = x; } } if (!isFinite(by)) { bx = BASE; by = topAt(BASE, BASE + W); } posOf.set(s, { x: bx, y: by }); raise(bx, bx + W, by + H); }
+	}
 	// 模块标题:用【锚点 + 真实器件型号】(准确、不误导)。设计者原图的描述性标题与我的网表聚类不一一对应
 	// (我按连通聚类、他按功能分),空间匹配会张冠李戴 → 故用器件型号这个确定可靠的信息。原图全部旧文字由 deliver 删除(消灭孤儿)。
 	for (const s of subs) {
