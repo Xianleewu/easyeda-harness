@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { RUBRIC, THRESHOLDS, crOrthogonality, crGridSnap, crRotation, crSpacing, crNamedRatio } from './commercial_rubric.mjs';
+import { RUBRIC, THRESHOLDS, crOrthogonality, crGridSnap, crRotation, crSpacing, crNamedRatio, crLabelToLine } from './commercial_rubric.mjs';
 
 test('RUBRIC 含 CR-01..CR-10 且字段完整', () => {
 	const ids = RUBRIC.map(r => r.id);
@@ -100,4 +100,18 @@ test('CR-07 命名占比统计,恒不扣分', () => {
 	assert.equal(r.total, 3);
 	assert.equal(r.namedPct, 67);
 	assert.equal(r.pass, true);
+});
+
+test('CR-06 标签贴在线顶点 → 距离 0 通过', () => {
+	const model = { wires: [{ line: [0, 0, 20, 0], attrs: [{ key: 'Name', value: 'NETA', x: 0, y: 0 }] }] };
+	const r = crLabelToLine(model);
+	assert.equal(r.medDist, 0);
+	assert.equal(r.pass, true);
+});
+
+test('CR-06 标签飘远(距 50) → 不通过', () => {
+	const model = { wires: [{ line: [0, 0, 20, 0], attrs: [{ key: 'Name', value: 'NETA', x: 0, y: 50 }] }] };
+	const r = crLabelToLine(model);
+	assert.equal(r.medDist, 50);
+	assert.equal(r.pass, false);
 });

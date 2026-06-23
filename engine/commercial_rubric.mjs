@@ -111,3 +111,22 @@ export function crNamedRatio(model) {
 	const namedPct = wires.length ? Math.round(named / wires.length * 100) : 0;
 	return { id: 'CR-07', pass: true, namedPct, named, total: wires.length };
 }
+
+export function crLabelToLine(model) {
+	const dists = [];
+	for (const w of model.wires || []) {
+		const l = w.line || [];
+		const verts = [];
+		for (let i = 0; i + 1 < l.length; i += 2) verts.push([l[i], l[i + 1]]);
+		for (const a of w.attrs || []) {
+			if (!/name/i.test(a.key) || !a.value || !Number.isFinite(a.x)) continue;
+			let m = Infinity;
+			for (const v of verts) { const d = Math.hypot(a.x - v[0], a.y - v[1]); if (d < m) m = d; }
+			if (m < Infinity) dists.push(m);
+		}
+	}
+	dists.sort((x, y) => x - y);
+	const medDist = +median(dists).toFixed(1);
+	const p90 = dists.length ? +dists[Math.floor(dists.length * 0.9)].toFixed(1) : 0;
+	return { id: 'CR-06', pass: dists.length === 0 || medDist <= THRESHOLDS.LABEL_TO_LINE_MED_MAX, medDist, p90, n: dists.length };
+}
