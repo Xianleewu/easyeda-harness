@@ -146,6 +146,19 @@ test('CR-01 error=0 通过,error>0 不通过', () => {
 	assert.equal(crDrc({ error: 2, warn: 0, info: 0 }).pass, false);
 });
 
+test('CR-01 DRC 不可用 → 不通过(fail-closed)', () => {
+	assert.equal(crDrc({raw:false}).pass, false, 'DRC 无证据应不通过');
+	assert.equal(crDrc({error:null}).pass, false, 'error=null 应不通过');
+	assert.equal(crDrc({}).pass, false, '空对象应不通过');
+});
+
+test('CR-01 error=null 的证据标签为 null', () => {
+	const r = crDrc({raw:false});
+	assert.equal(r.error, null);
+	assert.equal(r.warn, null);
+	assert.equal(r.info, null);
+});
+
 test('scoreAll 汇总:全好板 commercialPass=true', () => {
 	const model = {
 		components: [{ rotation: 0, mirror: false, x: 0, y: 0, bbox: { minX: -5, minY: -5, maxX: 5, maxY: 5 },

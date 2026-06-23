@@ -157,8 +157,8 @@ export function crLabelPlacement(model) {
 }
 
 export function crDrc(drc = {}) {
-	const error = drc.error || 0;
-	return { id: 'CR-01', pass: error === 0, error, warn: drc.warn || 0, info: drc.info || 0 };
+	const error = Number.isFinite(drc.error) ? drc.error : null;  // null = DRC 无证据
+	return { id: 'CR-01', pass: error === 0, error, warn: drc.warn ?? null, info: drc.info ?? null };
 }
 
 // 无纯几何判据规则(CR-08/CR-09)默认 pending,由视觉证据补判(Task 12)

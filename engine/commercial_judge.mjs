@@ -2,7 +2,7 @@
 import { scoreAll } from './commercial_rubric.mjs';
 import { readGeometry, captureRegion, regionFromParts } from './bridge_windows.mjs';
 import { executeCode } from './bridge_client.mjs';
-import { writeFileSync } from 'node:fs';
+import { mkdirSync, writeFileSync } from 'node:fs';
 
 export function judgeBoard(model, { drc, shots = [] } = {}) {
 	const s = scoreAll(model, { drc });
@@ -13,7 +13,7 @@ export function judgeBoard(model, { drc, shots = [] } = {}) {
 async function runDrc({ windowId, port, timeoutMs = 120000 }) {
 	const code = `
 const res = await eda.sch_Drc.check(true, false, true).catch(()=>null);
-if (!Array.isArray(res)) return { error:0, warn:0, info:0, raw:false };
+if (!Array.isArray(res)) return { error: null, warn: null, info: null, raw: false };
 const pick = t => (res.find(x=>x.type===t)||{count:0}).count||0;
 return { error: pick('fatalError')+pick('error'), warn: pick('warn'), info: pick('info'), raw:true };
 `;
@@ -31,6 +31,7 @@ export async function runLiveJudge({ windowId = '', port = 0, outDir = '.', time
 		try { await captureRegion({ windowId, port, region, outFile: out, timeoutMs }); shots.push(out); } catch { /* 截图失败不伪装,留空证据 */ }
 	}
 	const report = judgeBoard(model, { drc, shots });
+	mkdirSync(outDir, { recursive: true });
 	writeFileSync(`${outDir}/judge_report.json`, JSON.stringify({ ...report, drc }, null, 2), 'utf8');
 	return report;
 }
