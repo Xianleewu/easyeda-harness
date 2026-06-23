@@ -1,7 +1,7 @@
 // 几何严标检查器单测(RED 验证:无实现)
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { checkOrtho, checkGrid, checkNoCross, checkNoThru, checkNoOverlap } from './token_conformance.mjs';
+import { checkOrtho, checkGrid, checkNoCross, checkNoThru, checkNoOverlap, checkDensity, checkAnnotPlace, checkAnnotFull } from './token_conformance.mjs';
 
 test('T-ORTHO 严标:有1段斜线即不符合', () => {
 	const r = checkOrtho({ wires: [{ line: [0,0,10,0], net: '' }, { line: [0,0,10,10], net: '' }] });
@@ -55,4 +55,36 @@ test('T-NOOVERLAP 0 overlap → 符合', () => {
 	const r = checkNoOverlap({ components: [{ designator: 'R1', bbox: { minX: 0, minY: 0, maxX: 10, maxY: 10 }, pins: [] }, { designator: 'R2', bbox: { minX: 20, minY: 20, maxX: 30, maxY: 30 }, pins: [] }], wires: [], netflags: [] });
 	assert.equal(r.token, 'T-NOOVERLAP');
 	assert.equal(r.conform, true);
+});
+
+test('T-DENSITY:间距太散(中位>50)→不符合', () => {
+	const mk = x => ({ x, y: 0, bbox: { minX: x, minY: 0, maxX: x + 2, maxY: 2 }, pins: [] });
+	const sparse = checkDensity({ components: [mk(0), mk(200), mk(400)] });
+	assert.equal(sparse.token, 'T-DENSITY');
+	assert.equal(sparse.conform, false);
+	const dense = checkDensity({ components: [mk(0), mk(40), mk(80)] });
+	assert.equal(dense.conform, true);
+});
+
+test('T-ANNOT-PLACE:2脚件标号/值位置有效但坐标缺失 → 无异常', () => {
+	const noCoords = {
+		components: [{
+			bbox: { minX: 0, minY: 0, maxX: 10, maxY: 10 },
+			pins: [{ x: 0, y: 5 }, { x: 10, y: 5 }],
+			attrs: [
+				{ key: 'Designator', valueVisible: true }
+			]
+		}]
+	};
+	const r = checkAnnotPlace(noCoords);
+	assert.equal(r.token, 'T-ANNOT-PLACE');
+	// 无坐标的标注被过滤,total=0 → outsidePct=100 → conform=true
+	assert.equal(r.conform, true);
+});
+
+test('T-ANNOT-FULL:无源件缺值标注→不符合', () => {
+	const withVal = { pins: [{},{}], attrs: [{ key: 'Name', valueVisible: true, value: '10k' }] };
+	const bare    = { pins: [{},{}], attrs: [{ key: 'Designator', valueVisible: true, value: 'R1' }] };
+	assert.equal(checkAnnotFull({ components: [withVal] }).conform, true);
+	assert.equal(checkAnnotFull({ components: [bare] }).conform, false);
 });
