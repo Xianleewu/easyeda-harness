@@ -41,3 +41,17 @@ export function crOrthogonality(model) {
 	const orthoPct = seg ? +(ortho / seg * 100).toFixed(1) : 100;
 	return { id: 'CR-02', pass: orthoPct >= THRESHOLDS.ORTHO_MIN_PCT, orthoPct, seg, ortho, deg45, other: seg - ortho - deg45 };
 }
+
+export function crGridSnap(model) {
+	const g = THRESHOLDS.GRID;
+	let total = 0, on = 0;
+	for (const c of model.components || []) {
+		for (const p of c.pins || []) {
+			if (!Number.isFinite(p.x) || !Number.isFinite(p.y)) continue;
+			total++;
+			if (p.x % g === 0 && p.y % g === 0) on++;
+		}
+	}
+	const snapPct = total ? +(on / total * 100).toFixed(1) : 100;
+	return { id: 'CR-03', pass: snapPct >= THRESHOLDS.GRID_SNAP_MIN_PCT, snapPct, total, on };
+}

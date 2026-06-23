@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { RUBRIC, THRESHOLDS, crOrthogonality } from './commercial_rubric.mjs';
+import { RUBRIC, THRESHOLDS, crOrthogonality, crGridSnap } from './commercial_rubric.mjs';
 
 test('RUBRIC 含 CR-01..CR-10 且字段完整', () => {
 	const ids = RUBRIC.map(r => r.id);
@@ -39,5 +39,20 @@ test('CR-02 一段 45° 计入 deg45 且不算正交', () => {
 	const r = crOrthogonality(model);
 	assert.equal(r.deg45, 1);
 	assert.equal(r.orthoPct, 0);
+	assert.equal(r.pass, false);
+});
+
+test('CR-03 全部脚落 5 栅格 → 通过', () => {
+	const model = { components: [{ pins: [{ x: 0, y: 5 }, { x: 10, y: 15 }] }] };
+	const r = crGridSnap(model);
+	assert.equal(r.id, 'CR-03');
+	assert.equal(r.snapPct, 100);
+	assert.equal(r.pass, true);
+});
+
+test('CR-03 半数脱格 → 不通过', () => {
+	const model = { components: [{ pins: [{ x: 3, y: 5 }, { x: 10, y: 15 }] }] };
+	const r = crGridSnap(model);
+	assert.equal(r.snapPct, 50);
 	assert.equal(r.pass, false);
 });
