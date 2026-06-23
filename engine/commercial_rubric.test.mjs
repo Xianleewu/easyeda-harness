@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { RUBRIC, THRESHOLDS } from './commercial_rubric.mjs';
+import { RUBRIC, THRESHOLDS, crOrthogonality } from './commercial_rubric.mjs';
 
 test('RUBRIC 含 CR-01..CR-10 且字段完整', () => {
 	const ids = RUBRIC.map(r => r.id);
@@ -23,4 +23,21 @@ test('阈值常量存在且为冻结值', () => {
 test('零特定电路字面量(无具体器件/网名指纹)', () => {
 	const src = RUBRIC.map(r => r.desc).join(' ');
 	assert.doesNotMatch(src, /AMS1117|AO3400|ESP32|RK3576|VCC3V3_|VDD_CPU/i);
+});
+
+test('CR-02 全正交线 → 100% 通过', () => {
+	const model = { wires: [{ line: [0, 0, 10, 0, 10, 10] }] }; // 1 横 1 竖
+	const r = crOrthogonality(model);
+	assert.equal(r.id, 'CR-02');
+	assert.equal(r.seg, 2);
+	assert.equal(r.orthoPct, 100);
+	assert.equal(r.pass, true);
+});
+
+test('CR-02 一段 45° 计入 deg45 且不算正交', () => {
+	const model = { wires: [{ line: [0, 0, 10, 10] }] }; // 斜 45
+	const r = crOrthogonality(model);
+	assert.equal(r.deg45, 1);
+	assert.equal(r.orthoPct, 0);
+	assert.equal(r.pass, false);
 });

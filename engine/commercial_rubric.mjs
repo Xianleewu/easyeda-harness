@@ -26,3 +26,18 @@ export const RUBRIC = [
 	{ id: 'CR-09', dimension: '标注', desc: '无源件带值/封装/参数标注;关键功能块有注释;可选电路有 DNP 标注', evidence: 'image-region', severity: 'flag' },
 	{ id: 'CR-10', dimension: '标注摆放', desc: '标号/阻值在器件外、垂直脚轴偏移落格、同侧错开堆叠、不压件脚线不互盖', evidence: 'geom+image-region', severity: 'block' },
 ];
+
+export function crOrthogonality(model) {
+	let seg = 0, ortho = 0, deg45 = 0;
+	for (const w of model.wires || []) {
+		const l = w.line || [];
+		for (let i = 0; i + 3 < l.length; i += 2) {
+			seg++;
+			const dx = l[i + 2] - l[i], dy = l[i + 3] - l[i + 1];
+			if (dx === 0 || dy === 0) ortho++;
+			else if (Math.abs(Math.abs(dx) - Math.abs(dy)) < 1) deg45++;
+		}
+	}
+	const orthoPct = seg ? +(ortho / seg * 100).toFixed(1) : 100;
+	return { id: 'CR-02', pass: orthoPct >= THRESHOLDS.ORTHO_MIN_PCT, orthoPct, seg, ortho, deg45, other: seg - ortho - deg45 };
+}
