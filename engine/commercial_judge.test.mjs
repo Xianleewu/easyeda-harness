@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { judgeBoard, runLiveJudge, judgeSnapshot } from './commercial_judge.mjs';
+import { judgeBoard, judgeBoardTokens, runLiveJudge, judgeSnapshot } from './commercial_judge.mjs';
 import { writeFileSync, mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -28,4 +28,12 @@ test('judgeSnapshot 读 JSON 离线评分', () => {
 	const rep = judgeSnapshot(f, { drc: { error: 0, warn: 0, info: 0 } });
 	assert.equal(rep.rules.length, 10);
 	assert.equal(rep.commercialPass, true);
+});
+
+test('judgeBoardTokens 三层 + shots 透传,DRC脏→不符合', () => {
+	const rep = judgeBoardTokens({ components: [], wires: [] }, { drc: { error: 1, warn: 0, info: 0 }, shots: ['/tmp/x.png'] });
+	assert.equal(rep.conform, false);
+	assert.equal(rep.tier1.conform, false);
+	assert.deepEqual(rep.shots, ['/tmp/x.png']);
+	assert.equal(rep.score, undefined);
 });
