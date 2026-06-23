@@ -12,6 +12,9 @@
 
 export function connPlace(subs, nets, opts = {}) {
 	const PAD = opts.pad ?? 40, BASE = opts.base ?? 60;
+	// aspect 偏置(opt-in):仅最小化连接长会排成纵向稀疏图;商用图纸横向(A 系列~1.4)。
+	// 设 opts.aspect=目标长宽比 → 在连接代价上叠加"图过高"惩罚,破近平局偏横向铺开。默认关=零回归。
+	const TARGET = opts.aspect ?? 0, ASPECTW = opts.aspectW ?? 0.4;
 	const subById = new Map(subs.map(s => [s.id, s]));
 	const refSub = new Map();
 	for (const s of subs) for (const p of s.pins) refSub.set(p.ref, s.id);
@@ -52,6 +55,12 @@ export function connPlace(subs, nets, opts = {}) {
 							for (const or of oPins) { const op = pos.get(refSub.get(or)); const og = gpin(refSub.get(or), op.X, op.Y, op.mir, or); if (og) md = Math.min(md, Math.abs(g.x - og.x) + Math.abs(g.y - og.y)); }
 							if (isFinite(md)) cost += md;
 						}
+					}
+					// aspect 惩罚:候选放置后全图过高(h*TARGET>w)则加罚 → 偏好横向铺开。TARGET=0 关闭(默认)。
+					if (TARGET > 0) {
+						let mnx = c.X, mny = c.Y, mxx = c.X + s.w, mxy = c.Y + s.h;
+						for (const [id2, p] of pos) { const s2 = subById.get(id2); if (p.X < mnx) mnx = p.X; if (p.Y < mny) mny = p.Y; if (p.X + s2.w > mxx) mxx = p.X + s2.w; if (p.Y + s2.h > mxy) mxy = p.Y + s2.h; }
+						cost += ASPECTW * Math.max(0, (mxy - mny) * TARGET - (mxx - mnx));
 					}
 					if (cost < bestCost) { bestCost = cost; bestPos = { X: c.X, Y: c.Y, mir }; }
 				}

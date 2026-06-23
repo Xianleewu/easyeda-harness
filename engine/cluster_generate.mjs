@@ -489,7 +489,8 @@ export async function generateLayout(snap, opts = {}) {
 	if (opts.connPlace !== false && subs.length > 1) {
 		// 连接驱动摆放:相连模块摆相邻 + 选朝向使共享脚面对面 → 跨模块连接短(可直连)。镜像绕 bb 中线、保 bb → 装配偏移仍有效。
 		const cpSubs = subs.map(s => ({ id: s.anchor, w: s.w, h: s.h + TITLE, pins: s.model.components.flatMap(c => (c.pins || []).filter(p => p.x != null).map(p => ({ ref: `${c.designator}.${p.num}`, x: (p._ax ?? p.x) - s.bb.minX, y: (p._ay ?? p.y) - s.bb.minY }))) }));
-		const cp = connPlace(cpSubs, logical.nets, { pad: PAD, base: BASE });
+		// aspect 默认 1.4(商用图纸横向):仅最小连接长会排成纵向稀疏图(实测 0.78),偏置压成横向(实测 1.66,labelHard/geomHard 零回归)。
+		const cp = connPlace(cpSubs, logical.nets, { pad: PAD, base: BASE, aspect: opts.aspect ?? 1.4, aspectW: opts.aspectW ?? 1.0 });
 		for (const s of subs) { const p = cp.get(s.anchor); posOf.set(s, { x: p.X, y: p.Y }); if (p.mir) mirrorModuleX(s.model, (s.bb.minX + s.bb.maxX) / 2); }
 	} else {
 		const order = [...subs].sort((a, b) => b.h - a.h);
