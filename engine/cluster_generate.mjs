@@ -486,7 +486,7 @@ export async function generateLayout(snap, opts = {}) {
 	//    显著提升利用率(2.5%→~更高)。天际线 sky=[{x0,x1,y}],topAt 取区间最高 y,raise 抬升放置区间。
 	//    模块 s.w/s.h 已含逃逸标签 bbox,PAD 缝保证不叠压;保序遍历 subs 取 BLF 位,标题/区域随之。
 	const posOf = new Map();
-	if (opts.connPlace && subs.length > 1) {
+	if (opts.connPlace !== false && subs.length > 1) {
 		// 连接驱动摆放:相连模块摆相邻 + 选朝向使共享脚面对面 → 跨模块连接短(可直连)。镜像绕 bb 中线、保 bb → 装配偏移仍有效。
 		const cpSubs = subs.map(s => ({ id: s.anchor, w: s.w, h: s.h + TITLE, pins: s.model.components.flatMap(c => (c.pins || []).filter(p => p.x != null).map(p => ({ ref: `${c.designator}.${p.num}`, x: (p._ax ?? p.x) - s.bb.minX, y: (p._ay ?? p.y) - s.bb.minY }))) }));
 		const cp = connPlace(cpSubs, logical.nets, { pad: PAD, base: BASE });
