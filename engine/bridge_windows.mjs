@@ -50,8 +50,8 @@ export async function listWindows({ port = 0, timeoutMs = 3000 } = {}) {
 	return windows;
 }
 
-export async function readGeometry({ windowId = '', port = 0 } = {}) {
-	const { result } = await executeCode(SNAPSHOT_CODE, { windowId, port });
+export async function readGeometry({ windowId = '', port = 0, timeoutMs = 120000 } = {}) {
+	const { result } = await executeCode(SNAPSHOT_CODE, { windowId, port, timeoutMs });
 	return result;
 }
 
@@ -59,7 +59,7 @@ export async function activatePage({ windowId = '', port = 0, tabId }) {
 	await executeCode(`await eda.dmt_EditorControl.activateDocument(${JSON.stringify(tabId)}); return true;`, { windowId, port });
 }
 
-export async function captureRegion({ windowId = '', port = 0, region, outFile }) {
+export async function captureRegion({ windowId = '', port = 0, region, outFile, timeoutMs = 120000 }) {
 	const { left, right, top, bottom } = region;
 	const code = `
 const doc = await eda.dmt_SelectControl.getCurrentDocumentInfo().catch(()=>null);
@@ -72,7 +72,7 @@ const buf = await blob.arrayBuffer(); const bytes = new Uint8Array(buf);
 let bin=''; const ch=0x8000; for(let i=0;i<bytes.length;i+=ch) bin+=String.fromCharCode.apply(null,bytes.subarray(i,i+ch));
 return { type:blob.type, size:bytes.length, b64:btoa(bin) };
 `;
-	const { result } = await executeCode(code, { windowId, port });
+	const { result } = await executeCode(code, { windowId, port, timeoutMs });
 	if (!result || !result.b64) throw new Error(`captureRegion 无图: ${JSON.stringify(result)}`);
 	const { writeFileSync } = await import('node:fs');
 	writeFileSync(outFile, Buffer.from(result.b64, 'base64'));

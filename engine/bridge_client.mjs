@@ -29,7 +29,7 @@ export async function executeCode(code, {
 	windowId = process.env.EASYEDA_WINDOW_ID || '',
 	timeoutMs = 120000,
 } = {}) {
-	const bridge = await findBridge(port);
+	const bridge = await findBridge(port, { timeoutMs });
 	const payload = { code: String(code || '').replace(/^\uFEFF/, '') };
 	if (windowId) payload.windowId = windowId;
 	const resp = await fetch(`${bridge.base}/execute`, {
