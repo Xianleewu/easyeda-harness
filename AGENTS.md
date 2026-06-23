@@ -28,7 +28,13 @@ circuit. Any device/net/module-title literal tied to one schematic is a defect.
 - `engine/bridge_*.mjs` — live EasyEDA access via the official bridge.
 - delivery: `engine/cluster_generate.mjs` `deliverGenerated`, `engine/preserve_deliver.mjs`,
   `engine/plexus_apply_live.mjs`.
-- `bin/plexus.mjs` — the entry point.
+- `engine/commercial_rubric.mjs` / `engine/commercial_judge.mjs` / `engine/bridge_windows.mjs` —
+  commercial-grade judge: frozen, measurable rules `CR-01..CR-10` (orthogonality, grid-snap,
+  orientation, spacing, label-to-line, professional label placement, DRC) scored against real
+  EasyEDA evidence (geometry + `sch_Drc.check` + full/region screenshots). `bridge_windows`
+  enumerates/targets EDA windows and captures full/region images for board-vs-reference compare.
+  `engine/rubric_audit.mjs` guards the zero-specific-circuit rule by scanning for device/net fingerprints.
+- `bin/plexus.mjs` — the entry point (`layout` / `deliver` / `judge` / `repair` / `qc` / `audit`).
 
 ## Design language (generic, measurable)
 
