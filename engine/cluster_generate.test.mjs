@@ -55,7 +55,7 @@ test('clusterComponents:无 IC 锚点返回 null', () => {
 	assert.equal(cl, null);
 });
 
-// 通用性:全新合成板(非 vibe-buddy)也能产功能块模块图。
+// 通用性:全新合成板(非任何特定板)也能产功能块模块图。
 test('generateLayout 通用性:全新合成板产功能块、有真实连线', async () => {
 	const ic = (des, x, y, pins) => ({ designator: des, x, y, rotation: 0, mirror: false, bbox: { minX: x - 30, minY: y - pins.length * 10, maxX: x + 30, maxY: y + pins.length * 10 }, pins: pins.map((p, i) => ({ num: String(i + 1), name: p.n, x: p.s === 'L' ? x - 30 : x + 30, y: y - pins.length * 10 + i * 20 + 10 })) });
 	const rc = (des, x, y) => ({ designator: des, x, y, rotation: 0, mirror: false, bbox: { minX: x - 15, minY: y - 5, maxX: x + 15, maxY: y + 5 }, pins: [{ num: '1', x: x - 15, y }, { num: '2', x: x + 15, y }] });

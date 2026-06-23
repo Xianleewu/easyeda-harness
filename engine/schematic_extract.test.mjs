@@ -8,7 +8,7 @@ const snap = {
 	components: [
 		{ id: 'c1', designator: 'R1', value: '10k', pins: [{ num: '1', x: 0, y: 0 }, { num: '2', x: 10, y: 0 }] },
 		{ id: 'c2', designator: 'R2', value: '4k7', pins: [{ num: '1', x: 20, y: 0 }, { num: '2', x: 30, y: 0 }] },
-		{ id: 'u1', designator: 'U1', value: 'ESP32', pins: [{ num: '1', x: 0, y: 100 }, { num: '2', x: 0, y: 110 }] },
+		{ id: 'u1', designator: 'U1', value: 'IC1', pins: [{ num: '1', x: 0, y: 100 }, { num: '2', x: 0, y: 110 }] },
 	],
 	wires: [{ id: 'w1', line: [10, 0, 20, 0] }],
 	netflags: [

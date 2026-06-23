@@ -64,7 +64,7 @@ for (const id of partIds) {
       pins: ps.map(p => {
         const ref = `${c.designator || ''}.${p.pinNumber}`;
         const sourceNc = sourceNcByPin.has(ref) ? sourceNcByPin.get(ref) : null;
-        return { num: p.pinNumber, name: p.pinName, x: p.x, y: p.y, rot: p.rotation, len: p.pinLength, noConnected: sourceNc != null ? sourceNc : (p.getState_NoConnected ? p.getState_NoConnected() : false) };
+        return { num: p.pinNumber, name: p.pinName, x: p.x, y: p.y, rot: p.rotation, len: p.pinLength, type: p.pinType, noConnected: sourceNc != null ? sourceNc : (p.getState_NoConnected ? p.getState_NoConnected() : false) };
       }),
     });
   } else if (c.componentType === 'netflag' || c.componentType === 'netport') {

@@ -1,7 +1,6 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import { Resvg } from '@resvg/resvg-js';
-import { MODULE_TITLES } from '../harness/document_style.mjs';
-import { loadProjectModuleRegistry } from '../harness/module_registry.mjs';
+// 通用渲染器:零特定电路内容。模块标题/区域由调用方经 opts.moduleRegions 传入(各模块自带 title)。
 
 const DIR = (process.env.EASYEDA_WORKDIR || process.cwd()).replace(/\\/g, '/') + '/';
 const DEFAULT_OUT = DIR + 'sheet_output.png';
@@ -233,8 +232,8 @@ function summarizeTitleBlockMetadata(textBoxes) {
 	return {
 		texts: blockTexts,
 		count: blockTexts.length,
-		project: /PROJECT:\s*AIHWDEBUGER/i.test(joined),
-		pageTitle: /P1\s+DETAIL\s+SCHEMATIC/i.test(joined),
+		project: /PROJECT:\s*\S+/i.test(joined),
+		pageTitle: /\bSCHEMATIC\b/i.test(joined),
 		sheetNumber: /SHEET:\s*\d+\s+OF\s+\d+/i.test(joined),
 		revision: /REV:\s*[A-Z0-9.-]+/i.test(joined),
 		status: /STATUS:\s*(REVIEW|RELEASED|DRAFT|PASS)/i.test(joined),
@@ -378,11 +377,6 @@ function textRole(t) {
 	const c = String(t.content || '');
 	if (t.role) return t.role;
 	if (/^(PROJECT|REV|STATUS|SHEET|SOURCE):|STATUS:|SHEET:/i.test(c)) return 'title-block-meta';
-	if (/AIHWDEBUGER|CONTROL & POWER/i.test(c)) return 'sheet-title';
-	if (/P1 DETAIL SCHEMATIC/i.test(c)) return 'title-block';
-	if (/USB\/power|switched and relay outputs/i.test(c)) return 'reading-flow';
-	if (/DRC: 0 ERR/i.test(c)) return 'acceptance-note';
-	if (Object.values(MODULE_TITLES).some(title => c.toUpperCase().includes(title))) return 'module-title';
 	return 'text';
 }
 
@@ -397,23 +391,10 @@ function isSignalLabelFlag(f) {
 	return Math.max(w, h) >= 26 && !/^(GND|SYS_|VIN_|VOUT_)/.test(String(f.net || ''));
 }
 
-export function inferModuleRegions(snapshot, pad = 24) {
-	const byRef = new Map((snapshot?.components || []).map(c => [c.designator, c]));
-	const registry = loadProjectModuleRegistry();
-	const regions = [];
-	for (const mod of registry.modules) {
-		const boxes = mod.refs.map(ref => normalizeBox(byRef.get(ref)?.bbox)).filter(Boolean);
-		const box = union(boxes);
-		if (!box) continue;
-		regions.push({
-			name: mod.name,
-			title: MODULE_TITLES[mod.name] || mod.name.toUpperCase(),
-			box: expand(box, pad),
-			parts: boxes.length,
-			source: registry.source,
-		});
-	}
-	return regions;
+// 通用:模块区由调用方经 opts.moduleRegions 提供(cluster_generate/module_repack 产出,各自带 title)。
+// 无传入时不自动从任何特定工程注册表推断——本工具零特定电路耦合,故返回空(裸快照无框)。
+export function inferModuleRegions() {
+	return [];
 }
 
 export function renderSheetOutput(snapshot, outPng = DEFAULT_OUT, opts = {}) {
@@ -441,7 +422,7 @@ export function renderSheetOutput(snapshot, outPng = DEFAULT_OUT, opts = {}) {
 		pushText(out, textBoxes, { x: sheetPx.x + sheetPx.width - 14, y: gy, text: row, fontSize: 10, fill: '#222222', role: 'sheet-grid' });
 	}
 
-	// opts.moduleRegions:外部直接提供模块区(用于生成路径自定义簇,绕开 aihwdebugger 专属注册表)。
+	// opts.moduleRegions:调用方直接提供模块区(cluster_generate/module_repack 产出,各自带 title)。
 	const moduleRegions = opts.moduleRegions || inferModuleRegions(snapshot, opts.moduleRegionPad ?? 28);
 	const electricalBoxes = [];
 	for (const c of snapshot?.components || []) electricalBoxes.push(normalizeBox(c.bbox));
@@ -657,7 +638,7 @@ export function renderSheetOutput(snapshot, outPng = DEFAULT_OUT, opts = {}) {
 }
 
 if (import.meta.url === `file:///${process.argv[1]?.replace(/\\/g, '/')}`) {
-	const snapPath = process.argv[2] || DIR + 'full_model.json';
+	const snapPath = process.argv[2] || DIR + 'live.json';
 	const outPng = process.argv[3] || DEFAULT_OUT;
 	const outReport = process.argv[4] || DEFAULT_REPORT;
 	const { report } = renderSheetOutput(readJson(snapPath), outPng);

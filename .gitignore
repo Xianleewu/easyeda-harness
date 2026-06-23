@@ -1,71 +1,20 @@
 node_modules/
 
-# Generated schematic outputs
-full_model.json
-apply_source_report.json
-live_clean.json
-report.json
-loop_report.json
-layout_planner_report.json
-layout_planner_*.json
-layout_planner_*.png
+# Captured boards and generated layout outputs (any board)
 live.json
-live_diagnose_report.json
-live_shots_report.json
-drc_report.json
-live_region_shots/
-visual_review_report.json
-harness_*_report.json
-apply_report.json
-acceptance_report.json
-gsd_plan_report.json
-design_brief_report.json
-gsd_generate_report.json
-gsd_scaffold_report.json
-workflow_smoke_report.json
-next_actions.json
-repair_actions.json
-repair_loop_report.json
-entrypoint_audit_report.json
-agent_instruction_report.json
-action_schema_report.json
-cell_manifest_report.json
-cell_helpers_report.json
-bridge_check_report.json
-divider_pack_report.json
-spec_schema_report.json
-project_spec_report.json
-project_pack_report.json
-project_library_report.json
-project_contract_report.json
-project_assembly_report.json
-project_layout_report.json
-project_geometry_report.json
-project_label_layout_report.json
-project_model_report.json
-project_netlist_report.json
-project_live_model_report.json
-project_visual_report.json
-project_rule_report.json
-final_evidence_report.json
-commercial_*_report.json
-design_memory_report.json
-system_intent_gate.json
-sheet_output*.json
-sheet_output*.png
-
-# Generated EasyEDA write-back scripts
-af_*.js
-
-# Visual evidence generated locally
-visual_crops/
-live_region_shots/*.png
+live_clean.json
+live_canvas.png
+out.png
+layout.png
 *.png
 *.svg
 
 # Logs and temporary probes
 *.log
-_*.json
-_*.png
 tmp_*/
 .tmp_*/
+_*.json
+_*.png
+_*.mjs
+_*.js
+.tags

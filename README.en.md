@@ -1,198 +1,43 @@
-# EasyEDA Harness
+# EasyEDA Schematic Beautifier
 
 [中文](README.md)
 
-EasyEDA Harness is a schematic design collaboration and checking workflow for coding agents such as Codex and Claude Code. It is not the EasyEDA API skill, and it is not a complete automatic schematic layout solver. The official `easyeda-api-skill` owns the API docs, bridge, and EasyEDA extension; this repository owns structured project contracts, deterministic placement, quality checks, offline previews, real EasyEDA snapshot evidence, and the write-back loop.
+A **generic, public tool** that turns **any** EasyEDA schematic into a clean, commercial-grade 2D
+layout — like a frontend design workflow, but for circuits. It carries **zero specific-circuit
+content**: it adapts to any board via roles and patterns, never hardcoded devices, nets, or modules.
 
-The simplest user workflow is to hand this repository to an agent and ask it to follow `AGENTS.md` or `CLAUDE.md`. The agent should install dependencies, verify the official EasyEDA API Skill/Bridge, run the gates, generate visual evidence, and only write back to EasyEDA after every gate passes.
+## How it works
 
-The neutral runner entrypoint is `node bin/easyeda-plexus.mjs`; see `docs/agent-runner-guide.md`.
+1. Capture any open EasyEDA board → `live.json`.
+2. Classify components into roles (`role_infer`) → render each module with role-based archetype cells
+   (`circuit_packs/archetypes/`) → 2D shelf-pack the clean modules (`module_repack`, breaking the
+   wide-column vs aspect-ratio deadlock) → run the commercial geometry/label gates
+   (`geom_qc` / `label_qc`).
+3. Deliver the clean layout back to the live EasyEDA document.
 
-The workflow is intentionally staged like a UI design loop: first produce a short, reviewable draft of the design intent, then generate and check deterministic artifacts. `node bin/easyeda-plexus.mjs design-brief` writes a strict `design_brief_report.json` with a block diagram, module assumptions, pin/net plan, layout/interface plan, ERC/layout checklist, and next tasks. Agents should use that brief to catch missing module rectangles, missing label columns, missing pin maps, floating labels, and unclear interface ownership before spending time on full generation. `design-brief --draft` is only for early incomplete scaffolds; draft output is not generation or delivery evidence.
-
-## Scope
-
-This repository is an executable workflow, not a prompt pack for free-form drawing inside EasyEDA. For a new project, the agent must first create a project contract: functional modules, pins, required nets, module rectangles, allowed symbols, and visual evidence regions. Only then should it implement or modify deterministic templates and rules.
-
-A PASS on the current model only proves the current model. It does not validate another project, another schematic, or manual EasyEDA edits.
-
-`project_spec.json` is the machine-readable user-intent input. `node bin/easyeda-plexus.mjs plan` writes `plexus_plan_report.json`, proving that the spec is realized by the current contract, netlist, assembly, and circuit pack. `node bin/easyeda-plexus.mjs design-brief` writes the strict fast review artifact that explains the current block diagram, pin/net plan, layout/interface plan, label-column plan, and open tasks. `node bin/easyeda-plexus.mjs generate` writes `plexus_generate_report.json`, refuses to generate if the plan fails, and runs full layout search by default; `generate --fast` is only a draft iteration mode. `project_contract.json` is the design contract derived from that spec. `npm run spec` checks that the contract covers the spec, and `npm run contract` / `npm run accept` continue checking the contract and generated model.
-`npm run spec:schema` validates the spec shape before contract coverage is checked.
-
-`project_contract.json` is the first machine-readable file an agent must update for a new project. Each module must declare `drawingRules` for the reusable schematic-quality rules it expects. `project_netlist.json` records the required electrical endpoints. `circuit_packs/*/cell_manifest.json` declares deterministic cell capabilities for the selected circuit pack, and `project_assembly.json` maps each contract module to those cells, refs, anchors, nets, and layout policy. `npm run contract`, `npm run contract:netlist`, `npm run contract:cells`, `npm run contract:assembly`, `npm run contract:layout`, `npm run contract:geometry`, and `npm run accept` check them; if they fail, the agent should not edit write-back scripts, apply to EasyEDA, or claim completion.
-`circuit_packs/*/pack.mjs` owns circuit-family behavior such as cell builders, fallback anchors, and library snapshot normalization. `npm run contract:pack` verifies the selected pack before generation.
-
-## Capabilities
-
-- Deterministic schematic assembly: the selected `circuit_packs/<pack>/pack.mjs` exposes functional cell builders, `circuit_packs/<pack>/cell_manifest.json` declares their contracts, and `engine/assemble.mjs` composes the active `project_assembly.json`.
-- Project spec gate: `project_spec.json` defines user-level modules, nets, interfaces, and quality policy.
-- Spec schema gate: `spec:schema` validates `project_spec.json` as the first-layer user-intent contract.
-- Design brief stage: `design-brief` produces a strict fast review report with block diagram, module assumptions, pin/net plan, layout/interface plan, label-column plan, ERC/layout checklist, and next tasks before deterministic generation; `--draft` is early-review only.
-- Project contract gate: `project_contract.json` defines modules, key nets, interfaces, visual evidence regions, and the no-free-draw policy.
-- Project netlist gate: `project_netlist.json` defines required pins for key nets and proves the generated model connects them.
-- Circuit pack gate: `contract:pack` verifies the selected `pack.mjs` is registered and exposes required generation hooks.
-- Circuit pack scaffold: `init --pack <new_pack> --out <project-dir>` also creates `circuit_packs/<new_pack>/pack.mjs` and `cell_manifest.json` skeletons, preventing new projects from accidentally reusing the bundled example pack.
-- Library contract gate: `contract:library` verifies every required part has approved Symbol, Device, Footprint, name/value, and BOM/PCB state.
-- Workflow smoke gate: `workflow:smoke` proves bad specs are stopped by plan, incomplete scaffolds do not pass as ready, missing library bindings fail, and failed generate cannot rewrite `full_model.json`.
-- Cell manifest gate: `circuit_packs/*/cell_manifest.json` declares circuit-pack cell roles, required refs, net args, ports, layout intent, and `qualityRules`, while project-contract modules declare matching `drawingRules`; this moves drawing rules such as orthogonal wiring, real net labels, text clearance, and module isolation into the contract before assembly can use those cells.
-- Rule coverage check: `contract:rules` proves module registry, required parts, interface contracts, and core rules cover the project contract.
-- Assembly coverage check: `contract:assembly` proves every contract module is mapped to a deterministic cell, anchor, refs, and nets before generation.
-- Layout policy check: `contract:layout` proves layout search is driven by `project_assembly.json` and that `layoutPolicy.flow`, ordered `layoutPolicy.columns`, `layoutPolicy.moduleRegions`, generic `anchorVariants` or project search space, module spacing, no interlock, and no unrelated wire intrusion requirements are satisfied.
-- Geometry check: `contract:geometry` audits the actual generated model for orthogonal wires, different-net or unnamed wire crossings, wires through visible objects, and overlaps among text, labels, flags, attributes, and component bodies. In live mode, `contract:geometry:live` runs the same audit against the real EasyEDA snapshot.
-- Label layout check: `contract:labels` audits actual generated label geometry, including `layoutPolicy.labelColumns`, visible label budgets, left-bottom/right-bottom origins, same-net wire endpoint attachment, fake text labels, and scattered unbudgeted labels. Grouped cross-module interfaces must declare source and target module-side label columns with `module` and `routeEnd`. In live mode, `contract:labels:live` runs the same audit against the real EasyEDA snapshot.
-- Contract realization check: after `full_model.json` is generated, `contract:model` proves the model actually expresses the contract modules, parts, nets, and interfaces.
-- Visual evidence check: after offline previews are generated, `contract:visual` proves every contract visual evidence region exists and passes image inspection.
-- Fast offline check: validates the schematic model on local CPU and is intended for daily coordinate and rule iteration.
-- Full layout check: `npm run pipeline` runs layout search, structure checks, visual rhythm checks, text clearance, and system-intent audits.
-- Real EasyEDA loop: write back through the WebSocket bridge, then pull a live schematic snapshot with `snapshot2.js`.
-- Net-label discipline: single-sheet signal labels use the real wire `Name` attribute instead of fake `PrimitiveText` labels.
-- Native sheet-template friendly: title-block metadata should come from the EasyEDA native sheet template, not a duplicate title block drawn by the harness.
-
-## Design Principles
-
-- Electrical correctness first: key nets must be connected, and wire endpoints must land exactly on pin coordinates.
-- Readability is a gate, not decoration: orthogonal wiring, clean module boxes, same-side alignment, no labels on component bodies, and no wires through symbols.
-- Check before write-back: template checks, live checks, and EasyEDA DRC must pass before applying changes.
-- Fast iteration: use `npm run fast` for coordinate and rule edits, then run the full pipeline and live EasyEDA checks before handoff.
-
-## Requirements
-
-- Windows, Linux, or macOS
-- Node.js 18 or newer
-- EasyEDA / JLC EDA desktop client
-- Official EasyEDA API Skill: <https://github.com/easyeda/easyeda-api-skill>
-- EasyEDA API bridge, normally at `http://127.0.0.1:49620/execute`
-
-Install and start the official skill first. It provides the EasyEDA Pro API docs, `SKILL.md`, WebSocket bridge, and the EasyEDA-side `run-api-gateway.eext` extension. Its official Quick Start includes `npm install`, `npm run build:docs`, `npm run server`, and installing that extension in EasyEDA; the bridge then waits for the EasyEDA client on ports `49620-49629`.
-
-Then hand this repository to Codex, Claude Code, or a similar agent. Users do not need to run the harness commands one by one; the agent should follow `AGENTS.md` to install dependencies, verify the bridge, run checks, collect evidence, and write back only after the checks pass.
-
-## Quick Start
-
-One prompt for an agent:
-
-```text
-Follow AGENTS.md for this repository. For a new project, create the project contract, module templates, and rule coverage first; do not free-draw in EasyEDA. Verify easyeda-api-skill/Bridge, run the local gates, and before write-back pull real EasyEDA live snapshot/screenshot/DRC evidence. Write back only after every check passes.
-```
-
-The agent runs the local checks, workflow smoke checks, generates preview evidence, and writes `acceptance_report.json`, `workflow_smoke_report.json`, `next_actions.json`, and `repair_actions.json`. If a check fails, `next_actions.json` is the handoff summary and `repair_actions.json` maps each finding to edit targets, inspection files, and the next command to rerun.
-`node bin/easyeda-plexus.mjs repair` builds a read-only grouped repair plan through `workflows/repair_loop.mjs` and writes `repair_loop_report.json`.
-`next_actions.json` is a validated `schemaVersion=1` action contract; `npm run action:schema` checks ids, normalized check statuses, targets, evidence, and pass/action consistency.
-`final:evidence` writes `final_evidence_report.json`, proving required evidence artifacts are present, fresh, passing, and free of open repair actions.
-
-Preferred agent commands:
+## Quick start
 
 ```bash
-node bin/easyeda-plexus.mjs design-brief
-node bin/easyeda-plexus.mjs accept
-node bin/easyeda-plexus.mjs repair
-node bin/easyeda-plexus.mjs live-check
-node bin/easyeda-plexus.mjs deliver
-node bin/easyeda-plexus.mjs apply --gated project_spec.json
+npm install
+npm run live:save                              # capture the open board -> live.json (incl. pin electrical types)
+node bin/plexus.mjs qc      live.json          # net QC: shorts / stray power flags / malformed wires / ERC pin types / dangling flags
+node bin/plexus.mjs repair  live.json          # auto-repair (delete stray power-short flags / straighten malformed wires) + report DRC before/after
+node bin/plexus.mjs layout  live.json out.png  # any board -> commercial 2D layout + render + gates
+node bin/plexus.mjs deliver live.json          # deliver to the live EasyEDA document
+npm test                                       # generic test suite
 ```
 
-For an external project directory, pass that same spec path through every context-aware command, including final handoff and write-back: `node bin/easyeda-plexus.mjs deliver <project-dir>/project_spec.json` and `node bin/easyeda-plexus.mjs apply --gated <project-dir>/project_spec.json`.
+> Detect→repair loop: `qc` detects, `repair` fixes the schematic-layer issues (geometry / short flags) and reports the
+> DRC delta. ERC pin-electrical-type mistypes (passives flagged IN, GPIOs Undefined) are *detected* by `qc` but must be
+> corrected in the EasyEDA symbol library editor — pin electrical type is symbol-defined and read-only via the extension API.
 
-For a new project, the first implementation step is updating `project_spec.json`, realizing it in `project_contract.json` with module-level `drawingRules`, defining required endpoints in `project_netlist.json`, declaring/choosing a circuit-pack `cell_manifest.json`, then mapping the contract and layout policy in `project_assembly.json`. Only then should the agent implement project-specific deterministic cells and rules.
-For a new project directory, `node bin/easyeda-plexus.mjs init --pack <pack> --out <project-dir>` writes scaffold versions of those files plus `approved_library_manifest.json` and `plexus_scaffold_report.json`. If `<pack>` does not exist, it also creates `circuit_packs/<pack>/pack.mjs`, `circuit_packs/<pack>/cell_manifest.json`, and updates the pack registry. New pack manifests include per-module cell templates with executable `portLayout` entries, and the generated `project_assembly.json` references those cells so agents implement deterministic builders instead of inventing floating labels. The scaffold emits generic `layoutPolicy.anchorVariants` with enough candidates for the layout planner's minimum search-space gate, so new projects do not depend on the bundled USB/MCU/relay coordinate fields. The scaffold is intentionally incomplete and must not be treated as ready for generation until pack builders, cell manifest, contracts, netlist, library bindings, and assembly mappings make `plan` pass.
+Requires the official [EasyEDA API skill](https://github.com/easyeda/easyeda-api-skill) bridge
+(`http://127.0.0.1:49620`, ports `49620-49629`). Open **any** schematic in EasyEDA Pro.
 
-## Write Back To EasyEDA
+## Design language
 
-The agent writes back through `apply:gated`. That entry point runs the checks first and refuses to apply a failing schematic. Low-level write-back scripts are for agent debugging, not for normal user operation.
+`docs/schematic-design-rules.md` (DR1–DR18 measurable gates) and `docs/schematic_design_rulebook.md`
+(the project-agnostic design language). Commercial delivery target: EasyEDA DRC `0/0/0`.
 
-## Preview, Live Snapshot, And Visual Evidence
-
-Offline preview images are generated by the harness renderer. They are useful for fast structure, module-region, and obvious-overlap review, but they are not real EasyEDA canvas screenshots and are not sufficient as final evidence.
-
-It runs local gates, live snapshot, live canvas image, EasyEDA DRC, module-level live shots, and live diagnostics when needed, then writes `acceptance_report.json`.
-When a gate remains open, inspect `next_actions.json` first; it is the machine-readable handoff checklist for the next agent. Then inspect `repair_actions.json` for finding-level edit targets and rerun commands, or run `node bin/easyeda-plexus.mjs repair` to produce `repair_loop_report.json`.
-
-In live mode, `contract:live:model` checks `live.json` from the real EasyEDA canvas against `project_contract.json`. Final acceptance is not based on `full_model.json` alone.
-`contract:geometry:live` checks the real EasyEDA geometry, so local previews cannot hide live wire crossings, text overlap, or wires through symbols.
-`contract:labels:live` also checks the real EasyEDA wire `Name` geometry, so a local label contract cannot hide floating labels, wrong origins, or scattered live wire names.
-
-`node bin/easyeda-plexus.mjs deliver` writes `delivery_report.json` and is the final handoff gate. It rejects local-only `accept` output and only passes with `full-with-live` acceptance, live final evidence, `live.json`, `live_canvas.png`, live shots, live model proof, and EasyEDA DRC `0 error / 0 warning / 0 info`.
-
-`live:shots` is fail-closed. It first tries requested EasyEDA zoom-region captures. If the EasyEDA API returns the same full-page rendered image for every zoom request, the harness falls back to coordinate crops from that real EasyEDA rendered schematic image. Those crops are accepted only when at least 10 module images exist, all required crops are inside the real rendered image, hashes are distinct, and every image-quality gate passes.
-
-When `live:shots` reports fixed rendered-area captures, the agent should run live diagnose. The diagnostic report records the EasyEDA canvas list, active document/tab data, and hashes from both `getCurrentRenderedAreaImage()` and the DOM canvas after separate zoom requests.
-
-For handoff, review the global sheet and local crops for USB, LDO, RESET, BOOT, MCU left/right, PMOS, RELAY1, RELAY2, and title-template area.
-
-## Check List
-
-- Project contract check: `project_contract_report.json` has `HARD=0 SOFT=0 INFO=0`
-- Project spec coverage check: `project_spec_report.json` has `HARD=0 SOFT=0 INFO=0`
-- Spec schema check: `spec_schema_report.json` has `HARD=0 SOFT=0 INFO=0`
-- Project rule coverage check: `project_rule_report.json` has `HARD=0 SOFT=0 INFO=0`
-- Design brief check: `design_brief_report.json` has `HARD=0 SOFT=0 INFO=0` and explains block diagram, pin/net plan, layout/interface plan, label-column plan, ERC/layout checklist, and next tasks
-- Project netlist check: `project_netlist_report.json` has `HARD=0 SOFT=0 INFO=0`
-- Circuit pack check: `project_pack_report.json` has `HARD=0 SOFT=0 INFO=0`
-- Cell manifest check: `cell_manifest_report.json` has `HARD=0 SOFT=0 INFO=0`
-- Project assembly coverage check: `project_assembly_report.json` has `HARD=0 SOFT=0 INFO=0`
-- Project layout policy check: `project_layout_report.json` has `HARD=0 SOFT=0 INFO=0`
-- Project geometry check: `project_geometry_report.json` has `HARD=0 SOFT=0 INFO=0`
-- Project label layout check: `project_label_layout_report.json` has `HARD=0 SOFT=0 INFO=0`
-- Contract realization check: `project_model_report.json` has `HARD=0 SOFT=0 INFO=0`
-- Fast local check: `HARD=0 SOFT=0 INFO=0`
-- Full layout check: `HARD=0 SOFT=0 INFO=0`
-- Offline preview: at least 10 global/local screenshots generated and visual audit passes
-- Contract visual evidence check: `project_visual_report.json` has `HARD=0 SOFT=0 INFO=0`
-- EasyEDA live: pull `live.json` and review `live_canvas.png` captured from the real EasyEDA canvas
-- EasyEDA live contract check: `project_live_model_report.json` has `HARD=0 SOFT=0 INFO=0`
-- EasyEDA DRC: `0 error / 0 warning / 0 info`
-- EasyEDA live shots: at least 10 distinct module-level evidence images
-- `next_actions.json` has no open handoff summary actions
-- `action_schema_report.json` proves `next_actions.json` follows the stable action schema
-- `plexus_plan_report.json` proves the current spec is realized by contract, netlist, assembly, and circuit pack
-- `plexus_generate_report.json` proves deterministic generation was plan-gated
-- `project_library_report.json` proves every required part has approved library bindings
-- `repair_actions.json` has no finding-level repair actions
-- `repair_loop_report.json` has no grouped repair actions
-- `final_evidence_report.json` proves required local/live evidence is present, fresh, and passing
-- `delivery_report.json` proves final handoff evidence is live, not local-only
-- No fake text net labels
-- No unnecessary NET PORT symbols on a single-sheet schematic
-- Readable wire `Name` anchors: left-side labels use bottom-left origin, right-side labels use bottom-right origin
-- Declared label columns: every visible signal label is covered by `layoutPolicy.labelColumns`, and grouped interfaces have source/target module-side columns
-- Functional modules occupy clean rectangular regions declared by `layoutPolicy.moduleRegions` with reasonable gaps
-- No overlap among text, component attributes, net names, GND symbols, and NC markers
-
-## Lessons Captured
-
-- EasyEDA wire `Name` is the real visible net label; `PrimitiveText` is only text.
-- Live testing showed wire `Name` origin modes: left-side labels use `alignMode=6`, right-side labels use `alignMode=8`.
-- Use `eda.sch_PrimitiveAttribute.modify()` to patch wire `Name` attributes. Some `toAsync().setState_*().done()` paths can flip the Y coordinate.
-- EasyEDA wire creation is more reliable when every polyline is split into single two-point segments.
-- Slow live/DRC/screenshot loops should be final acceptance steps. Coordinate and rule work should start with the local fast gate.
-
-## Repository Layout
-
-- `engine/`: template assembly, layout search, write-back, rendering, DRC and live helpers.
-- `bin/easyeda-plexus.mjs`: neutral workflow wrapper for agent runners and CI.
-- `docs/agent-runner-guide.md`: concise runner contract for Codex, Claude Code, and other agents.
-- `reports/README.md`: generated report contract notes, including the `next_actions.json` action schema.
-- `harness/`: normalized model, module registry, and rule gates.
-- `project_spec.json` / `project_contract.json` / `project_netlist.json` / `project_assembly.json`: user intent, design contract, structured electrical endpoints, executable assembly mapping, and layout policy.
-- `contracts/spec_schema.mjs`: reusable schema validation for the first user-intent input.
-- `contracts/module_contract.mjs` / `contracts/net_contract.mjs` / `contracts/layout_contract.mjs`: reusable validators for functional modules, electrical endpoint intent, and project-driven layout policy.
-- `docs/schematic-design-rules.md`: executable schematic layout rules for wire crossings, object overlap, label origins, label columns, module rectangles, and live evidence.
-- `workflows/repair_loop.mjs`: read-only repair loop planner that groups `next_actions.json` and `repair_actions.json` into fix kinds, files, evidence, and rerun commands, then emits `repair_loop_report.json`.
-- `workflows/plexus_plan.mjs`: spec-to-contract realization planner that emits `plexus_plan_report.json`.
-- `workflows/design_brief.mjs`: short-cycle design review builder that emits `design_brief_report.json`.
-- `workflows/plexus_generate.mjs`: plan-gated deterministic generation wrapper that emits `plexus_generate_report.json`.
-- `workflows/plexus_scaffold.mjs`: new-project scaffold writer for spec, contract, netlist, assembly, and `plexus_scaffold_report.json`.
-- `contracts/library_contract.mjs`: approved library binding validator for required parts.
-- `engine/final_evidence_gate.mjs`: fail-closed local/live evidence gate for freshness, zero DRC, live model proof, and empty repair actions.
-- `circuit_packs/*/cell_manifest.json`: circuit-pack deterministic cell capability contracts.
-- `circuit_packs/*/pack.mjs`: circuit-pack generation hooks and library normalization.
-- `snap2.json`: component snapshot input.
-- `comp_state.json`: component state input for write-back preservation.
-- `engine/bridge_client.mjs` / `engine/bridge_exec.mjs`: cross-platform EasyEDA bridge runners.
-- `run.ps1` / `run-save.ps1` / `run-image.ps1`: Windows convenience wrappers.
-- `fix_wire_name_anchors.js`: utility for repairing live wire `Name` anchors.
-- `remove_duplicate_title_block.js`: migration utility for removing old harness-drawn title blocks.
-
-## License
-
-Released under the MIT License. See `LICENSE` at the repository root.
+See `AGENTS.md` for the full architecture. **Never add any specific-circuit content — this is a
+public tool.**

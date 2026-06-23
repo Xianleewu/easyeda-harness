@@ -1,18 +1,8 @@
 // 命名导线 / 网名几何：竖直网名、stub 过长、锚点未落在引出端点
 const EPS = 1;
 const STUB_MAX = 55;
-const STUB_MAX_BY_NET = new Map([
-	['USB_CC1', 90],
-	['USB_CC2', 90],
-	['USB_DN', 100],
-	['USB_DP', 100],
-	['EXT_PWR_EN', 110],
-	['RELAY1_EN', 100],
-	['RELAY2_EN', 100],
-	['RESET_EN', 100],
-	['BOOT_IO9', 80],
-]);
-const POWER_NETS = new Set(['GND', 'SYS_5V', 'SYS_3V3', 'VIN_12_19V', 'VOUT_SW']);
+// 通用电源/地网模式(零特定电路名):地名 + 常见电源轨前缀 + 电压数字模式(与 cluster_generate.classOf 一致)。
+const isPowerOrGround = n => /^(GND|VSS|AGND|DGND|PGND|VBUS|VCC|VDD|VIN|VOUT|VBAT|VSYS|VPP|VEE|AVDD|DVDD|VDDA|BL_|\+)/i.test(n) || /^\d+V/i.test(n);
 
 export function segsFromWires(wires) {
 	const out = [];
@@ -29,7 +19,7 @@ export function segsFromWires(wires) {
 }
 
 function isSignalNet(net) {
-	return net && !POWER_NETS.has(net) && !net.startsWith('NC_');
+	return net && !isPowerOrGround(net) && !net.startsWith('NC_');
 }
 
 function sigFlags(flags) {
@@ -37,7 +27,7 @@ function sigFlags(flags) {
 }
 
 function stubMax(net) {
-	return STUB_MAX_BY_NET.get(net) ?? STUB_MAX;
+	return STUB_MAX;
 }
 
 function labelWidth(net) {
@@ -148,7 +138,7 @@ function autoWireLabelRiskFindings(segs, labels, components) {
 	return findings;
 }
 
-/** pipeline / full_model：带 sig 锚点的网名导线规则 */
+/** 带 sig 锚点的网名导线规则 */
 export function wireLabelQC(model) {
 	const findings = [];
 	const S = segsFromWires(model.wires);
