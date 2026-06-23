@@ -101,3 +101,13 @@ export function crSpacing(model) {
 		(minNN >= THRESHOLDS.SPACING_MIN && medNN >= THRESHOLDS.SPACING_MED_LO && medNN <= THRESHOLDS.SPACING_MED_HI);
 	return { id: 'CR-05', pass, minNN, medNN, n: dists.length };
 }
+
+export function crNamedRatio(model) {
+	const wires = model.wires || [];
+	let named = 0;
+	for (const w of wires) {
+		if ((w.attrs || []).some(a => /name/i.test(a.key) && a.value)) named++;
+	}
+	const namedPct = wires.length ? Math.round(named / wires.length * 100) : 0;
+	return { id: 'CR-07', pass: true, namedPct, named, total: wires.length };
+}

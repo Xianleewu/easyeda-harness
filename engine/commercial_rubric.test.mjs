@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { RUBRIC, THRESHOLDS, crOrthogonality, crGridSnap, crRotation, crSpacing } from './commercial_rubric.mjs';
+import { RUBRIC, THRESHOLDS, crOrthogonality, crGridSnap, crRotation, crSpacing, crNamedRatio } from './commercial_rubric.mjs';
 
 test('RUBRIC 含 CR-01..CR-10 且字段完整', () => {
 	const ids = RUBRIC.map(r => r.id);
@@ -87,4 +87,17 @@ test('CR-05 过挤(间距 5) → 不通过', () => {
 	const model = { components: [mk(0), mk(5)] };
 	const r = crSpacing(model);
 	assert.equal(r.pass, false);
+});
+
+test('CR-07 命名占比统计,恒不扣分', () => {
+	const model = { wires: [
+		{ attrs: [{ key: 'Name', value: 'NETA' }] },
+		{ attrs: [{ key: 'Name', value: 'NETB' }] },
+		{ attrs: [] },
+	] };
+	const r = crNamedRatio(model);
+	assert.equal(r.named, 2);
+	assert.equal(r.total, 3);
+	assert.equal(r.namedPct, 67);
+	assert.equal(r.pass, true);
 });
