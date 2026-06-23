@@ -2,7 +2,7 @@
 import { scoreAll } from './commercial_rubric.mjs';
 import { readGeometry, captureRegion, regionFromParts } from './bridge_windows.mjs';
 import { executeCode } from './bridge_client.mjs';
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync, writeFileSync, readFileSync } from 'node:fs';
 
 export function judgeBoard(model, { drc, shots = [] } = {}) {
 	const s = scoreAll(model, { drc });
@@ -19,6 +19,11 @@ return { error: pick('fatalError')+pick('error'), warn: pick('warn'), info: pick
 `;
 	const { result } = await executeCode(code, { windowId, port, timeoutMs });
 	return result;
+}
+
+export function judgeSnapshot(snapshotPath, { drc } = {}) {
+	const model = JSON.parse(readFileSync(snapshotPath, 'utf8').replace(/^﻿/, ''));
+	return judgeBoard(model, { drc, shots: [] });
 }
 
 export async function runLiveJudge({ windowId = '', port = 0, outDir = '.', timeoutMs = 120000 } = {}) {

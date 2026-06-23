@@ -133,6 +133,24 @@ return { done, before: before.map(x=>x.type[0]+x.count).join('/'), after: after.
 		return;
 	}
 
+	if (cmd === 'judge') {
+		const live = args.includes('--live');
+		if (live) {
+			const { runLiveJudge } = await import('../engine/commercial_judge.mjs');
+			const rep = await runLiveJudge({ outDir: '.' });
+			console.log(rep.summary);
+			console.log('证据报告 -> judge_report.json');
+			process.exit(rep.commercialPass ? 0 : 1);
+		}
+		const { judgeSnapshot } = await import('../engine/commercial_judge.mjs');
+		const snap = args.find(a => /\.json$/.test(a));
+		if (!snap) { console.error('用法: plexus judge <snapshot.json> | judge --live'); process.exit(2); }
+		const rep = judgeSnapshot(snap);
+		for (const r of rep.rules) console.log(`${r.id}: ${r.pass === null ? '待视觉' : r.pass ? '✓' : '✗'} ${JSON.stringify(r)}`);
+		console.log(rep.summary);
+		process.exit(rep.commercialPass ? 0 : 1);
+	}
+
 	console.log(`通用原理图美化工具(公共工具,零特定电路内容)
 
 用法:
@@ -141,6 +159,8 @@ return { done, before: before.map(x=>x.type[0]+x.count).join('/'), after: after.
   node bin/plexus.mjs qc      <snapshot.json>             网级体检:短路 / 杂散电源标 / 畸形线 / ERC引脚类型 / 悬空标
   node bin/plexus.mjs repair  <snapshot.json>             自动修复(删杂散电源短路标 / 拉直畸形线)并报 DRC 前后
   node bin/plexus.mjs deliver <snapshot.json>             生成布局并投递到当前 live EDA 文档
+  node bin/plexus.mjs judge   <snapshot.json>             离线几何评分(DR 规则+商用达标判定)
+  node bin/plexus.mjs judge   --live                      live EDA 取证评分 + 输出 judge_report.json
 
 快照获取(从 live EDA 捕获任意板):
   npm run live:save        # -> live.json`);

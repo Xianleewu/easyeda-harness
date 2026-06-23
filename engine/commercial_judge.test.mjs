@@ -1,6 +1,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { judgeBoard, runLiveJudge } from './commercial_judge.mjs';
+import { judgeBoard, runLiveJudge, judgeSnapshot } from './commercial_judge.mjs';
+import { writeFileSync, mkdtempSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 
 test('judgeBoard 组装证据化报告', () => {
 	const model = { components: [], wires: [] };
@@ -16,4 +19,13 @@ test('runLiveJudge 无桥 → fail-closed(reject,不伪装绿灯)', async () => 
 		() => runLiveJudge({ port: 1, outDir: '/tmp', timeoutMs: 10 }),
 		/bridge|not found|fetch|abort|ECONN|timeout/i
 	);
+});
+
+test('judgeSnapshot 读 JSON 离线评分', () => {
+	const dir = mkdtempSync(join(tmpdir(), 'judge-'));
+	const f = join(dir, 's.json');
+	writeFileSync(f, JSON.stringify({ components: [], wires: [] }));
+	const rep = judgeSnapshot(f, { drc: { error: 0, warn: 0, info: 0 } });
+	assert.equal(rep.rules.length, 10);
+	assert.equal(rep.commercialPass, true);
 });
