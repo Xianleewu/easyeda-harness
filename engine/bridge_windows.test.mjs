@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { regionFromParts } from './bridge_windows.mjs';
+import { regionFromParts, listWindows } from './bridge_windows.mjs';
 
 test('regionFromParts 空 → null', () => {
 	assert.equal(regionFromParts([]), null);
@@ -15,4 +15,9 @@ test('regionFromParts 围住器件且满足 aspect', () => {
 	assert.ok(r.left <= 0 && r.right >= 100);
 	const w = r.right - r.left, h = r.top - r.bottom;
 	assert.ok(Math.abs(w / h - 2) < 1e-6); // 满足 aspect
+});
+
+test('listWindows 无桥时 fail-closed(reject)', async () => {
+	// 用极小超时 + 不可能端口,确认抛错而非静默返回空
+	await assert.rejects(() => listWindows({ port: 1, timeoutMs: 10 }), /bridge|not found|fetch|abort|ECONN|timeout/i);
 });
