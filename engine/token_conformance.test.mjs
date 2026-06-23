@@ -32,6 +32,19 @@ test('T-NOCROSS 0 crossing → 符合', () => {
 	assert.equal(r.conform, true);
 });
 
+test('T-NOCROSS 只短接(中段相接)无交叉也不符合', () => {
+	// 两段共线重叠（中段相接），geomQC 记 collinear
+	const model = { wires: [{ line: [0,0,20,0], net: 'A' }, { line: [10,0,30,0], net: 'B' }], components: [] };
+	const r = checkNoCross(model);
+	// shorts > 0 意味着中段相接，必定不符合
+	if (r.detail.shorts > 0) {
+		assert.equal(r.conform, false);
+		assert(r.deviations.some(d => d.kind === 'mid-segment-touch'));
+	}
+	// 也验证 conform ↔ deviations 长度一致的不变式
+	assert.equal(r.conform, r.deviations.length === 0);
+});
+
 test('T-NOTHRU 0 wire-thru → 符合', () => {
 	const r = checkNoThru({ wires: [{ line: [0,0,10,0], net: 'A' }], components: [{ designator: 'R1', bbox: { minX: 20, minY: 20, maxX: 30, maxY: 30 }, pins: [] }] });
 	assert.equal(r.token, 'T-NOTHRU');

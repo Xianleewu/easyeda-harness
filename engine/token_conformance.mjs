@@ -53,7 +53,10 @@ function geomCounts(model) {
 // T-NOCROSS: 异网线不交叉不中段相接(严标 max=0)
 export function checkNoCross(model) {
 	const c = geomCounts(model);
-	return res('T-NOCROSS', c.cross ? [{ kind: 'crossing', n: c.cross }] : [], { crossings: c.cross, shorts: c.shorts });
+	const dev = [];
+	if (c.cross > 0) dev.push({ kind: 'crossing', n: c.cross });
+	if (c.shorts > 0) dev.push({ kind: 'mid-segment-touch', n: c.shorts });
+	return res('T-NOCROSS', dev, { crossings: c.cross, shorts: c.shorts });
 }
 
 // T-NOTHRU: 线不穿件/脚(严标 max=0)
