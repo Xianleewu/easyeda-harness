@@ -106,6 +106,12 @@ test('T-ANNOT-PLACE:标号阻值异侧(一上一下)→不符合', () => {
 	assert.equal(r.conform, false);
 });
 
+test('T-DRC:全0→符合;缺/非数→不符合(fail-closed)', () => {
+	assert.equal(checkDrc({ error: 0, warn: 0, info: 0 }).conform, true);
+	assert.equal(checkDrc({ error: 0, warn: 1, info: 0 }).conform, false);
+	assert.equal(checkDrc({}).conform, false);
+});
+
 test('judgeTokens 三层结构、无合成分、DRC≠0则不符合', () => {
 	const rep = judgeTokens({ components: [], wires: [] }, { drc: { error: 0, warn: 24, info: 0 } });
 	assert.ok(rep.tier1 && Array.isArray(rep.tier2) && Array.isArray(rep.tier3));
