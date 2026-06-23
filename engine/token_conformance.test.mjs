@@ -1,7 +1,7 @@
 // 几何严标检查器单测(RED 验证:无实现)
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { checkOrtho, checkGrid, checkNoCross, checkNoThru, checkNoOverlap, checkDensity, checkAnnotPlace, checkAnnotFull } from './token_conformance.mjs';
+import { checkOrtho, checkGrid, checkNoCross, checkNoThru, checkNoOverlap, checkDensity, checkAnnotPlace, checkAnnotFull, checkDrc, judgeTokens } from './token_conformance.mjs';
 
 test('T-ORTHO 严标:有1段斜线即不符合', () => {
 	const r = checkOrtho({ wires: [{ line: [0,0,10,0], net: '' }, { line: [0,0,10,10], net: '' }] });
@@ -104,4 +104,14 @@ test('T-ANNOT-PLACE:标号阻值异侧(一上一下)→不符合', () => {
 	const r = checkAnnotPlace({ components: [c] });
 	assert.equal(r.detail.sameSidePct, 0);
 	assert.equal(r.conform, false);
+});
+
+test('judgeTokens 三层结构、无合成分、DRC≠0则不符合', () => {
+	const rep = judgeTokens({ components: [], wires: [] }, { drc: { error: 0, warn: 24, info: 0 } });
+	assert.ok(rep.tier1 && Array.isArray(rep.tier2) && Array.isArray(rep.tier3));
+	assert.equal(rep.tier1.conform, false);
+	assert.equal(rep.conform, false);
+	assert.equal(rep.score, undefined);
+	assert.equal(rep.commercialPass, undefined);
+	assert.ok(rep.tier2.find(r => r.token === 'T-ORTHO'));
 });

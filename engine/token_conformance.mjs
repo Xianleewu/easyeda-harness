@@ -171,3 +171,40 @@ export function checkAnnotFull(model) {
 	const dev = pct < v.minPct ? [{ kind: 'passives-missing-value', pct, need: v.minPct }] : [];
 	return res('T-ANNOT-FULL', dev, { pct, passives: passives.length });
 }
+
+// T-DRC: DRC error/warn/info 全为 0 即符合;缺失或非数字视为不符
+export function checkDrc(drc = {}) {
+	const v = tokenById('T-DRC').value;
+	const fin = k => Number.isFinite(drc[k]) ? drc[k] : null;
+	const e = fin('error'), w = fin('warn'), i = fin('info');
+	const dev = [];
+	if (e !== v.error) {
+		dev.push({ kind: 'drc-error', got: e });
+	}
+	if (w !== v.warn) {
+		dev.push({ kind: 'drc-warn', got: w });
+	}
+	if (i !== v.info) {
+		dev.push({ kind: 'drc-info', got: i });
+	}
+	return res('T-DRC', dev, { error: e, warn: w, info: i });
+}
+
+// tier3 视觉残余:几何量不到,留待 AI 对 RK3576 按 checklist 判;此处只占位"待视觉",不臆测符合
+function tier3Pending() {
+	return [{ token: 'T-VISUAL', conform: null, deviations: [], detail: { note: '待与 RK3576 并排视觉对照' } }];
+}
+
+// 三层符合裁判(tier1=DRC底线, tier2=几何8项, tier3=视觉占位)
+export function judgeTokens(model, { drc } = {}) {
+	const tier1 = checkDrc(drc);
+	const tier2 = [
+		checkOrtho(model), checkGrid(model), checkNoCross(model), checkNoThru(model), checkNoOverlap(model),
+		checkDensity(model), checkAnnotPlace(model), checkAnnotFull(model),
+	];
+	const tier3 = tier3Pending();
+	const tier2bad = tier2.filter(r => !r.conform);
+	const deviationCount = (tier1.conform ? 0 : tier1.deviations.length) + tier2bad.reduce((s, r) => s + r.deviations.length, 0);
+	const conform = tier1.conform && tier2bad.length === 0;
+	return { tier1, tier2, tier3, deviationCount, conform };
+}
