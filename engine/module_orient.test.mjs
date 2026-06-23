@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mirrorModuleX, moduleCenterX } from './module_orient.mjs';
+import { mirrorModuleX, moduleCenterX, mirrorModuleY, moduleCenterY } from './module_orient.mjs';
 
 const mk = () => ({
 	components: [{ designator: 'R1', x: 10, y: 0, mirror: false, bbox: { minX: 5, minY: -5, maxX: 15, maxY: 5 }, pins: [{ num: '1', x: 5, y: 0 }, { num: '2', x: 15, y: 0 }] }],
@@ -40,6 +40,19 @@ test('标签朝向翻转:左(8/180)↔右(6/0)', () => {
 test('moduleCenterX:件 bbox 水平中心', () => {
 	assert.equal(moduleCenterX(mk()), 10);   // bbox 5..15 → 中心 10
 });
+
+test('mirrorModuleY:垂直翻 + 保连通 + 对合', () => {
+	const s = { components: [{ designator: 'R1', y: 10, bbox: { minX: 0, minY: 5, maxX: 10, maxY: 15 }, pins: [{ num: '1', x: 5, y: 5 }] }], wires: [{ net: 'N', line: [5, 5, 5, -10] }], netflags: [{ net: 'N', x: 5, y: -10, rot: 90 }] };
+	mirrorModuleY(s, 0);
+	assert.equal(s.components[0].pins[0].y, -5, '脚 (5)→(-5)');
+	assert.deepEqual(s.wires[0].line, [5, -5, 5, 10], '线 y 翻');
+	assert.equal(s.netflags[0].y, 10, '标签 (-10)→(10)');
+	assert.deepEqual([s.components[0].pins[0].x, s.components[0].pins[0].y], [s.wires[0].line[0], s.wires[0].line[1]], '脚仍与线起点重合(连通)');
+	assert.equal(s.netflags[0].rot, 270, 'rot 90→270');
+	mirrorModuleY(s, 0); assert.equal(s.components[0].pins[0].y, 5, '两次复原');
+});
+
+test('moduleCenterY:件 bbox 垂直中心', () => { assert.equal(moduleCenterY({ components: [{ bbox: { minX: 0, minY: 5, maxX: 10, maxY: 15 } }] }), 10); });
 
 test('镜像两次=原状(对合)', () => {
 	const s = mk(); const cx = moduleCenterX(s);

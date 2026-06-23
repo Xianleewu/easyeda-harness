@@ -26,6 +26,29 @@ export function mirrorModuleX(sub, cx) {
 	return sub;
 }
 
+// 垂直镜像(绕 y=cy 翻 y)。配合上下相邻摆放使共享脚朝向对方。rot 竖直翻(90↔270)。
+export function mirrorModuleY(sub, cy) {
+	const fy = y => 2 * cy - y;
+	for (const c of (sub.components || [])) {
+		if (c.y != null) c.y = fy(c.y);
+		if (c.bbox) { const a = fy(c.bbox.minY), b = fy(c.bbox.maxY); c.bbox.minY = Math.min(a, b); c.bbox.maxY = Math.max(a, b); }
+		for (const p of (c.pins || [])) { if (p.y != null) p.y = fy(p.y); if (p._ay != null) p._ay = fy(p._ay); }
+	}
+	for (const w of (sub.wires || [])) w.line = w.line.map((v, i) => i % 2 === 1 ? fy(v) : v);
+	for (const f of (sub.netflags || [])) {
+		f.y = fy(f.y); if (f.textY != null) f.textY = fy(f.textY);
+		if (f.rot === 90) f.rot = 270; else if (f.rot === 270) f.rot = 90;
+	}
+	return sub;
+}
+
+// 求子模块所有件 bbox 的垂直中心(镜像轴)。
+export function moduleCenterY(sub) {
+	let minY = 1e9, maxY = -1e9;
+	for (const c of (sub.components || [])) if (c.bbox) { minY = Math.min(minY, c.bbox.minY); maxY = Math.max(maxY, c.bbox.maxY); }
+	return isFinite(minY) ? (minY + maxY) / 2 : 0;
+}
+
 // 求子模块所有件 bbox 的水平中心(镜像轴)。
 export function moduleCenterX(sub) {
 	let minX = 1e9, maxX = -1e9;
