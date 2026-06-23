@@ -28,12 +28,14 @@ circuit. Any device/net/module-title literal tied to one schematic is a defect.
 - `engine/bridge_*.mjs` — live EasyEDA access via the official bridge.
 - delivery: `engine/cluster_generate.mjs` `deliverGenerated`, `engine/preserve_deliver.mjs`,
   `engine/plexus_apply_live.mjs`.
-- `engine/commercial_rubric.mjs` / `engine/commercial_judge.mjs` / `engine/bridge_windows.mjs` —
-  commercial-grade judge: frozen, measurable rules `CR-01..CR-10` (orthogonality, grid-snap,
-  orientation, spacing, label-to-line, professional label placement, DRC) scored against real
-  EasyEDA evidence (geometry + `sch_Drc.check` + full/region screenshots). `bridge_windows`
-  enumerates/targets EDA windows and captures full/region images for board-vs-reference compare.
-  `engine/rubric_audit.mjs` guards the zero-specific-circuit rule by scanning for device/net fingerprints.
+- `engine/design_tokens.mjs` / `engine/token_conformance.mjs` / `engine/commercial_judge.mjs` /
+  `engine/bridge_windows.mjs` — design-token conformance judge. `design_tokens` is the single source
+  of truth (strict values from DR1-18, e.g. orthogonal=100%; density/annotation values from commercial
+  reference measurement). `token_conformance.judgeTokens` checks each token deterministically and
+  returns a **3-tier deviation report** (tier1 DRC `0/0/0/0` → tier2 geometry tokens → tier3 residual
+  visual), **no composite percentage**. `commercial_judge.runLiveJudge` collects real EasyEDA evidence
+  (geometry + `sch_Drc.check` + full/region screenshots via `bridge_windows`). `engine/rubric_audit.mjs`
+  guards the zero-specific-circuit rule. (`commercial_rubric.mjs` soft-threshold `scoreAll` is DEPRECATED.)
 - `bin/plexus.mjs` — the entry point (`layout` / `deliver` / `judge` / `repair` / `qc` / `audit`).
 
 ## Design language (generic, measurable)

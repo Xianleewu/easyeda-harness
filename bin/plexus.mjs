@@ -134,21 +134,28 @@ return { done, before: before.map(x=>x.type[0]+x.count).join('/'), after: after.
 	}
 
 	if (cmd === 'judge') {
+		// 三层 token 确定性符合裁判(无合成百分比):tier1 DRC 底线 / tier2 几何 token / tier3 视觉残余。
+		const printTiers = (rep) => {
+			console.log(`tier1 DRC: ${rep.tier1.conform ? '符合' : '✗ 不符合'} ${JSON.stringify(rep.tier1.detail)}`);
+			for (const r of rep.tier2) { console.log(`  ${r.token}: ${r.conform ? '符合' : '✗ 偏离'} ${JSON.stringify(r.detail)}`); }
+			console.log(rep.conform ? '✅ tier1+tier2 符合(tier3 视觉待并排商用参考图确认)' : `✗ 不符合,共偏离 ${rep.deviationCount} 处`);
+		};
 		const live = args.includes('--live');
 		if (live) {
 			const { runLiveJudge } = await import('../engine/commercial_judge.mjs');
 			const rep = await runLiveJudge({ outDir: '.' });
-			console.log(rep.summary);
+			printTiers(rep);
+			console.log('tier3 视觉证据:', rep.shots);
 			console.log('证据报告 -> judge_report.json');
-			process.exit(rep.commercialPass ? 0 : 1);
+			process.exit(rep.conform ? 0 : 1);
 		}
-		const { judgeSnapshot } = await import('../engine/commercial_judge.mjs');
+		const { judgeTokens } = await import('../engine/token_conformance.mjs');
 		const snap = args.find(a => /\.json$/.test(a));
 		if (!snap) { console.error('用法: plexus judge <snapshot.json> | judge --live'); process.exit(2); }
-		const rep = judgeSnapshot(snap);
-		for (const r of rep.rules) console.log(`${r.id}: ${r.pass === null ? '待视觉' : r.pass ? '✓' : '✗'} ${JSON.stringify(r)}`);
-		console.log(rep.summary);
-		process.exit(rep.commercialPass ? 0 : 1);
+		const model = JSON.parse(readFileSync(snap, 'utf8').replace(/^﻿/, ''));
+		const rep = judgeTokens(model, {});   // 离线无 DRC → T-DRC 不符合(诚实:无真 DRC 不认达标)
+		printTiers(rep);
+		process.exit(rep.conform ? 0 : 1);
 	}
 
 	console.log(`通用原理图美化工具(公共工具,零特定电路内容)

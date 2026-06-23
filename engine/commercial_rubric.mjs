@@ -1,4 +1,10 @@
 // 商用级原理图规则集(冻结)。阈值源自商用参考图实测标定,见 spec §7.1。零特定电路内容。
+//
+// ⚠️ DEPRECATED(2026-06-23):本文件的软阈值(GRID_SNAP_MIN_PCT=88、ORTHO_MIN_PCT=80 等放水值)与
+// 打分式 scoreAll/crXxx,是"我想象的松尺"旧裁判,曾把不达标板判"90%"。已被
+// engine/design_tokens.mjs(严标 DR1-18,T-ORTHO=100% 等单一真源)+ engine/token_conformance.mjs
+// (对 token 的确定性符合检查,三层 deviation,无合成百分比)取代。CR 算子仅作历史/算法参考,
+// 勿再用作"通过/达标"判定。新裁判入口:token_conformance.judgeTokens / commercial_judge.judgeBoardTokens。
 
 export const THRESHOLDS = {
 	GRID: 5,                    // 引脚吸附栅格(EDA 单位)
