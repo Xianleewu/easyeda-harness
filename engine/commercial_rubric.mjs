@@ -155,3 +155,37 @@ export function crLabelPlacement(model) {
 		(outsidePct === 100 && perpMed >= THRESHOLDS.LABEL_PERP_LO && perpMed <= THRESHOLDS.LABEL_PERP_HI && sameSidePct >= 70);
 	return { id: 'CR-10', pass, outsidePct, perpMed, sameSidePct, n: total };
 }
+
+export function crDrc(drc = {}) {
+	const error = drc.error || 0;
+	return { id: 'CR-01', pass: error === 0, error, warn: drc.warn || 0, info: drc.info || 0 };
+}
+
+// 无纯几何判据规则(CR-08/CR-09)默认 pending,由视觉证据补判(Task 12)
+function crPending(id) {
+	return { id, pass: null, pending: true, note: '需视觉证据判定' };
+}
+
+export function scoreAll(model, { drc } = {}) {
+	const rules = [
+		crDrc(drc),
+		crOrthogonality(model),
+		crGridSnap(model),
+		crRotation(model),
+		crSpacing(model),
+		crLabelToLine(model),
+		crNamedRatio(model),
+		crPending('CR-08'),
+		crPending('CR-09'),
+		crLabelPlacement(model),
+	];
+	const sev = id => (RUBRIC.find(r => r.id === id) || {}).severity;
+	let blockFail = 0, flagFail = 0;
+	for (const r of rules) {
+		if (r.pass === false) {
+			if (sev(r.id) === 'block') blockFail++;
+			else flagFail++;
+		}
+	}
+	return { rules, blockFail, flagFail, commercialPass: blockFail === 0 };
+}

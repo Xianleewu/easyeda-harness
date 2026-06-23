@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { RUBRIC, THRESHOLDS, crOrthogonality, crGridSnap, crRotation, crSpacing, crNamedRatio, crLabelToLine, crLabelPlacement } from './commercial_rubric.mjs';
+import { RUBRIC, THRESHOLDS, crOrthogonality, crGridSnap, crRotation, crSpacing, crNamedRatio, crLabelToLine, crLabelPlacement, crDrc, scoreAll } from './commercial_rubric.mjs';
 
 test('RUBRIC 含 CR-01..CR-10 且字段完整', () => {
 	const ids = RUBRIC.map(r => r.id);
@@ -139,4 +139,25 @@ test('CR-10 标签压在 body 内 → 不通过', () => {
 	const r = crLabelPlacement({ components: [bad] });
 	assert.ok(r.outsidePct < 100);
 	assert.equal(r.pass, false);
+});
+
+test('CR-01 error=0 通过,error>0 不通过', () => {
+	assert.equal(crDrc({ error: 0, warn: 3, info: 0 }).pass, true);
+	assert.equal(crDrc({ error: 2, warn: 0, info: 0 }).pass, false);
+});
+
+test('scoreAll 汇总:全好板 commercialPass=true', () => {
+	const model = {
+		components: [{ rotation: 0, mirror: false, x: 0, y: 0, bbox: { minX: -5, minY: -5, maxX: 5, maxY: 5 },
+			pins: [{ x: -10, y: 0 }, { x: 10, y: 0 }],
+			attrs: [{ key: 'Designator', valueVisible: true, x: -2, y: 12 }, { key: 'Name', valueVisible: true, x: -2, y: 10 }] },
+			{ rotation: 90, mirror: false, x: 40, y: 0, bbox: { minX: 35, minY: -5, maxX: 45, maxY: 5 },
+			pins: [{ x: 40, y: -10 }, { x: 40, y: 10 }],
+			attrs: [{ key: 'Designator', valueVisible: true, x: 50, y: 2 }, { key: 'Name', valueVisible: true, x: 50, y: -2 }] }],
+		wires: [{ line: [0, 0, 40, 0], attrs: [{ key: 'Name', value: 'NETA', x: 0, y: 0 }] }],
+	};
+	const r = scoreAll(model, { drc: { error: 0, warn: 0, info: 0 } });
+	assert.equal(r.rules.length, 10);
+	assert.equal(r.blockFail, 0);
+	assert.equal(r.commercialPass, true);
 });
