@@ -2,8 +2,8 @@
 
 export const THRESHOLDS = {
 	GRID: 5,                    // 引脚吸附栅格(EDA 单位)
-	GRID_SNAP_MIN_PCT: 88,      // CR-03 校准2026-06-23: 商用单页栅格~90%(RK806页90.4%)
-	ORTHO_MIN_PCT: 80,          // CR-02 校准2026-06-23: 商用单页正交下限~83%(RK3576十页floor),余量到80
+	GRID_SNAP_MIN_PCT: 88,      // CR-03 校准2026-06-23: 商用单页栅格下限~90%(见 spec §7.1 校准记录)
+	ORTHO_MIN_PCT: 80,          // CR-02 校准2026-06-23: 商用单页正交下限~83%(见 spec §7.1 校准记录)
 	ROT_ALLOWED: [0, 90, 180, 270], // CR-04
 	MIRROR_MAX_PCT: 5,          // CR-04 镜像占比上限(实测<1%,留余量)
 	SPACING_MIN: 15,            // CR-05 最近邻最小中心距

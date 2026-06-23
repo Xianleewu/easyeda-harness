@@ -29,6 +29,7 @@ export function judgeSnapshot(snapshotPath, { drc } = {}) {
 export async function runLiveJudge({ windowId = '', port = 0, outDir = '.', timeoutMs = 120000 } = {}) {
 	const model = await readGeometry({ windowId, port, timeoutMs });
 	const drc = await runDrc({ windowId, port, timeoutMs });
+	mkdirSync(outDir, { recursive: true });
 	const shots = [];
 	const region = regionFromParts(model.components || []);
 	if (region) {
@@ -36,7 +37,6 @@ export async function runLiveJudge({ windowId = '', port = 0, outDir = '.', time
 		try { await captureRegion({ windowId, port, region, outFile: out, timeoutMs }); shots.push(out); } catch { /* 截图失败不伪装,留空证据 */ }
 	}
 	const report = judgeBoard(model, { drc, shots });
-	mkdirSync(outDir, { recursive: true });
 	writeFileSync(`${outDir}/judge_report.json`, JSON.stringify({ ...report, drc }, null, 2), 'utf8');
 	return report;
 }
