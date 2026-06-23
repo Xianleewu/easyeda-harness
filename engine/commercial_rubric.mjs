@@ -130,3 +130,28 @@ export function crLabelToLine(model) {
 	const p90 = dists.length ? +dists[Math.floor(dists.length * 0.9)].toFixed(1) : 0;
 	return { id: 'CR-06', pass: dists.length === 0 || medDist <= THRESHOLDS.LABEL_TO_LINE_MED_MAX, medDist, p90, n: dists.length };
 }
+
+export function crLabelPlacement(model) {
+	let total = 0, outside = 0;
+	const perps = [];
+	let sameSide = 0, pairCount = 0;
+	for (const c of model.components || []) {
+		const pins = c.pins || [];
+		if (pins.length !== 2 || !c.bbox) continue;
+		const horiz = Math.abs(pins[0].x - pins[1].x) >= Math.abs(pins[0].y - pins[1].y);
+		const bb = c.bbox, bcx = (bb.minX + bb.maxX) / 2, bcy = (bb.minY + bb.maxY) / 2;
+		const labels = (c.attrs || []).filter(a => (a.key === 'Designator' || a.key === 'Name') && a.valueVisible && Number.isFinite(a.x));
+		const perpOf = a => horiz ? a.y - bcy : a.x - bcx;
+		const inside = a => a.x >= bb.minX && a.x <= bb.maxX && a.y >= bb.minY && a.y <= bb.maxY;
+		const desig = labels.find(a => a.key === 'Designator'), name = labels.find(a => a.key === 'Name');
+		for (const a of labels) { total++; if (!inside(a)) outside++; const p = perpOf(a); if (p) perps.push(Math.abs(p)); }
+		if (desig && name) { pairCount++; if (Math.sign(perpOf(desig)) === Math.sign(perpOf(name)) && perpOf(desig) !== 0) sameSide++; }
+	}
+	const outsidePct = total ? +(outside / total * 100).toFixed(0) : 100;
+	const sameSidePct = pairCount ? +(sameSide / pairCount * 100).toFixed(0) : 100;
+	const a = perps.sort((x, y) => x - y);
+	const perpMed = a.length ? a[Math.floor(a.length / 2)] : 0;
+	const pass = total === 0 ||
+		(outsidePct === 100 && perpMed >= THRESHOLDS.LABEL_PERP_LO && perpMed <= THRESHOLDS.LABEL_PERP_HI && sameSidePct >= 70);
+	return { id: 'CR-10', pass, outsidePct, perpMed, sameSidePct, n: total };
+}

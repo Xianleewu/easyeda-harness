@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { RUBRIC, THRESHOLDS, crOrthogonality, crGridSnap, crRotation, crSpacing, crNamedRatio, crLabelToLine } from './commercial_rubric.mjs';
+import { RUBRIC, THRESHOLDS, crOrthogonality, crGridSnap, crRotation, crSpacing, crNamedRatio, crLabelToLine, crLabelPlacement } from './commercial_rubric.mjs';
 
 test('RUBRIC 含 CR-01..CR-10 且字段完整', () => {
 	const ids = RUBRIC.map(r => r.id);
@@ -113,5 +113,30 @@ test('CR-06 标签飘远(距 50) → 不通过', () => {
 	const model = { wires: [{ line: [0, 0, 20, 0], attrs: [{ key: 'Name', value: 'NETA', x: 0, y: 50 }] }] };
 	const r = crLabelToLine(model);
 	assert.equal(r.medDist, 50);
+	assert.equal(r.pass, false);
+});
+
+// 横放 2 脚件:body y∈[-2,2],脚在 x=±10;标号/阻值同侧(上方),垂直偏移 10/10,在 body 外
+const goodPassive = () => ({
+	pins: [{ x: -10, y: 0 }, { x: 10, y: 0 }],
+	bbox: { minX: -8, minY: -2, maxX: 8, maxY: 2 },
+	attrs: [
+		{ key: 'Designator', valueVisible: true, x: -2, y: 12 },
+		{ key: 'Name', valueVisible: true, x: -2, y: 10 },
+	],
+});
+
+test('CR-10 标号/阻值在外、垂直偏移、同侧 → 通过', () => {
+	const r = crLabelPlacement({ components: [goodPassive()] });
+	assert.equal(r.outsidePct, 100);
+	assert.equal(r.sameSidePct, 100);
+	assert.equal(r.pass, true);
+});
+
+test('CR-10 标签压在 body 内 → 不通过', () => {
+	const bad = goodPassive();
+	bad.attrs = [{ key: 'Designator', valueVisible: true, x: 0, y: 0 }, { key: 'Name', valueVisible: true, x: 0, y: 0 }];
+	const r = crLabelPlacement({ components: [bad] });
+	assert.ok(r.outsidePct < 100);
 	assert.equal(r.pass, false);
 });
