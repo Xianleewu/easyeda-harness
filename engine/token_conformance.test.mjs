@@ -88,3 +88,20 @@ test('T-ANNOT-FULL:无源件缺值标注→不符合', () => {
 	assert.equal(checkAnnotFull({ components: [withVal] }).conform, true);
 	assert.equal(checkAnnotFull({ components: [bare] }).conform, false);
 });
+
+test('T-ANNOT-PLACE:标号阻值同侧(都在件上方)→符合', () => {
+	// 横放2脚件,body y∈[-2,2],脚在 x=±10;标号/阻值都在上方(y=10,12)同侧
+	const c = { pins: [{ x: -10, y: 0 }, { x: 10, y: 0 }], bbox: { minX: -8, minY: -2, maxX: 8, maxY: 2 },
+		attrs: [{ key: 'Designator', valueVisible: true, x: -2, y: 12 }, { key: 'Name', valueVisible: true, x: -2, y: 10 }] };
+	const r = checkAnnotPlace({ components: [c] });
+	assert.equal(r.detail.sameSidePct, 100);
+	assert.equal(r.conform, true);
+});
+
+test('T-ANNOT-PLACE:标号阻值异侧(一上一下)→不符合', () => {
+	const c = { pins: [{ x: -10, y: 0 }, { x: 10, y: 0 }], bbox: { minX: -8, minY: -2, maxX: 8, maxY: 2 },
+		attrs: [{ key: 'Designator', valueVisible: true, x: -2, y: 12 }, { key: 'Name', valueVisible: true, x: -2, y: -12 }] };
+	const r = checkAnnotPlace({ components: [c] });
+	assert.equal(r.detail.sameSidePct, 0);
+	assert.equal(r.conform, false);
+});

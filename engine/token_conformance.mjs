@@ -77,6 +77,7 @@ function bboxCenter(c) {
 }
 
 // 内部助手:求数组中位数
+// floor-median,与 T-DENSITY 阈值的标定方法一致(勿改成均值,会解校准)
 function median(a) {
 	if (!a.length) {
 		return 0;
@@ -139,7 +140,7 @@ export function checkAnnotPlace(model) {
 		}
 		if (d && n) {
 			pair++;
-			if (Math.sign(perp(d)) === Math.sign(perp(n)) && perp(d) !== 0) {
+			if (Math.sign(perp(d)) === Math.sign(perp(n)) && perp(d) !== 0 && perp(n) !== 0) {
 				same++;
 			}
 		}
