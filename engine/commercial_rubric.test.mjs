@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { RUBRIC, THRESHOLDS, crOrthogonality, crGridSnap, crRotation } from './commercial_rubric.mjs';
+import { RUBRIC, THRESHOLDS, crOrthogonality, crGridSnap, crRotation, crSpacing } from './commercial_rubric.mjs';
 
 test('RUBRIC 含 CR-01..CR-10 且字段完整', () => {
 	const ids = RUBRIC.map(r => r.id);
@@ -69,5 +69,22 @@ test('CR-04 出现 45 度旋转 → 不通过', () => {
 	const model = { components: [{ rotation: 45, mirror: false }] };
 	const r = crRotation(model);
 	assert.equal(r.badRot, 1);
+	assert.equal(r.pass, false);
+});
+
+test('CR-05 间距居中 → 通过', () => {
+	// 三件均匀间隔 40
+	const mk = (x) => ({ x, y: 0, bbox: { minX: x - 5, minY: -5, maxX: x + 5, maxY: 5 }, pins: [] });
+	const model = { components: [mk(0), mk(40), mk(80)] };
+	const r = crSpacing(model);
+	assert.equal(r.id, 'CR-05');
+	assert.equal(r.minNN, 40);
+	assert.equal(r.pass, true);
+});
+
+test('CR-05 过挤(间距 5) → 不通过', () => {
+	const mk = (x) => ({ x, y: 0, bbox: { minX: x, minY: 0, maxX: x + 2, maxY: 2 }, pins: [] });
+	const model = { components: [mk(0), mk(5)] };
+	const r = crSpacing(model);
 	assert.equal(r.pass, false);
 });

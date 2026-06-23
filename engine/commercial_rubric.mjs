@@ -69,3 +69,35 @@ export function crRotation(model) {
 	const mirrorPct = comps.length ? +(mir / comps.length * 100).toFixed(1) : 0;
 	return { id: 'CR-04', pass: bad === 0 && mirrorPct <= THRESHOLDS.MIRROR_MAX_PCT, rotDist, badRot: bad, mirrorPct };
 }
+
+// 模块内 helper：器件包围盒中心坐标
+function bboxCenter(c) {
+	if (c.bbox) return [(c.bbox.minX + c.bbox.maxX) / 2, (c.bbox.minY + c.bbox.maxY) / 2];
+	return [c.x, c.y];
+}
+
+// 模块内 helper：数组中位数(用于 CR-05 中位距离计算)
+function median(arr) {
+	if (!arr.length) return 0;
+	const a = [...arr].sort((x, y) => x - y);
+	return a[Math.floor(a.length / 2)];
+}
+
+export function crSpacing(model) {
+	const cs = (model.components || []).map(bboxCenter).filter(p => Number.isFinite(p[0]));
+	const dists = [];
+	for (let i = 0; i < cs.length; i++) {
+		let m = Infinity;
+		for (let j = 0; j < cs.length; j++) {
+			if (i === j) continue;
+			const d = Math.hypot(cs[i][0] - cs[j][0], cs[i][1] - cs[j][1]);
+			if (d < m) m = d;
+		}
+		if (m < Infinity) dists.push(m);
+	}
+	const minNN = dists.length ? +Math.min(...dists).toFixed(0) : 0;
+	const medNN = +median(dists).toFixed(0);
+	const pass = dists.length === 0 ||
+		(minNN >= THRESHOLDS.SPACING_MIN && medNN >= THRESHOLDS.SPACING_MED_LO && medNN <= THRESHOLDS.SPACING_MED_HI);
+	return { id: 'CR-05', pass, minNN, medNN, n: dists.length };
+}
