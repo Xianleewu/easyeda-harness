@@ -230,7 +230,7 @@ export function layoutClusterTemplate(anchor, members, ctx, depth = 0) {
 			ic.pins.filter(p => sd(p) === side1).length > 1 ? minGap(ic.pins.filter(p => sd(p) === side1), ax) : 99,
 			ic.pins.filter(p => sd(p) === side2).length > 1 ? minGap(ic.pins.filter(p => sd(p) === side2), ax) : 99);
 		const gapY = sideMin('L', 'R', 'y'), gapX = sideMin('T', 'B', 'x');
-		const sY = gapY < 20 ? 20 / gapY : 1, sX = gapX < 20 ? 20 / gapX : 1;
+		const sY = 1, sX = 1; void gapY; void gapX;   // 脚展开已禁用:实测 spread+bridge 净负(撑开脚→桥接竖直线在脚列同x重叠→异网短路80vs3、labelHard 67vs33反升)。密集脚标签叠压交给 deconflict 更优;bridge 因 _ax 未设自动跳过。
 		if (sY !== 1 || sX !== 1) {
 			// 按侧分轴展开:L/R 脚只竖直(sY,标签竖向留位),T/B 脚只水平(sX)——避免无谓的另一轴偏移,
 			// 使桥接线单轴短直、不跨他网(对角桥接 L-route 后会跨网短路)。存原始脚位 _ax/_ay 供投递桥接。
