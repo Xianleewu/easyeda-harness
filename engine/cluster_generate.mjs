@@ -15,7 +15,7 @@ import { recoverConnectivity } from './connectivity_recover.mjs';
 import { routeLocalNets } from './local_net_route.mjs';
 import { repairNetFaithfulness } from './net_faithfulness.mjs';
 import { directRouteClose } from './direct_route.mjs';
-import { connPlace } from './conn_place.mjs';
+import { connPlace, compactBlocks } from './conn_place.mjs';
 import { mirrorModuleX } from './module_orient.mjs';
 
 // 电源/地轨合并:同 net 同 x 的【密集 flag 列】(连续间距≤34=堆叠,如多上拉到 VDD 的 far flag)→
@@ -493,7 +493,11 @@ export async function generateLayout(snap, opts = {}) {
 		const cpSubs = subs.map(s => ({ id: s.anchor, w: s.w, h: s.h + TITLE, pins: s.model.components.flatMap(c => (c.pins || []).filter(p => p.x != null).map(p => ({ ref: `${c.designator}.${p.num}`, x: (p._ax ?? p.x) - s.bb.minX, y: (p._ay ?? p.y) - s.bb.minY }))) }));
 		// aspect 默认 1.4(商用图纸横向):仅最小连接长会排成纵向稀疏图(实测 0.78),偏置压成横向(实测 1.66,labelHard/geomHard 零回归)。
 		const cp = connPlace(cpSubs, logical.nets, { pad: PAD, base: BASE, aspect: opts.aspect ?? 1.4, aspectW: opts.aspectW ?? 1.0 });
-		for (const s of subs) { const p = cp.get(s.anchor); posOf.set(s, { x: p.X, y: p.Y }); if (p.mir) mirrorModuleX(s.model, (s.bb.minX + s.bb.maxX) / 2); }
+		// B2b 增量①:连接驱动初位后做块紧排——按连接序 BLF 天际线填洞重排,消块间不可约空洞(矮块旁上下留白)。
+		// 块刚性平移 + 跨模块连接靠网名标签 → 连接不变。compactPad=60(块边缘标签留白,避免靠近后标签互撞)。
+		// 单调守卫(compactBlocks 内)保证排布绝不变大;opts.compact:false 关(对比基线)。实测大散板缩 ~29.5% 零回归。
+		const packed = opts.compact === false ? cp : compactBlocks(cp, cpSubs, { pad: opts.compactPad ?? 60, base: BASE });
+		for (const s of subs) { const p = packed.get(s.anchor); posOf.set(s, { x: p.X, y: p.Y }); if (p.mir) mirrorModuleX(s.model, (s.bb.minX + s.bb.maxX) / 2); }
 	} else {
 		const order = [...subs].sort((a, b) => b.h - a.h);
 		const sky = [{ x0: BASE, x1: BASE + MAXW, y: BASE }];

@@ -385,3 +385,42 @@ test('generateLayout: 密集上拉far flag合并成轨', async () => {
 	const g = geomQC(r.model), lh = labelQC(r.model).filter(f => f.severity === 'hard').length;
 	assert.equal(g.crossings, 0, '轨不增交叉'); assert.equal(g.overlaps.length, 0, '零叠压'); assert.ok(lh <= 1, `labelHard低(实 ${lh})`);
 });
+
+// B2b 增量①:刚性块紧排 —— compact(默认开)经 compactBlocks BLF 天际线重排+单调守卫,
+// 整板【绝不变大】(单调),且几何/标签零回归、不掉件。合成多簇板已较紧 → 守卫保持不变(等于基线);
+// 大散板的真实缩小(实测 ~29.5%)在闭环真 EDA 验证(plan Task 3 / live)证。本测护"单调+零回归+接线生效"。
+test('generateLayout: compact 紧排 → 整板单调不变大 + geom/label 零回归', async () => {
+	const ic = (des, x, y, pins) => ({ designator: des, x, y, rotation: 0, mirror: false, bbox: { minX: x - 40, minY: y - pins.length * 10, maxX: x + 40, maxY: y + pins.length * 10 }, pins: pins.map((p, i) => ({ num: String(i + 1), name: p.n, x: p.s === 'L' ? x - 40 : x + 40, y: y - pins.length * 10 + i * 20 + 10, side: p.s === 'L' ? 'left' : 'right' })) });
+	const two = (des, x, y) => ({ designator: des, x, y, rotation: 0, mirror: false, bbox: { minX: x - 15, minY: y - 5, maxX: x + 15, maxY: y + 5 }, pins: [{ num: '1', x: x - 15, y }, { num: '2', x: x + 15, y }] });
+	const Q = (des, x, y) => ({ designator: des, x, y, rotation: 0, mirror: false, bbox: { minX: x - 15, minY: y - 20, maxX: x + 15, maxY: y + 20 }, pins: [{ num: '1', name: 'B', x: x - 15, y, side: 'left' }, { num: '2', name: 'C', x: x + 5, y: y - 20, side: 'top' }, { num: '3', name: 'E', x: x + 5, y: y + 20, side: 'bottom' }] });
+	const comps = [
+		ic('U1', 400, 500, [{ n: 'VDD', s: 'L' }, { n: 'GND', s: 'L' }, { n: 'SCL', s: 'R' }, { n: 'GPIO_LED', s: 'R' }, { n: 'ADC_IN', s: 'R' }]),
+		ic('U3', 900, 600, [{ n: 'VDD', s: 'L' }, { n: 'GND', s: 'L' }, { n: 'SCL', s: 'L' }]),
+		ic('U4', 400, 900, [{ n: 'IN_NEG', s: 'L' }, { n: 'IN_POS', s: 'L' }, { n: 'VDD', s: 'L' }, { n: 'OUT', s: 'R' }]),
+		Q('Q1', 700, 900), two('R1', 550, 520), two('R3', 550, 560), two('R_IN', 250, 860), two('R_FB', 550, 860), two('LED1', 750, 800), two('C1', 150, 420), two('C4', 150, 860),
+	];
+	const pin = (d, n) => { const c = comps.find(x => x.designator === d); const p = c.pins.find(pp => pp.name === n || pp.num === String(n)); return [p.x, p.y]; };
+	const W = (net, a, b) => ({ net, line: [a[0], a[1], b[0], b[1]] });
+	const wires = [
+		W('VDD', pin('U1', 'VDD'), pin('C1', 1)), W('VDD', pin('U3', 'VDD'), pin('U1', 'VDD')), W('VDD', pin('U4', 'VDD'), pin('C4', 1)),
+		W('SCL', pin('U1', 'SCL'), pin('U3', 'SCL')), W('SCL', pin('U1', 'SCL'), pin('R1', 1)), W('VDD', pin('R1', 2), pin('U1', 'VDD')),
+		W('GPIO_LED', pin('U1', 'GPIO_LED'), pin('R3', 1)), W('Q_B', pin('R3', 2), pin('Q1', 'B')), W('Q_COL', pin('Q1', 'C'), pin('LED1', 1)),
+		W('ADC_IN', pin('U1', 'ADC_IN'), pin('U4', 'OUT')), W('IN_NEG', pin('U4', 'IN_NEG'), pin('R_IN', 2)), W('OUT', pin('U4', 'OUT'), pin('R_FB', 1)), W('IN_NEG', pin('R_FB', 2), pin('U4', 'IN_NEG')),
+	];
+	const netflags = [['U1', 'GND'], ['U3', 'GND'], ['U4', 'IN_POS'], ['Q1', 'E'], ['C1', 2], ['C4', 2]].map(([d, p]) => ({ net: 'GND', symbol: 'Ground-GND', x: pin(d, p)[0], y: pin(d, p)[1] }));
+	netflags.push({ net: 'VCC', symbol: 'Power', x: pin('LED1', 2)[0], y: pin('LED1', 2)[1] });
+	const snap = { components: comps, wires, netflags };
+	const bboxArea = m => {
+		let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
+		for (const c of m.components) { const b = c.bbox; if (!b) continue; x0 = Math.min(x0, b.minX); y0 = Math.min(y0, b.minY); x1 = Math.max(x1, b.maxX); y1 = Math.max(y1, b.maxY); }
+		return (x1 - x0) * (y1 - y0);
+	};
+	const hard = m => labelQC(m).filter(f => f.severity === 'hard').length;
+	const geoHard = m => { const g = geomQC(m); return g.overlaps.length + g.crossings + g.wireThruComp.length + g.wireThruPin.length; };
+	const base = await generateLayout(structuredClone(snap), { scale: false, deconflict: true, compact: false });
+	const comp = await generateLayout(structuredClone(snap), { scale: false, deconflict: true, compact: true });
+	assert.equal(comp.stats.placements, base.stats.placements, '紧排不掉件');
+	assert.ok(bboxArea(comp.model) <= bboxArea(base.model), `紧排单调不变大(${Math.round(bboxArea(comp.model))} ≤ ${Math.round(bboxArea(base.model))})`);
+	assert.ok(geoHard(comp.model) <= geoHard(base.model), `几何零回归(${geoHard(comp.model)} ≤ ${geoHard(base.model)})`);
+	assert.ok(hard(comp.model) <= hard(base.model), `硬标签零回归(${hard(comp.model)} ≤ ${hard(base.model)})`);
+});
