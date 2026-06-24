@@ -46,3 +46,18 @@ export function pinLocalOffsets(c) {
 		return { num: p.num, ldx, ldy };
 	});
 }
+
+/* 本地 bbox(rot0/mirror-false、相对原点)→ 全局 AABB。正交旋转+镜像保矩形轴对齐,
+ * 故变换对角两角再取 min/max 即得 AABB(DR4/DR5 重叠按真实占位判的地基)。 */
+export function placeBBox(localBBox, ox, oy, rotation = 0, mirror = false) {
+	const a = placePin(localBBox.minX, localBBox.minY, ox, oy, rotation, mirror);
+	const b = placePin(localBBox.maxX, localBBox.maxY, ox, oy, rotation, mirror);
+	return { minX: Math.min(a[0], b[0]), minY: Math.min(a[1], b[1]), maxX: Math.max(a[0], b[0]), maxY: Math.max(a[1], b[1]) };
+}
+
+/* 全局 AABB → 本地 bbox(placeBBox 的逆;用 localOffset 反解对角两角)。 */
+export function inverseBBox(globalBBox, ox, oy, rotation = 0, mirror = false) {
+	const a = localOffset(globalBBox.minX, globalBBox.minY, ox, oy, rotation, mirror);
+	const b = localOffset(globalBBox.maxX, globalBBox.maxY, ox, oy, rotation, mirror);
+	return { minX: Math.min(a[0], b[0]), minY: Math.min(a[1], b[1]), maxX: Math.max(a[0], b[0]), maxY: Math.max(a[1], b[1]) };
+}

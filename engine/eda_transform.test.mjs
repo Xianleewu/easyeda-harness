@@ -1,7 +1,7 @@
 // eda_transform 测试 —— 锁死实测的 EDA 变换真值(R1@(210,700),脚2局部(20,0))。零特定电路内容。
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { rotOffset, placePin, localOffset, pinLocalOffsets } from './eda_transform.mjs';
+import { rotOffset, placePin, localOffset, pinLocalOffsets, placeBBox, inverseBBox } from './eda_transform.mjs';
 
 test('rotOffset:实测 CCW 旋转真值', () => {
 	assert.deepEqual(rotOffset(20, 0, 0), [20, 0]);
@@ -48,4 +48,24 @@ test('重排保真:换放置后用局部偏移重算脚位 = EDA 会产生的脚
 	assert.deepEqual([o2.ldx, o2.ldy], [20, 0]);
 	// 重排到 (500,300,rot90):脚2新全局 = placePin(20,0,500,300,90) = (500,320)
 	assert.deepEqual(placePin(o2.ldx, o2.ldy, 500, 300, 90, false), [500, 320]);
+});
+
+test('placeBBox:rot90 把 10x20 本地 bbox 变成 20x10(宽高互换)', () => {
+	const b = placeBBox({ minX: 0, minY: 0, maxX: 10, maxY: 20 }, 100, 100, 90, false);
+	assert.equal(b.maxX - b.minX, 20);
+	assert.equal(b.maxY - b.minY, 10);
+});
+
+test('placeBBox:rot0 mirror=false = 平移本地 bbox', () => {
+	const b = placeBBox({ minX: 0, minY: 0, maxX: 10, maxY: 20 }, 100, 100, 0, false);
+	assert.deepEqual(b, { minX: 100, minY: 100, maxX: 110, maxY: 120 });
+});
+
+test('inverseBBox 是 placeBBox 的逆(8 态往返=恒等)', () => {
+	const local = { minX: -4, minY: -2, maxX: 6, maxY: 8 };
+	for (const rot of [0, 90, 180, 270]) for (const mir of [false, true]) {
+		const g = placeBBox(local, 37, -11, rot, mir);
+		const back = inverseBBox(g, 37, -11, rot, mir);
+		assert.deepEqual(back, local, `rot${rot} mir${mir}`);
+	}
 });
