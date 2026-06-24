@@ -430,6 +430,8 @@ export function resolveDisplayValue(c) {
 
 // 生成:每簇 schematic-aware 模板布局(默认)或 elkLayout(opts.layout==='elk'),shelf-packing 排布,产模型 + moduleRegions(带框标题)。
 export async function generateLayout(snap, opts = {}) {
+	snap = structuredClone(snap);   // 不可变铁律 + 确定性:绝不改入参。EDA 是确定引擎,同输入必须同输出;
+	                                // 复用同一 snap 对象时若被内部就地改写 → 摆放漂移(实测 connPlace 漂移根因)。
 	const logical = opts.recover ? { nets: recoverConnectivity(snap).nets } : buildCleanLogical(snap);   // opts.recover:用完整网表(含无名本地网,P0 保连通),否则仅命名网(默认,零回归)
 	const cluster = clusterComponents(snap, logical);
 	if (!cluster) return null;

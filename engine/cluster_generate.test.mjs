@@ -115,6 +115,31 @@ test('generateLayout 模板布局:不掉件、去耦电容入图、零浮空', a
 	assert.equal(floating, 0, '零浮空件');
 });
 
+test('generateLayout 确定性:不修改入参 snap + 同输入产同摆放(EDA是确定引擎,零猜想)', async () => {
+	const ic = (des, x, y, pins) => ({ designator: des, x, y, rotation: 0, mirror: false, bbox: { minX: x - 30, minY: y - pins.length * 10, maxX: x + 30, maxY: y + pins.length * 10 }, pins: pins.map((p, i) => ({ num: String(i + 1), name: p.n, x: p.s === 'L' ? x - 30 : x + 30, y: y - pins.length * 10 + i * 20 + 10 })) });
+	const rc = (des, x, y) => ({ designator: des, x, y, rotation: 0, mirror: false, bbox: { minX: x - 15, minY: y - 5, maxX: x + 15, maxY: y + 5 }, pins: [{ num: '1', x: x - 15, y }, { num: '2', x: x + 15, y }] });
+	const comps = [
+		ic('U1', 200, 300, [{ n: 'VDD', s: 'L' }, { n: 'GND', s: 'L' }, { n: 'NET1', s: 'R' }, { n: 'NET2', s: 'R' }]),
+		rc('C1', 150, 420), rc('C2', 150, 450),
+		ic('U2', 600, 300, [{ n: 'VDD', s: 'L' }, { n: 'GND', s: 'L' }, { n: 'NET1', s: 'R' }]),
+		rc('C3', 550, 420),
+	];
+	const pin = (d, n) => { const c = comps.find(x => x.designator === d); return [c.pins[n - 1].x, c.pins[n - 1].y]; };
+	const W = (net, a, b) => ({ net, line: [a[0], a[1], b[0], b[1]] });
+	const wires = [
+		W('VDD', pin('U1', 1), pin('C1', 1)), W('GND', pin('U1', 2), pin('C1', 2)),
+		W('VDD', pin('U2', 1), pin('C3', 1)), W('GND', pin('U2', 2), pin('C3', 2)),
+		W('NET1', pin('U1', 3), pin('U2', 3)),
+	];
+	const snap = { components: comps, wires, netflags: [] };
+	const before = structuredClone(snap);
+	const r1 = await generateLayout(snap, {});
+	assert.deepEqual(snap, before, 'generateLayout 修改了入参 snap → 破坏确定性 + 违反不可变铁律');
+	const r2 = await generateLayout(structuredClone(before), {});
+	const hash = r => (r.model.components || []).map(c => `${c.designator}@${c.x},${c.y},${c.rotation || 0},${c.mirror ? 1 : 0}`).sort().join('|');
+	assert.equal(hash(r1), hash(r2), '同输入应产同摆放(确定性)');
+});
+
 // 四边脚 IC(电源顶/地底/信号左右):side-aware 判边——按到 bbox 四边最近距离,而非 |dx|/|dy|
 // (后者对高 IC 的右侧上部脚误判成 top → 内联失效掉 fallback 浮空)。验证不掉件、零浮空。
 test('generateLayout 模板布局:四边脚 IC 正确判边、不掉件、零浮空', async () => {
