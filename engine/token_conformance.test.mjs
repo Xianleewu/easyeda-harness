@@ -139,6 +139,16 @@ test('T-LABEL-ALIGN:行距过密(糊成一团)→ 不符合(DR16)', () => {
 	assert.ok(checkLabelAlign(m).deviations.some(d => d.kind === 'row-pitch-merged'));
 });
 
+/* Fix5:alignMode 既非 6 也非 8 → bad-alignmode 偏差 + conform===false */
+test('T-LABEL-ALIGN:alignMode 非 6/8 (e.g. 2) → bad-alignmode 偏差且不符合', () => {
+	const m = { netflags: [
+		{ kind: 'sig', net: 'CLK', textX: 0, textY: 0, alignMode: 2 },
+	] };
+	const r = checkLabelAlign(m);
+	assert.equal(r.conform, false, 'alignMode=2 应使 conform=false');
+	assert.ok(r.deviations.some(d => d.kind === 'bad-alignmode'), '应有 bad-alignmode 偏差');
+});
+
 test('judgeTokens 三层结构、无合成分、DRC≠0则不符合', () => {
 	const rep = judgeTokens({ components: [], wires: [] }, { drc: { error: 0, warn: 24, info: 0 } });
 	assert.ok(rep.tier1 && Array.isArray(rep.tier2) && Array.isArray(rep.tier3));

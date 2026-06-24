@@ -1,9 +1,13 @@
 /* 模型→「EDA 会怎么画」的忠实几何孪生(零特定电路)。从快照反解本地几何,按 model 新放置正算。
  * 输出与 bridge_windows.readGeometry 同形 → 直接喂 token_conformance.judgeTokens。 */
-import { placePin, placeBBox, localOffset, inverseBBox } from './eda_transform.mjs';
+import { placePin, placeBBox, localOffset, inverseBBox, fillVisibleAttrBBoxes } from './eda_transform.mjs';
 
 export function twinPredict(model, snapshot) {
-	const byDes = new Map((snapshot.components || []).map(c => [c.designator, c]));
+	/* 快照 attr bbox 缺失时先兜底填充(Fix2),使 DR4/DR5 检查有数据可查。
+	 * TODO(calibration): 估算 bbox 待 live 标定钉死字宽公式 */
+	const filledComponents = fillVisibleAttrBBoxes(snapshot.components);
+	const filledSnapshot = { ...snapshot, components: filledComponents };
+	const byDes = new Map((filledSnapshot.components || []).map(c => [c.designator, c]));
 	const components = [];
 	for (const c of model.components || []) {
 		const s = byDes.get(c.designator);

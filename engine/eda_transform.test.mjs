@@ -1,7 +1,7 @@
 // eda_transform 测试 —— 锁死实测的 EDA 变换真值(R1@(210,700),脚2局部(20,0))。零特定电路内容。
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { rotOffset, placePin, localOffset, pinLocalOffsets, placeBBox, inverseBBox, estimateTextBBox } from './eda_transform.mjs';
+import { rotOffset, placePin, localOffset, pinLocalOffsets, placeBBox, inverseBBox, estimateTextBBox, fillVisibleAttrBBoxes } from './eda_transform.mjs';
 
 test('rotOffset:实测 CCW 旋转真值', () => {
 	assert.deepEqual(rotOffset(20, 0, 0), [20, 0]);
@@ -80,4 +80,39 @@ test('estimateTextBBox:alignMode8(左展开)bbox 向左', () => {
 	const b = estimateTextBBox('VCC', 100, 50, 8, 14);
 	assert.equal(b.maxX, 100);
 	assert.ok(b.minX < 100);
+});
+
+/* Fix2:fillVisibleAttrBBoxes 单测 */
+test('fillVisibleAttrBBoxes:可见且无 bbox 的 attr 被填估算 bbox', () => {
+	const comps = [{
+		attrs: [{ key: 'Name', value: '10k', x: 100, y: 50, valueVisible: true, bbox: null }],
+	}];
+	const result = fillVisibleAttrBBoxes(comps);
+	assert.ok(result[0].attrs[0].bbox != null, '应填入估算 bbox');
+	assert.ok(result[0].attrs[0].bbox.maxX > result[0].attrs[0].bbox.minX, 'bbox 宽度 > 0');
+});
+
+test('fillVisibleAttrBBoxes:真实 bbox 不被覆盖', () => {
+	const real = { minX: 5, minY: 5, maxX: 50, maxY: 19 };
+	const comps = [{
+		attrs: [{ key: 'Name', value: 'X', x: 10, y: 5, valueVisible: true, bbox: real }],
+	}];
+	const result = fillVisibleAttrBBoxes(comps);
+	assert.deepEqual(result[0].attrs[0].bbox, real, '已有 bbox 不应被覆盖');
+});
+
+test('fillVisibleAttrBBoxes:不可见 attr 跳过(bbox 仍 null)', () => {
+	const comps = [{
+		attrs: [{ key: 'Name', value: 'X', x: 10, y: 5, valueVisible: false, keyVisible: false, bbox: null }],
+	}];
+	const result = fillVisibleAttrBBoxes(comps);
+	assert.equal(result[0].attrs[0].bbox, null, '不可见 attr 不应填 bbox');
+});
+
+test('fillVisibleAttrBBoxes:无坐标 attr 跳过(bbox 仍 null)', () => {
+	const comps = [{
+		attrs: [{ key: 'Name', value: 'X', valueVisible: true, bbox: null }],
+	}];
+	const result = fillVisibleAttrBBoxes(comps);
+	assert.equal(result[0].attrs[0].bbox, null, '无 x/y 的 attr 不应填 bbox');
 });

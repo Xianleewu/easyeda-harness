@@ -71,3 +71,24 @@ export function estimateTextBBox(text, x, y, alignMode = 6, fontSize = 14) {
 	if (alignMode === 8 || alignMode === 9) return { minX: x - len, minY: y, maxX: x, maxY: y + h };
 	return { minX: x, minY: y, maxX: x + len, maxY: y + h };
 }
+
+/* EDA 不给 attr bbox 时的批量兜底填充(Fix2 §3/§4:EDA 给不了则按字串长×字号估算)。
+ * 对 components 中每个 VISIBLE attr:若 bbox 缺失/为 null 且 x/y 有效,则用 estimateTextBBox 填。
+ * component attrs 无 alignMode 字段,默认 6(右展开,标定后可钉死)。
+ * TODO(calibration): 估算 bbox 待 live 标定钉死字宽公式 */
+export function fillVisibleAttrBBoxes(components) {
+	const DEFAULT_FONTSIZE = 14;
+	return (components || []).map(c => {
+		const attrs = (c.attrs || []).map(a => {
+			/* 仅处理可见、有坐标、且 bbox 确实缺失的 attr */
+			if (a.bbox != null) return a;
+			const visible = a.valueVisible || a.keyVisible;
+			if (!visible) return a;
+			if (a.x == null || a.y == null) return a;
+			const visibleText = a.valueVisible ? (a.value || '') : (a.key || '');
+			const bbox = estimateTextBBox(visibleText, a.x, a.y, 6, DEFAULT_FONTSIZE);
+			return { ...a, bbox };
+		});
+		return { ...c, attrs };
+	});
+}

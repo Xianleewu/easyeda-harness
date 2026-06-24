@@ -1,6 +1,7 @@
 // 可复用多窗口桥工具:窗口枚举/定向/激活/截图/读几何 + 区域计算。
 // 操作配方见记忆 eda-api-capability-map。零特定电路内容。
 import { findBridge, listEdaWindows, executeCode } from './bridge_client.mjs';
+import { fillVisibleAttrBBoxes } from './eda_transform.mjs';
 
 // 纯函数:由 parts 的 bbox 算紧窗(已排除大图框——调用方只传 parts)。
 export function regionFromParts(parts, { aspect = 2017 / 1081, pad = 160 } = {}) {
@@ -52,6 +53,9 @@ export async function listWindows({ port = 0, timeoutMs = 3000 } = {}) {
 
 export async function readGeometry({ windowId = '', port = 0, timeoutMs = 120000 } = {}) {
 	const { result } = await executeCode(SNAPSHOT_CODE, { windowId, port, timeoutMs });
+	/* Node 侧后处理:EDA 未返回 attr bbox 时按字串估算兜底,DR4/DR5 检查才有数据可查。
+	 * TODO(calibration): 估算 bbox 待 live 标定钉死字宽公式 */
+	if (result && result.components) result.components = fillVisibleAttrBBoxes(result.components);
 	return result;
 }
 

@@ -21,6 +21,6 @@ export function compareGeom(predicted, actual, opts = {}) {
 	/* tier2 偏离数差(用 geomQC 的几个计数代表;judge 级别由调用方按需扩) */
 	const gp = geomQC(predicted), ga = geomQC(actual);
 	const tokenDiff = { overlaps: Math.abs((gp.overlaps || []).length - (ga.overlaps || []).length), crossings: Math.abs((gp.crossings || 0) - (ga.crossings || 0)) };
-	const conform = maxPinErr <= tol && maxBBoxErr <= tol && tokenDiff.overlaps === 0 && tokenDiff.crossings === 0;
+	const conform = maxPinErr <= tol && maxBBoxErr <= tol && maxAttrErr <= tol && tokenDiff.overlaps === 0 && tokenDiff.crossings === 0;
 	return { maxPinErr: +maxPinErr.toFixed(2), maxBBoxErr: maxBBoxErr === Infinity ? Infinity : +maxBBoxErr.toFixed(2), maxAttrErr: +maxAttrErr.toFixed(2), tokenDiff, conform };
 }

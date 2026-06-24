@@ -14,6 +14,7 @@ export async function runLoop(model, deps, opts = {}) {
 	if (opts.restore && deps.restore) {
 		await deps.restore(snap);
 		const after = await deps.readSnapshot();
+		/* TODO: restore 校验仅比 components.length(最小 sanity);后续加强为 designator 集+位置比对 */
 		const ok = (after.components || []).length === (snap.components || []).length;
 		if (!ok) throw new Error(`live_loop: 还原校验不过!板可能被改,备份在 ${backupPath}`);
 	}

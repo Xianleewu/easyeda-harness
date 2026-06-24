@@ -178,6 +178,7 @@ export function checkLabelAlign(model) {
 	const v = tokenById('T-LABEL-ALIGN').value;
 	const labs = (model.netflags || []).filter(f => f.kind === 'sig');
 	const dev = [];
+	/* TODO(B1 calibration): alignMode↔side 与 rulebook DR11/12(左6/右8)相反,此处随引擎(左8/右6);live 量 EDA 后裁定哪个为准并统一,届时修正 side 标签 */
 	const sideOf = f => f.alignMode === 8 ? 'left' : f.alignMode === 6 ? 'right' : null;
 	for (const f of labs) { if (sideOf(f) === null) dev.push({ kind: 'bad-alignmode', at: [f.textX ?? f.x, f.textY ?? f.y], alignMode: f.alignMode ?? null }); }
 	for (const side of ['left', 'right']) {

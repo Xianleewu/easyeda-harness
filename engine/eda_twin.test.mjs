@@ -30,3 +30,20 @@ test('twinPredict:输出与 readGeometry 同形(顶层键齐全)', () => {
 test('twinPredict:模型件不在快照 → 抛(fail-closed,不瞎猜)', () => {
 	assert.throws(() => twinPredict({ components: [{ designator: 'ZZ', x: 0, y: 0 }] }, snap), /不在快照/);
 });
+
+/* Fix2:快照 attr bbox 缺失(null)但可见 → twinPredict 后预测件 attr 有 bbox */
+test('twinPredict:快照 attr bbox 缺失但可见 → 预测件 attr 得到非 null bbox', () => {
+	const snapNoBbox = {
+		components: [{
+			designator: 'X1', x: 0, y: 0, rotation: 0, mirror: false,
+			bbox: { minX: 0, minY: 0, maxX: 10, maxY: 20 },
+			pins: [{ num: '1', name: 'A', x: 10, y: 5, type: 'in', noConnected: false }],
+			attrs: [{ key: 'Name', value: '10k', x: 2, y: 22, valueVisible: true, bbox: null }],
+		}],
+	};
+	const model = { components: [{ designator: 'X1', x: 0, y: 0, rotation: 0, mirror: false }] };
+	const g = twinPredict(model, snapNoBbox);
+	const attr = g.components[0].attrs[0];
+	assert.ok(attr.bbox != null, 'attr bbox 应由 fillVisibleAttrBBoxes 填入');
+	assert.ok(attr.bbox.maxX > attr.bbox.minX, '填入的 bbox 宽度应 > 0');
+});
