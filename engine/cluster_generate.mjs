@@ -242,7 +242,7 @@ export function layoutClusterTemplate(anchor, members, ctx, depth = 0) {
 	const cy = ic.y != null ? ic.y : (ic.bbox ? (ic.bbox.minY + ic.bbox.maxY) / 2 : 0);
 	const out = { components: [{ ...ic }], wires: [], netflags: [], placements: [{ designator: anchor, x: ic.x, y: ic.y, rot: ic.rotation || 0, mirror: !!ic.mirror }] };
 	const used = new Set([anchor]);
-	const STUB = 24, PASS = 30, ROWC = 84, FLAGV = 26;   // 收紧间距(原30/40/100/28,真图证实板过稀疏)。ROWC=去耦带行距(电容含上下符号跨度~80,84 留薄余量);FLAGV=电容脚到电源地符号间距
+	const STUB = ctx.sp?.stub ?? 24, PASS = ctx.sp?.pass ?? 30, ROWC = ctx.sp?.rowc ?? 84, FLAGV = 26;   // 间距(opt 可调,twin 扫参)。ROWC=去耦带行距;FLAGV=电容脚到电源地符号间距
 	const isPass = d => /^[CRL]/.test(d) || /^Y/.test(d);
 	const isDecoup = d => { const c = compByDes.get(d); return /^C/.test(d) && c && (c.pins || []).length === 2 && c.pins.every(p => { const nn = netOf(`${d}.${p.num}`); return nn && (nn.class === 'power' || nn.class === 'ground'); }); };
 	// 引脚真实边:优先合法 p.side,否则按【到 bbox 四边的最近距离】判定(aspect-aware,对高/宽 IC 都对;
@@ -267,7 +267,7 @@ export function layoutClusterTemplate(anchor, members, ctx, depth = 0) {
 		if (!nn) continue;
 		if (nn.class === 'local') continue;   // 本地网脚不打标签逃逸 → 由 routeLocalNets 簇内直连(P0,opts.recover)
 		const s = sideOf(p), [dx, dy] = dirOf(s), lr = (s === 'left' || s === 'right');
-		const sStub = lr ? STUB : STUB + 40;   // 顶/底信号脚标签需更长逃逸,使旋转命名标签清出 IC body+keepout(rulebook 6.3:命名桩在 IC 体外)
+		const sStub = lr ? STUB : STUB + (ctx.sp?.topExtra ?? 40);   // 顶/底信号脚标签需更长逃逸,使旋转命名标签清出 IC body+keepout(rulebook 6.3:命名桩在 IC 体外)
 		const ex = p.x + dx * sStub, ey = p.y + dy * sStub;
 		if (nn.class === 'signal') {
 			// 该信号脚连接的簇内非去耦 2 脚无源件(串联/上拉/分压/RC),四方向均内联(顶/底脚竖直放置)。
@@ -438,7 +438,7 @@ export async function generateLayout(snap, opts = {}) {
 	const compByDes = new Map((snap.components || []).map(c => [c.designator, c]));
 	const pinNet = new Map();
 	for (const n of logical.nets) for (const ref of n.pins) pinNet.set(ref, n);
-	const ctx = { compByDes, pinNet, logical };
+	const ctx = { compByDes, pinNet, logical, sp: { stub: opts.stub ?? 24, pass: opts.pass ?? 30, rowc: opts.rowc ?? 84, topExtra: opts.topExtra ?? 40 } };
 	const subs = [];
 	for (const [anchor, members] of cluster) {
 		let m;
@@ -473,7 +473,7 @@ export async function generateLayout(snap, opts = {}) {
 	} else {
 		subs.sort((a, b) => b.h - a.h);
 	}
-	const PAD = 40, TITLE = 36;   // 模块间距/标题带:收紧(原 130/48 致利用率 2.5%=废图观感)。模块 bbox 已含逃逸标签,40px 缝不叠压。
+	const PAD = opts.modPad ?? 40, TITLE = 36;   // 模块间距/标题带(opt 可调)。模块 bbox 已含逃逸标签,40px 缝不叠压。
 	// 行宽:按目标 aspect 平衡换行(多模块单行=宽-短→渲染时件被缩小;平衡成接近 landscape sheet 让模块
 	// 渲染更大更易读)。保序 + PAD 不变 = 无叠压;单模块/总宽已小于 balancedW 的板不换行(行为不变)。
 	const totalW = subs.reduce((a, s) => a + s.w + PAD, 0);
