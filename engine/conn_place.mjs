@@ -71,3 +71,71 @@ export function connPlace(subs, nets, opts = {}) {
 	}
 	return pos;
 }
+
+// 纯几何重力压实(通用):把 connPlace 输出的块位向原点 (BASE,BASE) 压实,消块间空洞。
+// 块刚性整体平移、跨模块连接靠网名标签 → 不改任何电气连接。返回新 Map,不就地改 pos。
+export function compactBlocks(pos, subs, opts = {}) {
+	const PAD = opts.pad ?? 40, BASE = opts.base ?? 60, MAX_ITERS = opts.maxIters ?? 8;
+	const sub = new Map(subs.map(s => [s.id, s]));
+	const wOf = id => sub.get(id).w, hOf = id => sub.get(id).h;
+	const P = new Map([...pos].map(([id, p]) => [id, { X: p.X, Y: p.Y, mir: p.mir }]));
+	// 在 (X,Y) 放块 id 是否与他块叠压(带 PAD)。
+	const collides = (id, X, Y) => {
+		const w = wOf(id), h = hOf(id);
+		for (const [oid, q] of P) {
+			if (oid === id) continue;
+			if (X < q.X + wOf(oid) + PAD && X + w + PAD > q.X &&
+				Y < q.Y + hOf(oid) + PAD && Y + h + PAD > q.Y) return true;
+		}
+		return false;
+	};
+	// 沿 X 向左滑到最小可行位(≥BASE,≤当前 X);候选=BASE、各 Y 重叠块的右边沿+PAD、当前位。
+	const slideX = (id, Y) => {
+		const cur = P.get(id).X, h = hOf(id);
+		const stops = [BASE, cur];
+		for (const [oid, q] of P) {
+			if (oid === id) continue;
+			if (Y < q.Y + hOf(oid) + PAD && Y + h + PAD > q.Y) {
+				const edge = q.X + wOf(oid) + PAD;
+				if (edge <= cur) stops.push(edge);
+			}
+		}
+		stops.sort((a, b) => a - b);
+		for (const x of stops) if (x <= cur && !collides(id, x, Y)) return x;
+		return cur;
+	};
+	// 沿 Y 向上滑到最小可行位(对称)。
+	const slideY = (id, X) => {
+		const cur = P.get(id).Y, w = wOf(id);
+		const stops = [BASE, cur];
+		for (const [oid, q] of P) {
+			if (oid === id) continue;
+			if (X < q.X + wOf(oid) + PAD && X + w + PAD > q.X) {
+				const edge = q.Y + hOf(oid) + PAD;
+				if (edge <= cur) stops.push(edge);
+			}
+		}
+		stops.sort((a, b) => a - b);
+		for (const y of stops) if (y <= cur && !collides(id, X, y)) return y;
+		return cur;
+	};
+	for (let it = 0; it < MAX_ITERS; it++) {
+		let moved = false;
+		// 离原点近者先压(给后者让空间);距离平局按 id 字典序 → 确定性。
+		const order = [...P.keys()].sort((a, b) => {
+			const pa = P.get(a), pb = P.get(b);
+			const da = (pa.X - BASE) + (pa.Y - BASE), db = (pb.X - BASE) + (pb.Y - BASE);
+			return da - db || (a < b ? -1 : a > b ? 1 : 0);
+		});
+		for (const id of order) {
+			const p = P.get(id);
+			const nx = slideX(id, p.Y);
+			if (nx < p.X) { p.X = nx; moved = true; }
+			const ny = slideY(id, p.X);
+			if (ny < p.Y) { p.Y = ny; moved = true; }
+		}
+		if (!moved) break;
+	}
+	for (const [, p] of P) { p.X = Math.round(p.X / 10) * 10; p.Y = Math.round(p.Y / 10) * 10; }
+	return P;
+}

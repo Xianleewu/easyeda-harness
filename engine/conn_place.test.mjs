@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { connPlace } from './conn_place.mjs';
+import { connPlace, compactBlocks } from './conn_place.mjs';
 
 test('两相连模块 → 摆相邻(连接长最小)', () => {
 	// A: 100宽,脚 a.1 在右边沿(x=100);B: 100宽,脚 b.1 在左边沿(x=0)。共享网 N。
@@ -58,4 +58,45 @@ test('三模块链 A-B-C → 顺次相邻', () => {
 		const ov = a.X < b.X + sb.w && a.X + sa.w > b.X && a.Y < b.Y + sb.h && a.Y + sa.h > b.Y;
 		assert.ok(!ov, `${ia}/${ib} 不叠压`);
 	}
+});
+
+test('compactBlocks: 消空洞 → 整体 bbox 缩小且两块不重叠', () => {
+	const subs = [{ id: 'A', w: 100, h: 100 }, { id: 'B', w: 100, h: 100 }];
+	const pos = new Map([
+		['A', { X: 60, Y: 60, mir: false }],
+		['B', { X: 500, Y: 500, mir: false }],   // 远,留大洞
+	]);
+	const area = m => {
+		let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
+		for (const [id, p] of m) { const s = subs.find(z => z.id === id); x0 = Math.min(x0, p.X); y0 = Math.min(y0, p.Y); x1 = Math.max(x1, p.X + s.w); y1 = Math.max(y1, p.Y + s.h); }
+		return (x1 - x0) * (y1 - y0);
+	};
+	const out = compactBlocks(pos, subs, { pad: 40, base: 60 });
+	assert.ok(area(out) < area(pos), `压实后 bbox 应更小(${area(out)} < ${area(pos)})`);
+	const a = out.get('A'), b = out.get('B');
+	const overlap = a.X < b.X + 100 && b.X < a.X + 100 && a.Y < b.Y + 100 && b.Y < a.Y + 100;
+	assert.ok(!overlap, '两块不应重叠');
+});
+
+test('compactBlocks: mir 透传、块数不变、确定性、不改原 pos', () => {
+	const subs = [{ id: 'A', w: 80, h: 80 }, { id: 'B', w: 80, h: 80 }, { id: 'C', w: 80, h: 80 }];
+	const pos = new Map([
+		['A', { X: 60, Y: 60, mir: true }],
+		['B', { X: 400, Y: 60, mir: false }],
+		['C', { X: 60, Y: 400, mir: true }],
+	]);
+	const o1 = compactBlocks(pos, subs, { pad: 40, base: 60 });
+	const o2 = compactBlocks(pos, subs, { pad: 40, base: 60 });
+	assert.equal(o1.size, 3, '块数不变');
+	assert.equal(o1.get('A').mir, true, 'A.mir 透传');
+	assert.equal(o1.get('C').mir, true, 'C.mir 透传');
+	for (const id of ['A', 'B', 'C']) assert.deepEqual(o1.get(id), o2.get(id), `${id} 确定性`);
+	assert.equal(pos.get('B').X, 400, '不就地改原 pos(immutable)');
+});
+
+test('compactBlocks: 末位坐标吸格到 10 的倍数', () => {
+	const subs = [{ id: 'A', w: 73, h: 51 }, { id: 'B', w: 67, h: 49 }];
+	const pos = new Map([['A', { X: 60, Y: 60, mir: false }], ['B', { X: 300, Y: 300, mir: false }]]);
+	const out = compactBlocks(pos, subs, { pad: 40, base: 60 });
+	for (const [, p] of out) { assert.equal(p.X % 10, 0, 'X 吸格'); assert.equal(p.Y % 10, 0, 'Y 吸格'); }
 });
