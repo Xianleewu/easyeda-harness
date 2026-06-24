@@ -100,3 +100,17 @@ test('compactBlocks: 末位坐标吸格到 10 的倍数', () => {
 	const out = compactBlocks(pos, subs, { pad: 40, base: 60 });
 	for (const [, p] of out) { assert.equal(p.X % 10, 0, 'X 吸格'); assert.equal(p.Y % 10, 0, 'Y 吸格'); }
 });
+
+test('compactBlocks: 单调守卫 → BLF 重排不更小时原样返回(永不变差)', () => {
+	// A 高瘦、B 矮,已紧邻摆在 A 右侧(connPlace 式);BLF 重排此 2 块不会更小 → 应原样返回。
+	const subs = [{ id: 'A', w: 100, h: 300 }, { id: 'B', w: 100, h: 40 }];
+	const pos = new Map([
+		['A', { X: 60, Y: 60, mir: false }],
+		['B', { X: 200, Y: 60, mir: false }],
+	]);
+	const area = m => { let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9; for (const [id, p] of m) { const s = subs.find(z => z.id === id); x0 = Math.min(x0, p.X); y0 = Math.min(y0, p.Y); x1 = Math.max(x1, p.X + s.w); y1 = Math.max(y1, p.Y + s.h); } return (x1 - x0) * (y1 - y0); };
+	const out = compactBlocks(pos, subs, { pad: 60, base: 60 });
+	assert.ok(area(out) <= area(pos), '压实绝不大于原排布(单调)');
+	assert.deepEqual(out.get('A'), { X: 60, Y: 60, mir: false }, '守卫触发 → A 原样');
+	assert.deepEqual(out.get('B'), { X: 200, Y: 60, mir: false }, '守卫触发 → B 原样');
+});

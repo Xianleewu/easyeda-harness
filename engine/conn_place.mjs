@@ -72,70 +72,33 @@ export function connPlace(subs, nets, opts = {}) {
 	return pos;
 }
 
-// 纯几何重力压实(通用):把 connPlace 输出的块位向原点 (BASE,BASE) 压实,消块间空洞。
-// 块刚性整体平移、跨模块连接靠网名标签 → 不改任何电气连接。返回新 Map,不就地改 pos。
+// 纯几何块紧排(通用):按连接序(pos 插入序=connPlace 连接序)做 BLF 天际线填洞重排,
+// 消块间不可约空洞。单调守卫:仅当 BLF 排布 bbox 更小才采用(小板 connPlace 已更紧时原样返回,永不变差)。
+// 块刚性整体平移 + 跨模块连接靠网名标签 → 不改任何电气连接。返回新 Map,不就地改 pos。
 export function compactBlocks(pos, subs, opts = {}) {
-	const PAD = opts.pad ?? 40, BASE = opts.base ?? 60, MAX_ITERS = opts.maxIters ?? 8;
+	const PAD = opts.pad ?? 60, BASE = opts.base ?? 60;
 	const sub = new Map(subs.map(s => [s.id, s]));
 	const wOf = id => sub.get(id).w, hOf = id => sub.get(id).h;
-	const P = new Map([...pos].map(([id, p]) => [id, { X: p.X, Y: p.Y, mir: p.mir }]));
-	// 在 (X,Y) 放块 id 是否与他块叠压(带 PAD)。
-	const collides = (id, X, Y) => {
-		const w = wOf(id), h = hOf(id);
-		for (const [oid, q] of P) {
-			if (oid === id) continue;
-			if (X < q.X + wOf(oid) + PAD && X + w + PAD > q.X &&
-				Y < q.Y + hOf(oid) + PAD && Y + h + PAD > q.Y) return true;
-		}
-		return false;
-	};
-	// 沿 X 向左滑到最小可行位(≥BASE,≤当前 X);候选=BASE、各 Y 重叠块的右边沿+PAD、当前位。
-	const slideX = (id, Y) => {
-		const cur = P.get(id).X, h = hOf(id);
-		const stops = [BASE, cur];
-		for (const [oid, q] of P) {
-			if (oid === id) continue;
-			if (Y < q.Y + hOf(oid) + PAD && Y + h + PAD > q.Y) {
-				const edge = q.X + wOf(oid) + PAD;
-				if (edge <= cur) stops.push(edge);
-			}
-		}
-		stops.sort((a, b) => a - b);
-		for (const x of stops) if (x <= cur && !collides(id, x, Y)) return x;
-		return cur;
-	};
-	// 沿 Y 向上滑到最小可行位(对称)。
-	const slideY = (id, X) => {
-		const cur = P.get(id).Y, w = wOf(id);
-		const stops = [BASE, cur];
-		for (const [oid, q] of P) {
-			if (oid === id) continue;
-			if (X < q.X + wOf(oid) + PAD && X + w + PAD > q.X) {
-				const edge = q.Y + hOf(oid) + PAD;
-				if (edge <= cur) stops.push(edge);
-			}
-		}
-		stops.sort((a, b) => a - b);
-		for (const y of stops) if (y <= cur && !collides(id, X, y)) return y;
-		return cur;
-	};
-	for (let it = 0; it < MAX_ITERS; it++) {
-		let moved = false;
-		// 离原点近者先压(给后者让空间);距离平局按 id 字典序 → 确定性。
-		const order = [...P.keys()].sort((a, b) => {
-			const pa = P.get(a), pb = P.get(b);
-			const da = (pa.X - BASE) + (pa.Y - BASE), db = (pb.X - BASE) + (pb.Y - BASE);
-			return da - db || (a < b ? -1 : a > b ? 1 : 0);
-		});
-		for (const id of order) {
-			const p = P.get(id);
-			const nx = slideX(id, p.Y);
-			if (nx < p.X) { p.X = nx; moved = true; }
-			const ny = slideY(id, p.X);
-			if (ny < p.Y) { p.Y = ny; moved = true; }
-		}
-		if (!moved) break;
+	const ids = [...pos.keys()];
+	const clone = () => new Map(ids.map(id => { const p = pos.get(id); return [id, { X: p.X, Y: p.Y, mir: p.mir }]; }));
+	if (ids.length <= 1) return clone();
+	const totalW = ids.reduce((a, id) => a + wOf(id) + PAD, 0);
+	const maxH = Math.max(...ids.map(hOf));
+	const aspect = opts.aspect ?? 1.4;
+	const MAXW = Math.max(Math.sqrt(aspect * totalW * (maxH + PAD)), Math.max(...ids.map(wOf)) + 1);
+	const sky = [{ x0: BASE, x1: BASE + MAXW, y: BASE }];
+	const topAt = (x0, x1) => { let m = BASE; for (const sg of sky) { if (sg.x1 <= x0 || sg.x0 >= x1) continue; m = Math.max(m, sg.y); } return m; };
+	const raise = (x0, x1, y) => { const ns = []; for (const sg of sky) { if (sg.x1 <= x0 || sg.x0 >= x1) { ns.push(sg); continue; } if (sg.x0 < x0) ns.push({ x0: sg.x0, x1: x0, y: sg.y }); if (sg.x1 > x1) ns.push({ x0: x1, x1: sg.x1, y: sg.y }); } ns.push({ x0, x1, y }); ns.sort((a, b) => a.x0 - b.x0); sky.length = 0; sky.push(...ns); };
+	const blf = new Map();
+	for (const id of ids) {
+		const W = wOf(id) + PAD, H = hOf(id) + PAD;
+		let bx = BASE, by = Infinity;
+		for (let x = BASE; x + W <= BASE + MAXW + 1; x += 10) { const y = topAt(x, x + W); if (y < by) { by = y; bx = x; } }
+		if (!isFinite(by)) { bx = BASE; by = topAt(BASE, BASE + W); }
+		blf.set(id, { X: Math.round(bx / 10) * 10, Y: Math.round(by / 10) * 10, mir: pos.get(id).mir });
+		raise(bx, bx + W, by + H);
 	}
-	for (const [, p] of P) { p.X = Math.round(p.X / 10) * 10; p.Y = Math.round(p.Y / 10) * 10; }
-	return P;
+	// 单调守卫:用块排布 bbox 面积比较,BLF 不更小则原样返回。
+	const area = m => { let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9; for (const [id, p] of m) { x0 = Math.min(x0, p.X); y0 = Math.min(y0, p.Y); x1 = Math.max(x1, p.X + wOf(id)); y1 = Math.max(y1, p.Y + hOf(id)); } return (x1 - x0) * (y1 - y0); };
+	return area(blf) < area(pos) ? blf : clone();
 }
