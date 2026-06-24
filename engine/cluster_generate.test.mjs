@@ -424,3 +424,30 @@ test('generateLayout: compact 紧排 → 整板单调不变大 + geom/label 零�
 	assert.ok(geoHard(comp.model) <= geoHard(base.model), `几何零回归(${geoHard(comp.model)} ≤ ${geoHard(base.model)})`);
 	assert.ok(hard(comp.model) <= hard(base.model), `硬标签零回归(${hard(comp.model)} ≤ ${hard(base.model)})`);
 });
+
+// B2b 增量①:散板上 compact 必须【严格缩小】——证明 BLF 紧排真接入并生效(若接入被删则 comp==base,本测会失败)。
+// 散板夹具:多个不同高度的独立 IC 簇、IC 间无共享信号网 → connPlace 排成长行留竖向空洞 → BLF 天际线填洞缩小。
+test('generateLayout: compact 在散板上严格缩小(BLF 接入生效证据)', async () => {
+	const ic = (des, x, y, n) => ({ designator: des, x, y, rotation: 0, mirror: false, bbox: { minX: x - 40, minY: y - n * 10, maxX: x + 40, maxY: y + n * 10 }, pins: Array.from({ length: n }, (_, i) => ({ num: String(i + 1), name: i === 0 ? 'VDD' : i === 1 ? 'GND' : 'IO' + i, x: i % 2 ? x - 40 : x + 40, y: y - n * 10 + i * 20 + 10, side: i % 2 ? 'left' : 'right' })) });
+	const two = (des, x, y) => ({ designator: des, x, y, rotation: 0, mirror: false, bbox: { minX: x - 15, minY: y - 5, maxX: x + 15, maxY: y + 5 }, pins: [{ num: '1', x: x - 15, y }, { num: '2', x: x + 15, y }] });
+	const heights = [12, 3, 9, 4, 11, 5]; const comps = []; const wires = []; const netflags = [];
+	heights.forEach((n, k) => {
+		const U = 'U' + (k + 1), C = 'C' + (k + 1), x = 200 + k * 400, y = 400;
+		comps.push(ic(U, x, y, n)); comps.push(two(C, x - 120, y));
+		const vdd = comps.find(c => c.designator === U).pins.find(p => p.name === 'VDD');
+		wires.push({ net: 'VDD' + k, line: [vdd.x, vdd.y, x - 120 - 15, y] });
+		const gnd = comps.find(c => c.designator === U).pins.find(p => p.name === 'GND');
+		netflags.push({ net: 'GND', symbol: 'Ground-GND', x: gnd.x, y: gnd.y });
+	});
+	const snap = { components: comps, wires, netflags };
+	const bboxArea = m => { let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9; for (const c of m.components) { const b = c.bbox; if (!b) continue; x0 = Math.min(x0, b.minX); y0 = Math.min(y0, b.minY); x1 = Math.max(x1, b.maxX); y1 = Math.max(y1, b.maxY); } return (x1 - x0) * (y1 - y0); };
+	const geoHard = m => { const g = geomQC(m); return g.overlaps.length + g.crossings + g.wireThruComp.length + g.wireThruPin.length; };
+	const hard = m => labelQC(m).filter(f => f.severity === 'hard').length;
+	const base = await generateLayout(structuredClone(snap), { scale: false, deconflict: true, compact: false });
+	const comp = await generateLayout(structuredClone(snap), { scale: false, deconflict: true, compact: true });
+	assert.ok(base.stats.clusters >= 5, `散板多簇(实 ${base.stats.clusters})`);
+	assert.equal(comp.stats.placements, base.stats.placements, '散板紧排不掉件');
+	assert.ok(bboxArea(comp.model) < bboxArea(base.model), `散板紧排严格缩小(${Math.round(bboxArea(comp.model))} < ${Math.round(bboxArea(base.model))})`);
+	assert.ok(geoHard(comp.model) <= geoHard(base.model), `几何零回归(${geoHard(comp.model)} ≤ ${geoHard(base.model)})`);
+	assert.ok(hard(comp.model) <= hard(base.model), `硬标签零回归(${hard(comp.model)} ≤ ${hard(base.model)})`);
+});

@@ -95,8 +95,11 @@ export function compactBlocks(pos, subs, opts = {}) {
 		let bx = BASE, by = Infinity;
 		for (let x = BASE; x + W <= BASE + MAXW + 1; x += 10) { const y = topAt(x, x + W); if (y < by) { by = y; bx = x; } }
 		if (!isFinite(by)) { bx = BASE; by = topAt(BASE, BASE + W); }
-		blf.set(id, { X: Math.round(bx / 10) * 10, Y: Math.round(by / 10) * 10, mir: pos.get(id).mir });
-		raise(bx, bx + W, by + H);
+		// 吸格用【同一】坐标存 blf 与抬天际线:bx 已在 10 格(扫描步进 10、BASE 在格);by 向【上】吸格
+		// (块坐落不高于天际线 → 绝不侵入 PAD 区 → 间距恒 ≥ PAD),且天际线与存值一致。
+		const sy = Math.ceil(by / 10) * 10;
+		blf.set(id, { X: bx, Y: sy, mir: pos.get(id).mir });
+		raise(bx, bx + W, sy + H);
 	}
 	// 单调守卫:用块排布 bbox 面积比较,BLF 不更小则原样返回。
 	const area = m => { let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9; for (const [id, p] of m) { x0 = Math.min(x0, p.X); y0 = Math.min(y0, p.Y); x1 = Math.max(x1, p.X + wOf(id)); y1 = Math.max(y1, p.Y + hOf(id)); } return (x1 - x0) * (y1 - y0); };
