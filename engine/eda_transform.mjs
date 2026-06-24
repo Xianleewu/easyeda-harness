@@ -61,3 +61,13 @@ export function inverseBBox(globalBBox, ox, oy, rotation = 0, mirror = false) {
 	const b = localOffset(globalBBox.maxX, globalBBox.maxY, ox, oy, rotation, mirror);
 	return { minX: Math.min(a[0], b[0]), minY: Math.min(a[1], b[1]), maxX: Math.max(a[0], b[0]), maxY: Math.max(a[1], b[1]) };
 }
+
+/* 估算可见文字 bbox(EDA 不给 attr bbox 时的兜底;标定钉死)。
+ * 公式对齐 cluster_generate.mjs:152-156:字宽 ≈ 字号 × 0.6。
+ * alignMode 6/7(或 null)→ 右展开;8/9 → 左展开。 */
+export function estimateTextBBox(text, x, y, alignMode = 6, fontSize = 14) {
+	const len = Math.max(1, String(text || '').length) * fontSize * 0.6;
+	const h = fontSize;
+	if (alignMode === 8 || alignMode === 9) return { minX: x - len, minY: y, maxX: x, maxY: y + h };
+	return { minX: x, minY: y, maxX: x + len, maxY: y + h };
+}

@@ -28,7 +28,7 @@ for (const id of ids) {
     const attrs = (await eda.sch_PrimitiveAttribute.getAll(id).catch(()=>[])) || [];
     components.push({ id, designator:c.designator||null, name:c.name||null, value:(c.otherProperty&&c.otherProperty.Value)||null,
       x:c.x, y:c.y, rotation:c.rotation, mirror:!!c.mirror, bbox,
-      attrs: attrs.map(a=>({key:a.key||'', value:a.value||'', x:a.x, y:a.y, keyVisible:a.keyVisible??null, valueVisible:a.valueVisible??null})),
+      attrs: await Promise.all(attrs.map(async a=>{ let bb=null; try{ if(a.primitiveId){ const r=await eda.sch_Primitive.getPrimitivesBBox([a.primitiveId]); if(r) bb={minX:round(r.minX??r.x),minY:round(r.minY??r.y),maxX:round(r.maxX??(r.x+r.width)),maxY:round(r.maxY??(r.y+r.height))}; } }catch(e){} return {key:a.key||'', value:a.value||'', x:a.x, y:a.y, keyVisible:a.keyVisible??null, valueVisible:a.valueVisible??null, bbox:bb}; })),
       pins: ps.map(p=>({num:p.pinNumber, name:p.pinName, x:p.x, y:p.y, rot:p.rotation, len:p.pinLength, type:p.pinType, noConnected:p.getState_NoConnected?p.getState_NoConnected():false})) });
   } else if (c.componentType==='netflag'||c.componentType==='netport') {
     netflags.push({ id, type:c.componentType, net:c.net||c.netLabel||'', x:c.x, y:c.y, rotation:c.rotation, mirror:!!c.mirror, bbox });

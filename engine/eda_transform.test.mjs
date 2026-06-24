@@ -1,7 +1,7 @@
 // eda_transform 测试 —— 锁死实测的 EDA 变换真值(R1@(210,700),脚2局部(20,0))。零特定电路内容。
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { rotOffset, placePin, localOffset, pinLocalOffsets, placeBBox, inverseBBox } from './eda_transform.mjs';
+import { rotOffset, placePin, localOffset, pinLocalOffsets, placeBBox, inverseBBox, estimateTextBBox } from './eda_transform.mjs';
 
 test('rotOffset:实测 CCW 旋转真值', () => {
 	assert.deepEqual(rotOffset(20, 0, 0), [20, 0]);
@@ -68,4 +68,16 @@ test('inverseBBox 是 placeBBox 的逆(8 态往返=恒等)', () => {
 		const back = inverseBBox(g, 37, -11, rot, mir);
 		assert.deepEqual(back, local, `rot${rot} mir${mir}`);
 	}
+});
+
+test('estimateTextBBox:alignMode6(右展开)bbox 从锚点向右', () => {
+	const b = estimateTextBBox('10k', 100, 50, 6, 14);
+	assert.equal(b.minX, 100);
+	assert.ok(b.maxX > 100 && b.maxY - b.minY === 14);
+});
+
+test('estimateTextBBox:alignMode8(左展开)bbox 向左', () => {
+	const b = estimateTextBBox('VCC', 100, 50, 8, 14);
+	assert.equal(b.maxX, 100);
+	assert.ok(b.minX < 100);
 });
