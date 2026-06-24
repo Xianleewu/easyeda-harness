@@ -542,8 +542,34 @@ export async function generateLayout(snap, opts = {}) {
 	for (const pl of placements) { pl.x = SNAP(pl.x); pl.y = SNAP(pl.y); }
 	if (opts.deconflict !== false) deconflictLabels(out);   // 默认开:标签去冲突(验证式向外移,零回归;实测 labelHard 43→21)
 	if (opts.ortho || opts.recover) orthogonalizeWires(out);   // DR1:对角线段 → L 形正交(含 deconflict L桩产生的斜段)。recover 路径默认开(零回归:默认路径不触发)
+	if (opts.annot !== false) placeAnnotations(out);   // 标号/阻值标注跟随器件最终 body 重放(同侧件外)——根治"标注压体"重叠(T-ANNOT-PLACE/overlap)
 	const sigLabels = out.netflags.filter(f => f.kind === 'sig').length;
 	return { model: out, moduleRegions, placements, stats: { clusters: subs.length, components: out.components.length, wires: out.wires.length, sigLabels, powerGnd: out.netflags.length - sigLabels, nets: logical.nets.length, placements: placements.length, faith } };
+}
+
+// 标注放置(通用):把每件可见 Designator/Name 标注重放到【件最终 body 同侧件外】,跟随器件。
+// 根因:布局移动器件时 attrs 位置陈旧(留在原始坐标)→ 标注散落压在乱七八糟器件体上(T-ANNOT-PLACE 100%错位、
+// overlap 多为 "件×attr")。此 pass 按最终 bbox 重写位置:横放件→标注上方堆叠;竖放件→右侧堆叠。同侧+件外。
+function placeAnnotations(model) {
+	const GAP = 10, PITCH = 16;
+	for (const c of model.components || []) {
+		const bb = c.bbox; if (!bb) continue;
+		const attrs = c.attrs || []; if (!attrs.length) continue;
+		const d = attrs.find(a => a.key === 'Designator'), n = attrs.find(a => a.key === 'Name');
+		if (!d && !n) continue;
+		const bcx = Math.round((bb.minX + bb.maxX) / 2 / 5) * 5;
+		const pins = c.pins || [];
+		const horiz = pins.length === 2 ? Math.abs((pins[0].x ?? 0) - (pins[1].x ?? 0)) >= Math.abs((pins[0].y ?? 0) - (pins[1].y ?? 0)) : true;
+		if (horiz) {   // 标注堆在 body 上方(同侧、件外)
+			if (d) { d.x = bcx; d.y = bb.minY - GAP; d.valueVisible = true; }
+			if (n) { n.x = bcx; n.y = bb.minY - GAP - PITCH; n.valueVisible = true; }
+		} else {       // 竖放件:标注堆在 body 右侧(同侧、件外)
+			const rx = bb.maxX + GAP, rcy = Math.round((bb.minY + bb.maxY) / 2 / 5) * 5;
+			if (d) { d.x = rx; d.y = rcy - PITCH / 2; d.valueVisible = true; }
+			if (n) { n.x = rx; n.y = rcy + PITCH / 2; n.valueVisible = true; }
+		}
+	}
+	return model;
 }
 
 // 把生成的模块图投递到 live EDA。2026-06-20 实测验证:必须用【命名线】(无名线被 EDA 删=0线),
