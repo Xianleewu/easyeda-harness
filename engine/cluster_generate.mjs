@@ -601,6 +601,12 @@ export async function deliverGenerated(snap, opts = {}) {
 			}
 		} catch (e) { console.error('  网表修复跳过:', String(e).slice(0, 70)); }
 	}
+	// 投后强制重绘:EasyEDA 【不对桥的改动实时重绘】,必须 save + 关闭重开文档才显示(否则"改了看不见"
+	// = 整季"EDA 没变化"的真因)。见记忆 eda-modify-needs-reload-to-repaint。save 必须在 close 前(不存会丢数据)。
+	if (opts.reload !== false) {
+		await exec(`const info=await eda.dmt_SelectControl.getCurrentDocumentInfo();if(!info)return{};await eda.sch_Document.save();await eda.dmt_EditorControl.closeDocument(info.tabId);await new Promise(r=>setTimeout(r,1000));await eda.dmt_EditorControl.openDocument(info.uuid);return{};`);
+		console.log('已 save + 重载文档(强制重绘 → 改动在 EDA 上可见)。');
+	}
 	console.log('cluster 生成模块图已投 live(命名线持久、跨簇 netport、导线正交化、权威网表零断网)。');
 	return cg.stats;
 }
