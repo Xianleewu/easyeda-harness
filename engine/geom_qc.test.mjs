@@ -133,3 +133,48 @@ test('不可见标注不计入重叠', () => {
 	], wires: [], netflags: [] };
 	assert.equal(geomQC(m).overlaps.filter(s => s.includes('attr:')).length, 0);
 });
+
+/* textOnWire 专项测试 (rulebook 行 166)
+ * 用到 A1 器件:bbox=[0..20 x 0..10], 脚1@(0,5)(左中), 脚2@(20,5)(右中)
+ * attr 'Ref' 可见,bbox=[0..30 x 12..18] — 位于体框正下方
+ */
+test('textOnWire[正]:别的器件连过来的线穿过标注 bbox → 报 attr:A1.Ref', () => {
+	/* 导线 [0,15→50,15] 水平穿过 attr bbox(y 在 12..18 内),
+	 * 端点(0,15)和(50,15)都不在 A1 的脚(0,5)或(20,5)上 → 应报 */
+	const m = {
+		components: [
+			{
+				designator: 'A1',
+				bbox: { minX: 0, minY: 0, maxX: 20, maxY: 10 },
+				pins: [{ num: '1', x: 0, y: 5 }, { num: '2', x: 20, y: 5 }],
+				attrs: [{ key: 'Ref', valueVisible: true, bbox: { minX: 0, minY: 12, maxX: 30, maxY: 18 } }],
+			},
+		],
+		wires: [{ net: 'SIG', line: [0, 15, 50, 15] }],
+		netflags: [],
+	};
+	const r = geomQC(m);
+	assert.ok(r.textOnWire.length >= 1, `应报 textOnWire,实际:${JSON.stringify(r.textOnWire)}`);
+	assert.ok(r.textOnWire[0].includes('attr:A1.Ref'), `finding 应含 attr:A1.Ref,实际:${r.textOnWire[0]}`);
+});
+
+test('textOnWire[负]:穿过标注 bbox 的线其端点在本件自己脚上 → 不报(无 false positive)', () => {
+	/* A1 自身脚2@(20,5),从(20,5)出发的线段向右到(50,5),纵坐标=5。
+	 * 将 attr bbox 设在 y 范围包含 5 的位置([18..20 x 3..8]),
+	 * 且线段 x 范围(20..50)会穿过 minX=18..maxX=20+ 的左侧,
+	 * 使 segInRect 判定"穿过",但端点(20,5)恰好在 A1 脚2 → 应被排除不报 */
+	const m = {
+		components: [
+			{
+				designator: 'A1',
+				bbox: { minX: 0, minY: 0, maxX: 20, maxY: 10 },
+				pins: [{ num: '1', x: 0, y: 5 }, { num: '2', x: 20, y: 5 }],
+				attrs: [{ key: 'Ref', valueVisible: true, bbox: { minX: 15, minY: 3, maxX: 35, maxY: 8 } }],
+			},
+		],
+		wires: [{ net: 'VCC', line: [20, 5, 50, 5] }],
+		netflags: [],
+	};
+	const r = geomQC(m);
+	assert.equal(r.textOnWire.length, 0, `端点在本件脚上的线不应报 textOnWire,实际:${JSON.stringify(r.textOnWire)}`);
+});

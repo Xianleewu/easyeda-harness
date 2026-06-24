@@ -124,17 +124,27 @@ export function geomQC(model, opt = {}) {
 		}
 	}
 
-	/* rulebook 行 166:可见标注 bbox 被【異網】线段穿过 = hard(text over an other-net wire)。
+	/* rulebook 行 166:可见标注 bbox 被其他器件线段穿过 = hard(text over another wire)。
+	 * "異網/other wire" 在此模型中以几何同器件排除实现:attr 和脚均无 net 字段,无法
+	 * 按网名过滤,改为排除端点落在本器件任意脚坐标(容差≤2)上的线段 ——
+	 * 这类段是连接本件自身的脚线,正常出现在标注附近,报出属于误报。
 	 * 复用已建的 segs 集合与 segInRect 判定函数,不引入重复逻辑(DRY)。 */
 	const textOnWire = [];
 	for (const c of model.components || []) {
 		for (const a of (c.attrs || [])) {
 			if (!a.bbox || !(a.valueVisible || a.keyVisible)) continue;
+			const cPins = c.pins || [];
 			for (const s of segs) {
-				if (segInRect(s, a.bbox)) {
-					textOnWire.push(`attr:${c.designator}.${a.key || '?'} x wire[${s.net || ''}]`);
-					break;
-				}
+				if (!segInRect(s, a.bbox)) continue;
+				/* 几何同器件排除:若线段任一端点与本件任意脚坐标重合(≤2 单位容差),
+				 * 视为本器件自身脚线,不报;只有真正"外来"线才记录。 */
+				const ownPin = cPins.some(p =>
+					(Math.abs(s.a[0] - p.x) <= 2 && Math.abs(s.a[1] - p.y) <= 2) ||
+					(Math.abs(s.b[0] - p.x) <= 2 && Math.abs(s.b[1] - p.y) <= 2)
+				);
+				if (ownPin) continue;
+				textOnWire.push(`attr:${c.designator}.${a.key || '?'} x wire[${s.net || ''}]`);
+				break;
 			}
 		}
 	}
