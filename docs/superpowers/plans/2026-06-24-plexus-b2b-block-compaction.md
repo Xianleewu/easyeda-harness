@@ -8,6 +8,14 @@
 
 **Tech Stack:** Node.js ESM、`node:test` + `node:assert/strict`(项目现有测试栈)、纯 JS 几何。
 
+## ⚠ 执行修正记录(闭环探针所得,2026-06-24)
+
+下方 Task 1/2 原描述的 `compactBlocks`【重力压实(向原点滑动)】机制**已被投递前探针证伪**:connPlace 已局部紧排,滑动是 no-op(真板/合成板均不缩)。已改为**连接序 BLF 天际线填洞 + 单调守卫(pad=60)**,实测大散板缩 ~29.5% 零回归、小已紧板单调守卫保持不变。详见同名 spec「算法」节。
+
+- 实现提交:`1afd763`(compactBlocks 机制修正 + 单测)、`32258f9`(接入 generateLayout + 集成测试)。
+- 关键差异:① 机制 = BLF 天际线(非重力滑动)② pad 默认 60(非 40,块边标签留白)③ 单调守卫保证 `compact ≤ base`④ 集成测试断言 `<=`(单调,非严格 `<`;小板压实可能无效,大板真缩在 Task 3/live 证)⑤ 新增 `opts.compactPad` 可调。
+- Task 1/2 的「验收/裁判/连通安全」意图不变,仍以 spec 的硬门/报告目标为准。Task 3(闭环真 EDA)不变。
+
 ## Global Constraints
 
 - 通用、零特定电路内容:任何代码/测试/文档**绝不含** designator、器件型号、网名等特定电路字面量;测试夹具用通用名(U1/R1/Q1…)。
