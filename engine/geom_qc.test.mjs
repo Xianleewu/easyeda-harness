@@ -107,3 +107,29 @@ test('回归:既有字段仍在(含 collinear/endpointShort/endpointOnWire 短�
 	assert.equal(r.endpointShort, 0);
 	assert.equal(r.endpointOnWire, 0);
 });
+
+test('DR4:两器件的可见标注 bbox 重叠 → overlaps 报 attr 对', () => {
+	const m = { components: [
+		{ designator: 'R1', bbox: { minX: 0, minY: 0, maxX: 10, maxY: 6 }, pins: [], attrs: [{ key: 'Name', valueVisible: true, bbox: { minX: 0, minY: 8, maxX: 20, maxY: 14 } }] },
+		{ designator: 'R2', bbox: { minX: 40, minY: 0, maxX: 50, maxY: 6 }, pins: [], attrs: [{ key: 'Name', valueVisible: true, bbox: { minX: 12, minY: 8, maxX: 32, maxY: 14 } }] },
+	], wires: [], netflags: [] };
+	const r = geomQC(m);
+	assert.ok(r.overlaps.some(s => s.includes('attr:R1.Name') && s.includes('attr:R2.Name')), JSON.stringify(r.overlaps));
+});
+
+test('DR5:标注 bbox 压到别的器件本体 → overlaps 报', () => {
+	const m = { components: [
+		{ designator: 'U1', bbox: { minX: 0, minY: 0, maxX: 30, maxY: 30 }, pins: [], attrs: [] },
+		{ designator: 'R9', bbox: { minX: 100, minY: 100, maxX: 110, maxY: 106 }, pins: [], attrs: [{ key: 'Designator', valueVisible: true, bbox: { minX: 5, minY: 5, maxX: 25, maxY: 12 } }] },
+	], wires: [], netflags: [] };
+	const r = geomQC(m);
+	assert.ok(r.overlaps.some(s => s.includes('attr:R9.Designator') && s.includes('U1')), JSON.stringify(r.overlaps));
+});
+
+test('不可见标注不计入重叠', () => {
+	const m = { components: [
+		{ designator: 'A', bbox: { minX: 0, minY: 0, maxX: 10, maxY: 6 }, pins: [], attrs: [{ key: 'Name', valueVisible: false, bbox: { minX: 0, minY: 8, maxX: 20, maxY: 14 } }] },
+		{ designator: 'B', bbox: { minX: 40, minY: 0, maxX: 50, maxY: 6 }, pins: [], attrs: [{ key: 'Name', valueVisible: false, bbox: { minX: 12, minY: 8, maxX: 32, maxY: 14 } }] },
+	], wires: [], netflags: [] };
+	assert.equal(geomQC(m).overlaps.filter(s => s.includes('attr:')).length, 0);
+});

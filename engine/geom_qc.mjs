@@ -8,6 +8,16 @@ export function geomQC(model, opt = {}) {
 	const rects = [];
 	for (const c of comps) rects.push({ tag: c.designator, ...c.bbox });
 	for (const f of flags) if (f.bbox) rects.push({ tag: `[${f.net}]`, minX: f.bbox.minX, minY: f.bbox.minY, maxX: f.bbox.maxX, maxY: f.bbox.maxY });
+	/* DR4/DR5(docs/schematic-design-rules.md):可见 attribute/text bbox 也是不可重叠的可见对象。
+	 * DR4:attribute vs attribute、attribute vs flag 互不重叠。
+	 * DR5:attribute bbox 不得压覆其它器件本体。
+	 * 不可见标注(valueVisible 与 keyVisible 均非真)不纳入审计。 */
+	for (const c of model.components || []) {
+		for (const a of (c.attrs || [])) {
+			if (!a.bbox || !(a.valueVisible || a.keyVisible)) continue;
+			rects.push({ tag: `attr:${c.designator}.${a.key || '?'}`, minX: a.bbox.minX, minY: a.bbox.minY, maxX: a.bbox.maxX, maxY: a.bbox.maxY });
+		}
+	}
 
 	const ov = (a, b) => a.minX < b.maxX && b.minX < a.maxX && a.minY < b.maxY && b.minY < a.maxY;
 	const inset = (r, m) => ({ minX: r.minX + m, minY: r.minY + m, maxX: r.maxX - m, maxY: r.maxY - m });
@@ -114,7 +124,22 @@ export function geomQC(model, opt = {}) {
 		}
 	}
 
-	return { overlaps, wireThruComp, wireThruPin, offgrid, offEx, crossings, crossEx, collinear, collEx, endpointShort, endEx, endpointOnWire, eowEx };
+	/* rulebook 行 166:可见标注 bbox 被【異網】线段穿过 = hard(text over an other-net wire)。
+	 * 复用已建的 segs 集合与 segInRect 判定函数,不引入重复逻辑(DRY)。 */
+	const textOnWire = [];
+	for (const c of model.components || []) {
+		for (const a of (c.attrs || [])) {
+			if (!a.bbox || !(a.valueVisible || a.keyVisible)) continue;
+			for (const s of segs) {
+				if (segInRect(s, a.bbox)) {
+					textOnWire.push(`attr:${c.designator}.${a.key || '?'} x wire[${s.net || ''}]`);
+					break;
+				}
+			}
+		}
+	}
+
+	return { overlaps, wireThruComp, wireThruPin, offgrid, offEx, crossings, crossEx, collinear, collEx, endpointShort, endEx, endpointOnWire, eowEx, textOnWire };
 }
 
 if (process.argv[1] && process.argv[1].endsWith('geom_qc.mjs') && process.argv[2]) {
