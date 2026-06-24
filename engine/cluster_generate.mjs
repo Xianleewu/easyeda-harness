@@ -564,14 +564,16 @@ export async function deliverGenerated(snap, opts = {}) {
 	// createNetPort/createNetFlag 旋转约定均为镜像(输入 R → 回读 360-R,已实证),
 	// 模型 f.rot 是【目标显示旋转】(deconflict/geomQC 据此验证),投递须补偿镜像否则 90↔270 翻转。
 	await runOps('网标/符号', cg.model.netflags.map(f => { const x = f.x, y = f.y, r = netflagCreateRotation(f.rot); if (f.kind === 'sig') return `try{await eda.sch_PrimitiveComponent.createNetPort('BI',${JSON.stringify(f.net)},${x},${y},${r});n++;}catch(e){}`; return `try{await eda.sch_PrimitiveComponent.createNetFlag('${f.kind === 'gnd' ? 'Ground' : 'Power'}',${JSON.stringify(f.net)},${x},${y},${r});n++;}catch(e){}`; }));
-	// 文字标题:删原图全部文字(重排后孤儿="废图"主因)→ 建 N 占位 → modify 设内容+位置
-	// (实测:Text.create 不接受 content 入参,须 create 后 modify 设 content)。
-	const nMod = cg.moduleRegions.length;
-	// 用 getAllPrimitiveId(可靠)而非 getAll().map(primitiveId)(大量文本/重负载下返回不全 → 旧文本清不掉、
-	// 累积成"废文本/重复/重叠"坟场,实测累积达 198 个 ×15 重复)。bulk delete 失败时逐个兜底。
-	await exec(`for(let p=0;p<5;p++){const ids=(await eda.sch_PrimitiveText.getAllPrimitiveId())||[];if(!ids.length)break;try{await eda.sch_PrimitiveText.delete(ids);}catch(e){for(const id of ids){try{await eda.sch_PrimitiveText.delete([id]);}catch(e2){}}}}for(let i=0;i<${nMod};i++){try{await eda.sch_PrimitiveText.create({x:0,y:0});}catch(e){}}return{};`);
-	const tids = await exec(`return (await eda.sch_PrimitiveText.getAllPrimitiveId())||[];`);
-	await runOps('模块标题', cg.moduleRegions.map((mr, i) => { const id = (tids || [])[i]; return id ? `try{await eda.sch_PrimitiveText.modify(${JSON.stringify(id)},{content:${JSON.stringify(mr.title)},x:${Math.round(mr.titleAt.x)},y:${Math.round(mr.titleAt.y)},fontSize:11});n++;}catch(e){}` : null; }).filter(Boolean));
+	// 文字标题:【默认不创建任何文本原语】。实测 bridge 的 sch_PrimitiveText delete/modify 在 close+open 重开后
+	// 被源还原(不持久),只 create 持久 → 每次 deliver 造的标题会累积、却清不掉,十几次堆成"废文本/重复/重叠"
+	// 坟场=用户判"废图"主因(见 memory bridge-text-delete-not-persistent)。故默认杜绝造文本;旧文本需用户在
+	// EDA UI 一次性删(唯一持久法)。opts.titles===true 才造标题(仅在找到持久删除法后再开)。
+	if (opts.titles === true) {
+		const nMod = cg.moduleRegions.length;
+		await exec(`for(let i=0;i<${nMod};i++){try{await eda.sch_PrimitiveText.create({x:0,y:0});}catch(e){}}return{};`);
+		const tids = await exec(`return (await eda.sch_PrimitiveText.getAllPrimitiveId())||[];`);
+		await runOps('模块标题', cg.moduleRegions.map((mr, i) => { const id = (tids || [])[i]; return id ? `try{await eda.sch_PrimitiveText.modify(${JSON.stringify(id)},{content:${JSON.stringify(mr.title)},x:${Math.round(mr.titleAt.x)},y:${Math.round(mr.titleAt.y)},fontSize:11});n++;}catch(e){}` : null; }).filter(Boolean));
+	}
 	// 覆盖式自愈:回读已连网,对完全没连上的命名网在连线两端补 netport(密集脚 create 失败兜底)。
 	const covered = await exec(`const ws=await eda.sch_PrimitiveWire.getAll();const ps=await eda.sch_PrimitiveComponent.getAll();return [...new Set([...(ws||[]).map(w=>w.net),...(ps||[]).map(p=>p.net)].filter(Boolean))];`);
 	const cset = new Set(covered || []);
