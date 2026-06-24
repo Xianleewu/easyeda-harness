@@ -172,6 +172,25 @@ export function checkAnnotFull(model) {
 	return res('T-ANNOT-FULL', dev, { pct, passives: passives.length });
 }
 
+// T-LABEL-ALIGN:同侧扇出标签 alignMode 合法 + 同侧共列 x(容差) + 行距不糊(DR11/12/13/16)。
+// side: alignMode 6→右, 8→左;其它(2/上下)本检查跳过(B1 先管左右扇出列)。
+export function checkLabelAlign(model) {
+	const v = tokenById('T-LABEL-ALIGN').value;
+	const labs = (model.netflags || []).filter(f => f.kind === 'sig');
+	const dev = [];
+	const sideOf = f => f.alignMode === 8 ? 'left' : f.alignMode === 6 ? 'right' : null;
+	for (const f of labs) { if (sideOf(f) === null) dev.push({ kind: 'bad-alignmode', at: [f.textX ?? f.x, f.textY ?? f.y], alignMode: f.alignMode ?? null }); }
+	for (const side of ['left', 'right']) {
+		const g = labs.filter(f => sideOf(f) === side);
+		if (g.length < 2) continue;
+		const xs = g.map(f => f.textX ?? f.x);
+		if (Math.max(...xs) - Math.min(...xs) > v.xTol) dev.push({ kind: 'column-x-spread', side, spread: +(Math.max(...xs) - Math.min(...xs)).toFixed(1) });
+		const ys = g.map(f => f.textY ?? f.y).sort((a, b) => a - b);
+		for (let i = 1; i < ys.length; i++) if (ys[i] - ys[i - 1] < v.minPitch) { dev.push({ kind: 'row-pitch-merged', side, pitch: +(ys[i] - ys[i - 1]).toFixed(1) }); break; }
+	}
+	return { token: 'T-LABEL-ALIGN', conform: dev.length === 0, deviations: dev, detail: { labels: labs.length } };
+}
+
 // T-DRC: DRC error/warn/info 全为 0 即符合;缺失或非数字视为不符
 export function checkDrc(drc = {}) {
 	const tok = tokenById('T-DRC');
@@ -201,7 +220,7 @@ export function judgeTokens(model, { drc } = {}) {
 	const tier1 = checkDrc(drc);
 	const tier2 = [
 		checkOrtho(model), checkGrid(model), checkNoCross(model), checkNoThru(model), checkNoOverlap(model),
-		checkDensity(model), checkAnnotPlace(model), checkAnnotFull(model),
+		checkDensity(model), checkAnnotPlace(model), checkAnnotFull(model), checkLabelAlign(model),
 	];
 	const tier3 = tier3Pending();
 	const tier2bad = tier2.filter(r => !r.conform);

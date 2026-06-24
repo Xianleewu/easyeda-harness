@@ -30,3 +30,9 @@ test('零特定电路字面量', () => {
 	const src = TOKENS.map(t => t.desc + ' ' + t.source).join(' ');
 	assert.doesNotMatch(src, /AMS1117|AO3400|ESP32|RK3576|RK806|VCC3V3_|VDD_CPU|vibe.?buddy/i);
 });
+
+test('T-LABEL-ALIGN 存在且严标(同侧共列、行距)', () => {
+	const t = tokenById('T-LABEL-ALIGN');
+	assert.ok(t && t.evidence === 'geom' && t.tier === 2, '应为 geom/tier2');
+	assert.ok(t.value.xTol >= 0 && t.value.minPitch > 0);
+});

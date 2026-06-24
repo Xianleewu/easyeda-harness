@@ -1,7 +1,7 @@
 // 几何严标检查器单测(RED 验证:无实现)
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { checkOrtho, checkGrid, checkNoCross, checkNoThru, checkNoOverlap, checkDensity, checkAnnotPlace, checkAnnotFull, checkDrc, judgeTokens } from './token_conformance.mjs';
+import { checkOrtho, checkGrid, checkNoCross, checkNoThru, checkNoOverlap, checkDensity, checkAnnotPlace, checkAnnotFull, checkDrc, judgeTokens, checkLabelAlign } from './token_conformance.mjs';
 
 test('T-ORTHO 严标:有1段斜线即不符合', () => {
 	const r = checkOrtho({ wires: [{ line: [0,0,10,0], net: '' }, { line: [0,0,10,10], net: '' }] });
@@ -110,6 +110,33 @@ test('T-DRC:全0→符合;缺/非数→不符合(fail-closed)', () => {
 	assert.equal(checkDrc({ error: 0, warn: 0, info: 0 }).conform, true);
 	assert.equal(checkDrc({ error: 0, warn: 1, info: 0 }).conform, false);
 	assert.equal(checkDrc({}).conform, false);
+});
+
+test('T-LABEL-ALIGN:同侧扇出共列 x → 符合', () => {
+	const m = { netflags: [
+		{ kind: 'sig', net: 'A', textX: 100, textY: 0, alignMode: 6 },
+		{ kind: 'sig', net: 'B', textX: 100, textY: 20, alignMode: 6 },
+		{ kind: 'sig', net: 'C', textX: 100, textY: 40, alignMode: 6 },
+	] };
+	assert.equal(checkLabelAlign(m).conform, true);
+});
+
+test('T-LABEL-ALIGN:同侧 x 散开(不成列)→ 不符合', () => {
+	const m = { netflags: [
+		{ kind: 'sig', net: 'A', textX: 100, textY: 0, alignMode: 6 },
+		{ kind: 'sig', net: 'B', textX: 160, textY: 20, alignMode: 6 },
+	] };
+	const r = checkLabelAlign(m);
+	assert.equal(r.conform, false);
+	assert.ok(r.deviations.some(d => d.kind === 'column-x-spread'));
+});
+
+test('T-LABEL-ALIGN:行距过密(糊成一团)→ 不符合(DR16)', () => {
+	const m = { netflags: [
+		{ kind: 'sig', net: 'A', textX: 100, textY: 0, alignMode: 6 },
+		{ kind: 'sig', net: 'B', textX: 100, textY: 3, alignMode: 6 },
+	] };
+	assert.ok(checkLabelAlign(m).deviations.some(d => d.kind === 'row-pitch-merged'));
 });
 
 test('judgeTokens 三层结构、无合成分、DRC≠0则不符合', () => {
