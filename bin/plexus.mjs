@@ -133,6 +133,27 @@ return { done, before: before.map(x=>x.type[0]+x.count).join('/'), after: after.
 		return;
 	}
 
+	if (cmd === 'twin') {   // 离线忠实预览 + 离线 judgeTokens(tier2)
+		const snap = loadSnap(args[0]);
+		const out = args.find(a => /\.png$/.test(a)) || 'twin.png';
+		const { generateLayout } = await import('../engine/cluster_generate.mjs');
+		const { twinPredict } = await import('../engine/eda_twin.mjs');
+		const { renderTwin } = await import('../engine/twin_renderer.mjs');
+		const { judgeTokens } = await import('../engine/token_conformance.mjs');
+		const r = await generateLayout(snap, {});
+		const g = twinPredict(r.model, snap);
+		renderTwin(g, out, { width: 1980 });
+		const rep = judgeTokens(g, {});
+		console.log('孪生忠实预览 ->', out, '(注:这是 EDA 实貌预测,非 sheet_renderer 美化图)');
+		for (const t of rep.tier2) console.log('  ', t.token, ':', t.conform ? '符合' : '✗偏离', JSON.stringify(t.detail));
+		console.log('tier1 DRC: 需 live(离线不可预测)');
+		return;
+	}
+	if (cmd === 'calibrate') {   // 钉死孪生:需 live;由控制者执行
+		console.log('calibrate --live:在 live_loop 上跑 deliver→read→compareGeom(需桥+confirmOverwrite)。见 spec B1 §6。');
+		return;
+	}
+
 	if (cmd === 'judge') {
 		// 三层 token 确定性符合裁判(无合成百分比):tier1 DRC 底线 / tier2 几何 token / tier3 视觉残余。
 		const printTiers = (rep) => {
@@ -161,13 +182,15 @@ return { done, before: before.map(x=>x.type[0]+x.count).join('/'), after: after.
 	console.log(`通用原理图美化工具(公共工具,零特定电路内容)
 
 用法:
-  node bin/plexus.mjs layout  <snapshot.json> [out.png]   离线:任意板快照 → 商业 2D 布局 + 渲染 + 门校验
-  node bin/plexus.mjs audit   <snapshot.json>             商业化布局质量诊断:6 类(连接/走线/间距/电源地/标注/结构)按严重度
-  node bin/plexus.mjs qc      <snapshot.json>             网级体检:短路 / 杂散电源标 / 畸形线 / ERC引脚类型 / 悬空标
-  node bin/plexus.mjs repair  <snapshot.json>             自动修复(删杂散电源短路标 / 拉直畸形线)并报 DRC 前后
-  node bin/plexus.mjs deliver <snapshot.json>             生成布局并投递到当前 live EDA 文档
-  node bin/plexus.mjs judge   <snapshot.json>             离线几何评分(DR 规则+商用达标判定)
-  node bin/plexus.mjs judge   --live                      live EDA 取证评分 + 输出 judge_report.json
+  node bin/plexus.mjs layout     <snapshot.json> [out.png]   离线:任意板快照 → 商业 2D 布局 + 渲染 + 门校验
+  node bin/plexus.mjs twin       <snapshot.json> [out.png]   离线忠实预览(EDA 实貌预测)+离线 judgeTokens tier2
+  node bin/plexus.mjs calibrate                              打印 live 标定使用说明(需桥)
+  node bin/plexus.mjs audit      <snapshot.json>             商业化布局质量诊断:6 类(连接/走线/间距/电源地/标注/结构)按严重度
+  node bin/plexus.mjs qc         <snapshot.json>             网级体检:短路 / 杂散电源标 / 畸形线 / ERC引脚类型 / 悬空标
+  node bin/plexus.mjs repair     <snapshot.json>             自动修复(删杂散电源短路标 / 拉直畸形线)并报 DRC 前后
+  node bin/plexus.mjs deliver    <snapshot.json>             生成布局并投递到当前 live EDA 文档
+  node bin/plexus.mjs judge      <snapshot.json>             离线几何评分(DR 规则+商用达标判定)
+  node bin/plexus.mjs judge      --live                      live EDA 取证评分 + 输出 judge_report.json
 
 快照获取(从 live EDA 捕获任意板):
   npm run live:save        # -> live.json`);

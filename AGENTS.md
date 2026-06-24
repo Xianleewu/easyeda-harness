@@ -36,7 +36,11 @@ circuit. Any device/net/module-title literal tied to one schematic is a defect.
   visual), **no composite percentage**. `commercial_judge.runLiveJudge` collects real EasyEDA evidence
   (geometry + `sch_Drc.check` + full/region screenshots via `bridge_windows`). `engine/rubric_audit.mjs`
   guards the zero-specific-circuit rule. (`commercial_rubric.mjs` soft-threshold `scoreAll` is DEPRECATED.)
-- `bin/plexus.mjs` — the entry point (`layout` / `deliver` / `judge` / `repair` / `qc` / `audit`).
+- `engine/eda_twin.mjs` / `engine/twin_renderer.mjs` / `engine/twin_calibrate.mjs` / `engine/live_loop.mjs` —
+  可信镜头(Spec B1):twinPredict 按 eda_transform 忠实预测 EDA 几何(bbox/脚/标注按放置重算),
+  twin_renderer 取代 sheet_renderer 当质量预览,twin_calibrate 用真 EDA 钉死,live_loop 安全闭环。
+  几何裁判已补全到 DR4/DR5(可见标注不重叠)+ DR11-16(同侧扇出对齐)。
+- `bin/plexus.mjs` — the entry point (`layout` / `twin` / `calibrate` / `deliver` / `judge` / `repair` / `qc` / `audit`).
 
 ## Design language (generic, measurable)
 
