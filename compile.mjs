@@ -5,12 +5,9 @@
 //   transform → compileSourcePlan → assertSource → candidate twin → judgeTokens → deliveryGate
 // 每条输出带规则 / 对象 / 坐标 / 期望 vs 实际；任一阶段失败即打印 FAIL[阶段] 并退出非零。
 // 工件默认取 --artifact-dir（或 EASYEDA_ARTIFACT_DIR，再退 ~/.local/share/easyeda-harness/workflow）：
-//   last_commit_after.txt            基线源（wf check/commit 自动刷新）
-//   last-commit-verification.json    最近一次 commit 的 afterGate（基线几何/网表/DRC 证据）
-//   workflow-check.json              componentTypes
-//   pin-owners.json                  引脚归属
+//   workflow-context.json            当前 lint/check 的原子工件清单
+//   workflow-preflight-receipt.json  文档/源码/规则/证据绑定
 // 证据：EASYEDA_TOKEN_EVIDENCE 必填（--token-evidence 可覆盖）。
-import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { homedir } from 'node:os';
 import { pathToFileURL } from 'node:url';
@@ -19,6 +16,7 @@ import { assertSource } from './assert_source.mjs';
 import { runCandidatePreflight } from './engine/candidate_preflight.mjs';
 import { loadDeliveryEvidence } from './engine/delivery_gate.mjs';
 import { formatActionableQueue } from './engine/actionable_report.mjs';
+import { loadCompileContext } from './engine/compile_context.mjs';
 
 const args = process.argv.slice(2);
 const transformPath = args.find(a => !a.startsWith('--'));
@@ -36,17 +34,8 @@ let stage = '启动';
 const fail = msg => { console.error(`FAIL[${stage}] (${Date.now() - t0}ms): ${msg}`); process.exit(1); };
 try {
   stage = '读取基线源';
-  const sourcePath = path.join(artifactDir, 'last_commit_after.txt');
-  const baselineSource = readFileSync(sourcePath, 'utf8');
-
-  stage = '读取基线证据';
-  const verification = JSON.parse(readFileSync(path.join(artifactDir, 'last-commit-verification.json'), 'utf8'));
-  const baselineReport = verification.afterGate || verification.live;
-  if (!baselineReport?.geometryArtifact || !baselineReport?.netlistArtifact)
-    fail('last-commit-verification.json 缺 afterGate 几何/网表工件——先跑一次 wf check 生成基线');
-  const check = JSON.parse(readFileSync(path.join(artifactDir, 'workflow-check.json'), 'utf8'));
-  const componentTypes = check.componentTypes || {};
-  const pinOwners = JSON.parse(readFileSync(path.join(artifactDir, 'pin-owners.json'), 'utf8'));
+  stage = '读取并验证 lint/check 基线证据';
+  const {source:baselineSource,baselineReport,componentTypes,pinOwners}=loadCompileContext({artifactDir,repo:path.dirname(fileURLToPath(import.meta.url))});
   if (!evidenceFile) fail('缺少 token 证据：设 EASYEDA_TOKEN_EVIDENCE=<私有 evidence.json> 或传 --token-evidence');
   const tokenEvidence = loadDeliveryEvidence(evidenceFile);
 
