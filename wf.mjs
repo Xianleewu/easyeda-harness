@@ -24,6 +24,17 @@ const repo = path.dirname(fileURLToPath(import.meta.url));
 const outDir = path.resolve(process.env.EASYEDA_ARTIFACT_DIR || path.join(homedir(), '.local/share/easyeda-harness/workflow'));
 const receiptPath = path.join(outDir, 'workflow-preflight-receipt.json');
 const contextPath = path.join(outDir, 'workflow-context.json');
+let workflowWindowId = process.env.EASYEDA_WINDOW_ID || '';
+async function runCode(code, options = {}) {
+  const response = await executeCode(code, { ...options, windowId: workflowWindowId });
+  const actual = String(response.body?.windowId || '');
+  if (!workflowWindowId) {
+    if (!actual) throw new Error('bridge 回包缺少 windowId，无法锁定 EasyEDA 窗口');
+    workflowWindowId = actual;
+    process.env.EASYEDA_WINDOW_ID = actual;
+  } else if (actual !== workflowWindowId) throw new Error(`EasyEDA 窗口漂移: ${workflowWindowId} -> ${actual || '<missing>'}`);
+  return response;
+}
 function prepareArtifacts() {
   const guard = dir => {
     const rel = path.relative(realpathSync(repo), dir);
@@ -36,19 +47,19 @@ function prepareArtifacts() {
 }
 
 async function activate() {
-  const d = await executeCode('return await eda.dmt_SelectControl.getCurrentDocumentInfo();', { timeoutMs: 15000 });
-  if (!d.result?.uuid || d.result.documentType !== 1) throw new Error(`活动文档非原理图(先在 EDA 打开原理图页): ${JSON.stringify(d.result ?? null)}`);
+  const d = await runCode('return await eda.dmt_SelectControl.getCurrentDocumentInfo();', { timeoutMs: 15000 });
+  if (!d.result?.uuid || d.result.documentType !== 1) throw new Error(`活动文档非原理图(窗口 ${workflowWindowId || '<unknown>'}，先在 EDA 打开原理图页): ${JSON.stringify(d.result ?? null)}`);
   if (process.env.EASYEDA_DOCUMENT_UUID && d.result.uuid !== process.env.EASYEDA_DOCUMENT_UUID)
     throw new Error('活动文档与指定 EASYEDA_DOCUMENT_UUID 不一致');
   return d.result;
 }
 async function readSrc() {
   const doc = await activate();
-  const r = await executeCode('return await eda.sys_FileManager.getDocumentSource();', { timeoutMs: 25000 });
+  const r = await runCode('return await eda.sys_FileManager.getDocumentSource();', { timeoutMs: 25000 });
   const head = typeof r.result === 'string' && parseSource(r.result).find(x => x.head.type === 'DOCHEAD')?.atom;
   if (head?.docType !== 'SCH_PAGE' || head.uuid !== doc.uuid) throw new Error('原理图源与活动文档身份不一致');
   if ((await activate()).uuid !== doc.uuid) throw new Error('读取过程中活动文档改变');
-  const { result: componentEvidence } = await executeCode('const components=await eda.sch_PrimitiveComponent.getAll();const owners=[];for(const c of components){if(c.componentType==="sheet")continue;for(const p of await c.getAllPins()||[])owners.push([p.primitiveId,c.primitiveId]);}return {components:components.map(c=>({id:c.primitiveId,type:c.componentType})),owners};', { timeoutMs: 25000 });
+  const { result: componentEvidence } = await runCode('const components=await eda.sch_PrimitiveComponent.getAll();const owners=[];for(const c of components){if(c.componentType==="sheet")continue;for(const p of await c.getAllPins()||[])owners.push([p.primitiveId,c.primitiveId]);}return {components:components.map(c=>({id:c.primitiveId,type:c.componentType})),owners};', { timeoutMs: 25000 });
   const components=componentEvidence?.components;
   if (!Array.isArray(components)) throw new Error('无法核验组件类型');
   if (!Array.isArray(componentEvidence.owners)) throw new Error('无法核验虚拟引脚归属');
@@ -82,11 +93,11 @@ try {
     const r = assertSource(src, { componentTypes });
     console.log(r.summary);
     for (const f of r.findings.slice(0, 15)) console.log(` [${f.sev}] ${f.rule}: ${f.detail}`);
-    const drc = await executeCode(`const text=()=>((document.body&&document.body.innerText)||''); const lines=()=>text().split('\\n').filter(x=>/完成设计规则检查|design rule check/i.test(x)); let changed=false; const observer=new MutationObserver(()=>{changed=true}); observer.observe(document.body,{childList:true,subtree:true,characterData:true}); const raw=await eda.sch_Drc.check(true,true,true); let now=lines(); for(let i=0;i<20&&!now.length;i++){await new Promise(r=>setTimeout(r,100));now=lines();} const diagnosticText=text().split('\\n').filter(x=>/^\\s*\\[(?:致命错误|错误|警告|信息|fatal error|error|warning|info)\\]\\s*:/i.test(x)).join('\\n'); observer.disconnect(); return {raw,completion:now.at(-1)||'',diagnosticText,fresh:changed&&now.length>0,invoked:true};`, { timeoutMs: 25000 });
+    const drc = await runCode(`const text=()=>((document.body&&document.body.innerText)||''); const lines=()=>text().split('\\n').filter(x=>/完成设计规则检查|design rule check/i.test(x)); let changed=false; const observer=new MutationObserver(()=>{changed=true}); observer.observe(document.body,{childList:true,subtree:true,characterData:true}); const raw=await eda.sch_Drc.check(true,true,true); let now=lines(); for(let i=0;i<20&&!now.length;i++){await new Promise(r=>setTimeout(r,100));now=lines();} const diagnosticText=text().split('\\n').filter(x=>/^\\s*\\[(?:致命错误|错误|警告|信息|fatal error|error|warning|info)\\]\\s*:/i.test(x)).join('\\n'); observer.disconnect(); return {raw,completion:now.at(-1)||'',diagnosticText,fresh:changed&&now.length>0,invoked:true};`, { timeoutMs: 25000 });
     if ((await activate()).uuid !== doc.uuid) throw new Error('DRC 检查期间活动文档改变');
     const report = evaluateSourceAudit(r, drc.result?.raw, drc.result);
     const finalAudit = cmd === 'audit';
-    const live = await runLiveJudge({windowId:process.env.EASYEDA_WINDOW_ID||'',outDir:path.join(outDir,finalAudit?'audit-live':'check-live'),captureCanvas:finalAudit,
+    const live = await runLiveJudge({windowId:workflowWindowId,outDir:path.join(outDir,finalAudit?'audit-live':'check-live'),captureCanvas:finalAudit,
       verifiedDrc:{...report.drc,diagnosticText:drc.result?.diagnosticText||''},...tokenEvidence});
     const diagnosticText = drc.result?.diagnosticText || live.drc?.diagnosticText || '';
     const completeGeometry = JSON.parse(readFileSync(live.geometryArtifact, 'utf8'));
@@ -157,7 +168,7 @@ try {
     process.env.EASYEDA_TOKEN_EVIDENCE = resolveTokenEvidencePath({ explicitPath:process.env.EASYEDA_TOKEN_EVIDENCE,
       receiptPath, contextPath, documentUuid:doc.uuid });
     const {runApiTransaction}=await import('./engine/api_transaction.mjs');
-    await runApiTransaction(path.resolve(args[0]),{outDir,documentUuid:doc.uuid,windowId:process.env.EASYEDA_WINDOW_ID||'',repo,
+    await runApiTransaction(path.resolve(args[0]),{outDir,documentUuid:doc.uuid,windowId:workflowWindowId,repo,
       receiptPath,contextPath});
   } else if (cmd === 'pcb-sync') {
     const pcbFlag=args.indexOf('--pcb');
@@ -166,7 +177,7 @@ try {
     const tokenEvidencePath=resolveTokenEvidencePath({explicitPath:process.env.EASYEDA_TOKEN_EVIDENCE,
       receiptPath,contextPath,documentUuid:doc.uuid});
     const {syncPcbFromSchematic}=await import('./engine/pcb_sync_transaction.mjs');
-    await syncPcbFromSchematic({pcbUuid,outDir,windowId:process.env.EASYEDA_WINDOW_ID||'',repo,
+    await syncPcbFromSchematic({pcbUuid,outDir,windowId:workflowWindowId,repo,
       receiptPath,contextPath,tokenEvidencePath,
       footprintMapPath:(()=>{const i=args.indexOf('--footprint-map');return i>=0?args[i+1]:'';})()});
   } else if (cmd === 'runbook') {

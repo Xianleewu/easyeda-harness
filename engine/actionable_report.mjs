@@ -9,6 +9,7 @@ const severityOrder = new Map([
 	['T-CONN-MOUNT', 3], ['T-ADJACENCY', 3], ['T-FLAG-ORIENT', 3],
 	['T-PIN-SEMANTICS', 3],
 	['T-HIGHSPEED', 3],
+	['T-PASSIVE', 3],
 	['T-LABEL-ALIGN', 4], ['T-FLAG-ALIGN', 4], ['T-ANNOT-SIDE', 4],
 	['T-ORPHAN', 3], ['T-CELL-SPACING', 5], ['T-MODULE-SPACING', 5], ['T-BODY-CLEARANCE', 5], ['T-DENSITY', 5],
 ]);
@@ -24,6 +25,7 @@ const deterministicRecipe = new Map([
 	['T-CONN-MOUNT', 'ground-mechanical-connector-pins'],
 	['T-PIN-SEMANTICS', 'reconcile-connector-pin-profile'],
 	['T-HIGHSPEED', 'reconcile-differential-pair-contract'],
+	['T-PASSIVE', 'audit-passive-electrical-and-bound-footprint'],
 	['T-ADJACENCY', 'place-support-by-connectivity'],
 	['T-FLAG-ORIENT', 'orient-endpoint-away-from-stub'],
 	['T-LABEL-ALIGN', 'snap-label-anchor-to-wire-end'],
@@ -42,11 +44,17 @@ const deviationRecipe = new Map([
 	['connector-footprint-binding-mismatch','restore-declared-footprint-binding'],
 	['connector-footprint-source-uuid-mismatch','replace-mismatched-footprint-source'],
 	['connector-footprint-pads-missing','replace-empty-footprint'],
+	['passive-electrical-profile-missing','complete-per-reference-electrical-review'],
+	['passive-electrical-basis-incomplete','complete-per-reference-electrical-review'],
+	['passive-electrical-not-approved','resolve-passive-electrical-review'],
+	['passive-footprint-nonconform','sanitize-or-rebind-passive-footprint'],
+	['passive-footprint-live-source-unverified','resolve-bound-passive-footprint-source'],
+	['passive-footprint-library-mismatch','restore-declared-passive-footprint-library'],
 ]);
 
 function targetOf(d) {
 	const target = {};
-	for (const key of ['id', 'component', 'designator', 'pin', 'net', 'side', 'a', 'b', 'footprintUuid', 'expect', 'got'])
+	for (const key of ['id', 'component', 'designator', 'ref', 'pin', 'net', 'side', 'a', 'b', 'footprintUuid', 'expect', 'got'])
 		if (d?.[key] !== undefined && d[key] !== '') target[key] = d[key];
 	for (const key of ['segment', 'at', 'textBox', 'examples', 'pairs']) if (d?.[key] !== undefined) target[key] = d[key];
 	return target;
@@ -101,7 +109,7 @@ export function actionableQueue(live) {
 
 function oneLine(d) {
 	const fields = [];
-	for (const key of ['kind', 'a', 'b', 'designator', 'pin', 'net', 'side', 'gap', 'minGap', 'dist'])
+	for (const key of ['kind', 'a', 'b', 'designator', 'ref', 'footprintUuid', 'pin', 'net', 'side', 'gap', 'minGap', 'dist'])
 		if (d?.[key] !== undefined && d[key] !== '') fields.push(`${key}=${d[key]}`);
 	for (const key of ['designatorSides','valueSides']) if(Array.isArray(d?.[key])) fields.push(`${key}=${d[key].join('|')}`);
 	if (Array.isArray(d?.segment)) fields.push(`segment=${d.segment.join(',')}`);

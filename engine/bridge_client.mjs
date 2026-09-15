@@ -41,6 +41,7 @@ const MUTATION_SIGNATURES = [
 	/\bsch_Document\.save\s*\(/,
 	/\b(?:sch|pcb)_Primitive[A-Za-z0-9_]*\.(?:create|delete|modify|update)\s*\(/,
 	/\bdmt_(?:Schematic|Pcb|Board)[A-Za-z0-9_]*\.(?:create|delete|copy|modify|update|rename)\s*\(/,
+	/\blib_[A-Za-z0-9_]+\.(?:create|copy|delete|modify|updateDocumentSource)\s*\(/,
 ];
 
 export function bridgeMutationSignatures(code) {
@@ -55,6 +56,15 @@ export function assertBridgeWriteAuthorized(code, writeContext = '') {
 		throw new Error('LIVE_WRITE_BLOCKED: mutating EasyEDA calls must run inside wf commit, wf seed, or wf api transaction');
 	}
 	return { mutating: true, signatures };
+}
+
+export function assertBridgeWindow(requestedWindowId, body) {
+	const requested = String(requestedWindowId || '');
+	const actual = String(body?.windowId || '');
+	if (requested && actual !== requested) {
+		throw new Error(`BRIDGE_WINDOW_MISMATCH: requested ${requested}, received ${actual || '<missing>'}`);
+	}
+	return actual;
 }
 
 export async function executeCode(code, {
@@ -77,6 +87,7 @@ export async function executeCode(code, {
 	if (!resp.ok || body.success === false) {
 		throw new Error(`EXEC_FAIL: ${JSON.stringify(body)}`);
 	}
+	assertBridgeWindow(windowId, body);
 	return { bridge, body, result: body.result };
 }
 

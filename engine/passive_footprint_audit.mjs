@@ -44,6 +44,53 @@ export function parseEasyEdaRecords(source) {
 	return records;
 }
 
+/**
+ * Convert a downloaded EasyEDA library bundle into the document body accepted by
+ * LIB_Footprint.updateDocumentSource().  An .elibu export can contain catalogue
+ * headers before the actual editable footprint.  The editor API expects only the
+ * final drawing document and identifies that document as PCB.
+ */
+export function editableFootprintDocumentSource(source, { uuid = '' } = {}) {
+	const records = parseEasyEdaRecords(source);
+	const starts = records.map((record, index) => record?.head?.type === 'DOCHEAD' ? index : -1).filter(index => index >= 0);
+	if (!starts.length) throw new Error('Footprint source has no document header');
+	const body = records.slice(starts.at(-1)).map(record => ({ head: { ...record.head }, atom: { ...record.atom } }));
+	const head = body[0];
+	head.atom.docType = 'PCB';
+	if (uuid) head.atom.uuid = uuid;
+	const output = body.map(record => `${JSON.stringify(record.head)}||${JSON.stringify(record.atom)}|`).join('\n') + '\n';
+	const audit = analyzeFootprintSource(output, { maxCopperLongMil: Infinity, maxCopperShortMil: Infinity });
+	if (audit.detail.pads !== 2 || !audit.detail.copperBox)
+		throw new Error('Editable footprint document lost its two-pad geometry');
+	return output;
+}
+
+const FOOTPRINT_GEOMETRY_TYPES = new Set(['PAD', 'VIA', 'LINE', 'POLY', 'FILL', 'ARC', 'CIRCLE', 'RECT', 'REGION', 'STRING']);
+
+/**
+ * Retain the target library object's live editor header/settings and replace only
+ * its drawing primitives with audited donor geometry.  This avoids copying stale
+ * version/client identity from a downloaded library export.
+ */
+export function transplantFootprintGeometry(templateSource, donorSource, { uuid = '', title = '', policy = {} } = {}) {
+	const template = parseEasyEdaRecords(templateSource);
+	const donor = parseEasyEdaRecords(donorSource);
+	if (!template.length || template[0]?.head?.type !== 'DOCHEAD') throw new Error('Target footprint template has no document header');
+	const geometry = donor.filter(record => FOOTPRINT_GEOMETRY_TYPES.has(record?.head?.type));
+	if (!geometry.length) throw new Error('Donor footprint has no drawing geometry');
+	const kept = template.filter(record => !FOOTPRINT_GEOMETRY_TYPES.has(record?.head?.type) && record?.head?.type !== 'ELE_PLACEHOLDER')
+		.map(record => ({ head: { ...record.head }, atom: { ...record.atom } }));
+	kept[0].atom.docType = 'PCB';
+	if (uuid) kept[0].atom.uuid = uuid;
+	if (title) for (const record of kept) if (record?.head?.type === 'ATTR' && record?.atom?.key === 'Footprint') record.atom.value = title;
+	let ticket = Math.max(0, ...kept.map(record => Number(record?.head?.ticket) || 0));
+	const copied = geometry.map(record => ({ head: { ...record.head, ticket: ++ticket }, atom: { ...record.atom } }));
+	const output = [...kept, ...copied].map(record => `${JSON.stringify(record.head)}||${JSON.stringify(record.atom)}|`).join('\n') + '\n';
+	const audit = analyzeFootprintSource(output, policy);
+	if (!audit.conform) throw new Error(`Transplanted footprint fails audit: ${JSON.stringify(audit.deviations)}`);
+	return { source: output, audit };
+}
+
 function padBox(pad) {
 	const shape = pad?.defaultPad;
 	if (!shape || !Number.isFinite(shape.width) || !Number.isFinite(shape.height)) return null;
@@ -131,6 +178,32 @@ export function analyzeFootprintSource(source, policy = {}) {
 	};
 }
 
+export function sanitizePassiveFootprintSource(source, { uuid = '', title = '', policy = {} } = {}) {
+	const records = parseEasyEdaRecords(source);
+	if (!records.length) throw new Error('Cannot sanitize an empty or unreadable footprint source');
+	const before = analyzeFootprintSource(records, policy);
+	if (before.detail.pads !== 2 || !before.detail.copperBox)
+		throw new Error('Passive footprint sanitization requires exactly two readable SMD pads');
+	const outer = new Set(before.deviations.filter(d => d.kind === 'outer-top-silkscreen').map(d => d.index));
+	let silkIndex = 0;
+	const kept = records.filter(record => {
+		const isSilk = record?.atom?.layerId === 3 && ['POLY', 'LINE', 'FILL'].includes(record?.head?.type);
+		if (!isSilk) return true;
+		const remove = outer.has(silkIndex++);
+		return !remove;
+	}).map(record => ({ head: { ...record.head }, atom: { ...record.atom } }));
+	for (const record of kept) {
+		if (uuid && record.head.type === 'DOCHEAD') record.atom.uuid = uuid;
+		if (title && record.head.type === 'META') record.atom.title = title;
+	}
+	const output = kept.map(record => `${JSON.stringify(record.head)}||${JSON.stringify(record.atom)}|`).join('\n') + '\n';
+	const after = analyzeFootprintSource(output, policy);
+	if (!after.conform) throw new Error(`Sanitized passive footprint still fails: ${JSON.stringify(after.deviations)}`);
+	const hasDocumentHeader = kept.some(record => record?.head?.type === 'DOCHEAD');
+	return { source: output, editableSource: hasDocumentHeader ? editableFootprintDocumentSource(output, { uuid }) : null,
+		removedTopSilk: outer.size, before, after };
+}
+
 function evidenceFor(table, ref, footprintUuid) {
 	if (!table) return undefined;
 	if (table instanceof Map) return table.get(ref) ?? table.get(footprintUuid);
@@ -138,7 +211,7 @@ function evidenceFor(table, ref, footprintUuid) {
 }
 
 export function auditPassiveFootprints(components, {
-	resolvedByRef = {}, sourcesByFootprint = {}, electricalByRef = {}, policy = {},
+	resolvedByRef = {}, sourcesByFootprint = {}, electricalByRef = {}, policy = {}, policyByRef = {},
 } = {}) {
 	const rows = [];
 	for (const component of components || []) {
@@ -149,8 +222,9 @@ export function auditPassiveFootprints(components, {
 		const resolved = evidenceFor(resolvedByRef, ref) || {};
 		const footprintUuid = resolved.footprintUuid || resolved.uuid || attrs.get('Footprint') || '';
 		const source = resolved.source || evidenceFor(sourcesByFootprint, ref, footprintUuid);
-		const footprint = analyzeFootprintSource(source, policy);
 		const electrical = evidenceFor(electricalByRef, ref) || null;
+		const itemPolicy = evidenceFor(policyByRef, ref, footprintUuid) || electrical?.footprintPolicy || {};
+		const footprint = analyzeFootprintSource(source, { ...policy, ...itemPolicy });
 		const electricalStatus = String(electrical?.status || '').toUpperCase();
 		const electricalConform = electricalStatus === 'PASS';
 		rows.push({

@@ -3,6 +3,7 @@ import { TOKENS, tokenById } from './design_tokens.mjs';
 import { geomQC } from './geom_qc.mjs';
 import { netflagNameBox, flagBox } from './structured_layout.mjs';
 import { pageQC } from './page_qc.mjs';
+import { auditPassiveFootprints, passiveKind } from './passive_footprint_audit.mjs';
 
 const res = (id, deviations, detail) => ({ token: id, conform: deviations.length === 0, deviations, detail });
 
@@ -1127,9 +1128,70 @@ export function auditTokenCoverage(results, tokens = TOKENS) {
 	};
 }
 
+// DR25: a schematic footprint UUID/name is not manufacturing evidence.  Every
+// fitted resistor/capacitor must have one per-reference electrical review and
+// the source of the footprint currently bound in EasyEDA.  The public engine
+// knows only generic refs and evidence contracts; circuit values stay in the
+// caller-owned runtime evidence.
+export function checkPassiveFootprints(model, {
+	profiles = [], footprintSources = [], requireEvidence = false, requireLiveFootprintEvidence = false,
+} = {}) {
+	const passives = (model.components || []).filter(passiveKind);
+	if (!passives.length) return res('T-PASSIVE', [], { checked: 0, profiles: profiles.length, footprintSources: footprintSources.length });
+	if (!requireEvidence && !profiles.length && !footprintSources.length)
+		return res('T-PASSIVE', [], { checked: 0, skipped: true, reason: 'passive evidence not requested' });
+	const deviations = [];
+	const byRef = new Map();
+	for (const profile of profiles || []) {
+		const ref = String(profile?.ref || '').trim();
+		if (!ref) { deviations.push({ kind: 'passive-profile-ref-missing' }); continue; }
+		if (byRef.has(ref)) deviations.push({ kind: 'passive-profile-duplicate', ref });
+		else byRef.set(ref, profile);
+	}
+	const passiveRefs = new Set(passives.map(c => String(c.designator || '')));
+	for (const ref of byRef.keys()) if (!passiveRefs.has(ref)) deviations.push({ kind: 'passive-profile-object-missing', ref });
+	const sourceByUuid = new Map();
+	for (const item of footprintSources || []) {
+		const uuid = String(item?.footprintUuid || '').trim();
+		if (uuid && !sourceByUuid.has(uuid)) sourceByUuid.set(uuid, item);
+	}
+	const resolvedByRef = {}, electricalByRef = {};
+	for (const component of passives) {
+		const ref = String(component.designator || '');
+		const profile = byRef.get(ref);
+		if (!profile) deviations.push({ kind: 'passive-electrical-profile-missing', ref });
+		const source = String(profile?.source || profile?.basis || '').trim();
+		const note = String(profile?.note || profile?.rationale || '').trim();
+		if (profile && requireEvidence && (!source || !note)) deviations.push({ kind: 'passive-electrical-basis-incomplete', ref });
+		const footprintUuid = String((component.attrs || []).find(a => a.key === 'Footprint')?.value || '').trim();
+		const expectedUuid = String(profile?.footprintUuid || '').trim();
+		if (expectedUuid && expectedUuid !== footprintUuid)
+			deviations.push({ kind: 'passive-footprint-binding-mismatch', ref, expected: expectedUuid, actual: footprintUuid });
+		const live = sourceByUuid.get(footprintUuid);
+		if (!footprintUuid) deviations.push({ kind: 'passive-footprint-binding-missing', ref });
+		if (requireLiveFootprintEvidence && live?.verified !== true)
+			deviations.push({ kind: 'passive-footprint-live-source-unverified', ref, footprintUuid, error: live?.error || 'source unavailable' });
+		const expectedLibrary = String(profile?.libraryUuid || '').trim(), actualLibrary = String(live?.resolvedLibraryUuid || '').trim();
+		if (expectedLibrary && live?.verified === true && expectedLibrary !== actualLibrary)
+			deviations.push({ kind: 'passive-footprint-library-mismatch', ref, expected: expectedLibrary, actual: actualLibrary });
+		resolvedByRef[ref] = { footprintUuid, source: live?.verified === true ? live.sourceText : '' };
+		if (profile) electricalByRef[ref] = profile;
+	}
+	const audit = auditPassiveFootprints(passives, { resolvedByRef, electricalByRef });
+	for (const row of audit.rows) {
+		if (!row.footprintConform) deviations.push({ kind: 'passive-footprint-nonconform', ref: row.ref, footprintUuid: row.footprintUuid, findings: row.footprint.deviations });
+		if (byRef.has(row.ref) && !row.electricalConform) deviations.push({ kind: 'passive-electrical-not-approved', ref: row.ref, status: row.electrical?.status || 'MISSING' });
+	}
+	return res('T-PASSIVE', deviations, {
+		checked: audit.detail.checked, profiles: profiles.length, footprintSources: footprintSources.length,
+		footprintPass: audit.detail.footprintPass, electricalPass: audit.detail.electricalPass,
+		rows: audit.rows,
+	});
+}
+
 // 三层符合裁判(tier1=DRC底线, tier2=几何项, tier3=视觉占位)。opts.nets 给定(权威网表 pin→net)时启用 T-ADJACENCY。
-export function judgeTokens(model, { drc, nets, moduleRegions, cellRegions, placementExceptions, connectorMountExceptions, connectorSemanticProfiles, connectorFootprintProfiles, highSpeedProfiles, adjacency,
-	sheetBounds, titleBlockKeepout, pageClearance, requirePageEvidence = false, requireConnectorSemanticEvidence = false, requireLiveFootprintEvidence = false, requireHighSpeedEvidence = false, requireNetlistEvidence = false, requireRegionEvidence = false } = {}) {
+export function judgeTokens(model, { drc, nets, moduleRegions, cellRegions, placementExceptions, connectorMountExceptions, connectorSemanticProfiles, connectorFootprintProfiles, highSpeedProfiles, passiveElectricalProfiles, passiveFootprintSources, adjacency,
+	sheetBounds, titleBlockKeepout, pageClearance, requirePageEvidence = false, requireConnectorSemanticEvidence = false, requireLiveFootprintEvidence = false, requireHighSpeedEvidence = false, requirePassiveEvidence = false, requireNetlistEvidence = false, requireRegionEvidence = false } = {}) {
 	const tier1 = checkDrc(drc);
 	const tier2 = [
 		checkOrtho(model), checkGrid(model), checkNoCross(model), checkNoThru(model), checkNoOverlap(model),
@@ -1140,6 +1202,7 @@ export function judgeTokens(model, { drc, nets, moduleRegions, cellRegions, plac
 		checkConnectorMountingPins(model, { nets, exceptions: connectorMountExceptions }),
 		checkConnectorPinSemantics(model, { nets, profiles: connectorSemanticProfiles, footprintProfiles:connectorFootprintProfiles, requireEvidence: requireConnectorSemanticEvidence, requireLiveFootprintEvidence }),
 		checkHighSpeedIntent(model, { nets, profiles: highSpeedProfiles, connectorProfiles: connectorSemanticProfiles, requireEvidence: requireHighSpeedEvidence }),
+		checkPassiveFootprints(model, { profiles: passiveElectricalProfiles, footprintSources: passiveFootprintSources, requireEvidence: requirePassiveEvidence, requireLiveFootprintEvidence }),
 		checkAnnotPlace(model), checkAnnotSide(model), checkAnnotFull(model), checkRegionCoverage(model,{moduleRegions,cellRegions,requireEvidence:requireRegionEvidence}),
 		checkLabelAlign(model), checkFlagAlign(model), checkFlagOrient(model), checkAdjacency(model, { nets, adjacency, requireEvidence:requireNetlistEvidence }),
 	];

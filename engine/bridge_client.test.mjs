@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {assertBridgeWriteAuthorized, bridgeMutationSignatures, encodeBridgePayload} from './bridge_client.mjs';
+import {assertBridgeWriteAuthorized, assertBridgeWindow, bridgeMutationSignatures, encodeBridgePayload} from './bridge_client.mjs';
 
 test('bridge JSON survives independent decoding at every possible byte boundary', () => {
   const payload = {code: 'return "中文 ±10% 😀 \\u4e2d \\n";', windowId: 'example'};
@@ -23,5 +23,14 @@ test('direct live mutation is blocked unless a workflow transaction authorizes i
   const code = 'await eda.sch_PrimitiveWire.create([0,0,10,0],"N");await eda.sch_Document.save();';
   assert.throws(() => assertBridgeWriteAuthorized(code), /LIVE_WRITE_BLOCKED/);
   assert.equal(assertBridgeWriteAuthorized(code, 'api-transaction').mutating, true);
-  assert.throws(() => assertBridgeWriteAuthorized(code, 'ad-hoc-script'), /LIVE_WRITE_BLOCKED/);
+	assert.throws(() => assertBridgeWriteAuthorized(code, 'ad-hoc-script'), /LIVE_WRITE_BLOCKED/);
+	assert.throws(()=>assertBridgeWriteAuthorized('return await eda.lib_Footprint.updateDocumentSource("f","l",source);'),/LIVE_WRITE_BLOCKED/);
+	assert.equal(assertBridgeWriteAuthorized('return await eda.lib_Footprint.create("l","name",[]);','api-transaction').mutating,true);
+});
+
+test('an explicit EasyEDA window cannot silently fall through to another window',()=>{
+	assert.equal(assertBridgeWindow('',{windowId:'actual'}),'actual');
+	assert.equal(assertBridgeWindow('actual',{windowId:'actual'}),'actual');
+	assert.throws(()=>assertBridgeWindow('expected',{windowId:'other'}),/BRIDGE_WINDOW_MISMATCH/);
+	assert.throws(()=>assertBridgeWindow('expected',{}),/BRIDGE_WINDOW_MISMATCH/);
 });

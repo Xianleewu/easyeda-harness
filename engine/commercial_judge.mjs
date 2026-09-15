@@ -8,6 +8,7 @@ import { buildRegionEvidence } from './region_evidence.mjs';
 import { mkdirSync, writeFileSync, readFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import path from 'node:path';
+import { passiveKind } from './passive_footprint_audit.mjs';
 
 export function judgeBoard(model, { drc, shots = [] } = {}) {
 	const s = scoreAll(model, { drc });
@@ -122,14 +123,19 @@ export function judgeSnapshot(snapshotPath, { drc } = {}) {
 }
 
 export async function runLiveJudge({ windowId = '', port = 0, outDir = '.', timeoutMs = 120000,
-	moduleRegions, cellRegions, placementExceptions, connectorMountExceptions, connectorSemanticProfiles, connectorFootprintProfiles, highSpeedProfiles, adjacency,
+	moduleRegions, cellRegions, placementExceptions, connectorMountExceptions, connectorSemanticProfiles, connectorFootprintProfiles, highSpeedProfiles, passiveElectricalProfiles, adjacency,
 	sheetBounds, titleBlockKeepout, pageClearance, captureCanvas = true, verifiedDrc = null } = {}) {
 	/* Canonical reader merges source NET labels and fails closed if label coverage is unknown. */
 	const model = await readCompleteGeometry({ windowId, port, timeoutMs });
 	/* 权威网表(T-ADJACENCY)+ 标题栏真 bbox(器件/标签压标题栏)→ live judge 与 model judge 同等完整,不留瞎区 */
 	const netlist = await readNetlist({ windowId, port, timeoutMs });
 	const nets = netlist?.nets || null;
-	const liveFootprintSources=await readLiveFootprintEvidence(connectorFootprintProfiles,{windowId,port,timeoutMs,outDir});
+	const passiveProfileByRef=new Map((passiveElectricalProfiles||[]).map(profile=>[String(profile?.ref||''),profile]));
+	const passiveFootprintRequests=(model.components||[]).filter(passiveKind).map(component=>({
+		footprintUuid:String((component.attrs||[]).find(a=>a.key==='Footprint')?.value||''),
+		libraryUuid:String(passiveProfileByRef.get(String(component.designator||''))?.libraryUuid||''),
+	}));
+	const liveFootprintSources=await readLiveFootprintEvidence([...(connectorFootprintProfiles||[]),...passiveFootprintRequests],{windowId,port,timeoutMs,outDir});
 	const measuredFootprintProfiles=applyLiveFootprintEvidence(connectorFootprintProfiles,liveFootprintSources);
 	const tb = titleBlockBBox(model.components || []);
 	if (tb) model._titleBlock = tb;
@@ -160,8 +166,8 @@ export async function runLiveJudge({ windowId = '', port = 0, outDir = '.', time
 		try { await captureRegion({ windowId, port, region, outFile: out, timeoutMs }); shots.push(out); } catch { /* 截图失败不伪装,留空证据 */ }
 	}
 	const report = judgeBoardTokens(model, { drc, shots, nets, moduleRegions:measuredModules, cellRegions:measuredCells,
-		placementExceptions, connectorMountExceptions, connectorSemanticProfiles, connectorFootprintProfiles:measuredFootprintProfiles, highSpeedProfiles, adjacency, sheetBounds, titleBlockKeepout, pageClearance,
-		requirePageEvidence: true, requireConnectorSemanticEvidence: true, requireLiveFootprintEvidence:true, requireHighSpeedEvidence: true, requireNetlistEvidence:true, requireRegionEvidence:true });
+		placementExceptions, connectorMountExceptions, connectorSemanticProfiles, connectorFootprintProfiles:measuredFootprintProfiles, highSpeedProfiles, passiveElectricalProfiles, passiveFootprintSources:liveFootprintSources, adjacency, sheetBounds, titleBlockKeepout, pageClearance,
+		requirePageEvidence: true, requireConnectorSemanticEvidence: true, requireLiveFootprintEvidence:true, requireHighSpeedEvidence: true, requirePassiveEvidence:true, requireNetlistEvidence:true, requireRegionEvidence:true });
 	const geometryArtifact = `${outDir}/complete_geometry.json`;
 	writeFileSync(geometryArtifact, JSON.stringify(model, null, 2), 'utf8');
 	const liveReport = { ...report, drc, regionEvidence:{moduleRegions:measuredModules,cellRegions:measuredCells}, footprintEvidence:liveFootprintSources.map(({base64,...item})=>item), geometryArtifact, netlistArtifact,

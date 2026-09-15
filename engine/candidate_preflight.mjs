@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { readRecords } from './source_transaction.mjs';
 import { enrichNetLabels, assertNetLabelCoverage } from './source_labels.mjs';
 import { buildRegionEvidence } from './region_evidence.mjs';
-import { judgeBoardTokens } from './commercial_judge.mjs';
+import { judgeBoardTokens, applyLiveFootprintEvidence } from './commercial_judge.mjs';
 import { evaluateDeliveryGate } from './delivery_gate.mjs';
 import { predictSourceCandidate } from './source_candidate_twin.mjs';
 import { auditSourceCatalogBindings } from './source_catalog_audit.mjs';
@@ -95,6 +95,19 @@ export function applyVerifiedPinNetChanges(baselineNets,changes){
   return expected;
 }
 
+export function applyBaselineLiveEvidence(tokenEvidence, baselineReport) {
+	if (!tokenEvidence) return tokenEvidence;
+	return {
+		...tokenEvidence,
+		...(Array.isArray(tokenEvidence.connectorFootprintProfiles) ? { connectorFootprintProfiles:applyLiveFootprintEvidence(
+			tokenEvidence.connectorFootprintProfiles, baselineReport?.footprintEvidence || []) } : {}),
+		passiveFootprintSources: (()=>{
+			const baseline=baselineReport?.footprintEvidence||[],known=new Set(baseline.map(x=>String(x?.footprintUuid||'')));
+			return [...baseline,...(tokenEvidence.passiveFootprintSources||[]).filter(x=>!known.has(String(x?.footprintUuid||'')))];
+		})(),
+	};
+}
+
 export async function runCandidatePreflight({ candidateSource, baselineSource, plan, baselineReport, tokenEvidence, componentTypes = {}, pinOwners = {} }) {
   if (!baselineReport?.geometryArtifact || !baselineReport?.netlistArtifact)
     throw new Error('Baseline live evidence is incomplete; candidate preflight cannot run');
@@ -118,14 +131,15 @@ export async function runCandidatePreflight({ candidateSource, baselineSource, p
   model._labelCoverage = assertNetLabelCoverage(model, candidateSource);
   const coverage = sourceCoverage(candidateSource, model, {...componentTypes,...(plan.componentTypes||{})});
   if (!coverage.pass) throw new Error(`Candidate geometry coverage failed: ${JSON.stringify(coverage.findings)}`);
+  const effectiveTokenEvidence=applyBaselineLiveEvidence(tokenEvidence,baselineReport);
   const materialize = regions => buildRegionEvidence(model, regions, {padding:10,requireComplete:true});
-  const moduleRegions = materialize(tokenEvidence.moduleRegions);
-  const cellRegions = materialize(tokenEvidence.cellRegions);
+  const moduleRegions = materialize(effectiveTokenEvidence.moduleRegions);
+  const cellRegions = materialize(effectiveTokenEvidence.cellRegions);
   const baselineDrc = baselineReport.drc;
   if (baselineReport.tier1?.conform !== true || baselineDrc?.evidence?.verified !== true)
     throw new Error('Baseline native DRC is not verified clean for offline carry-forward');
-  const report = judgeBoardTokens(model, { ...tokenEvidence, nets:prediction.nets, drc:baselineDrc,
-    moduleRegions,cellRegions,requirePageEvidence:true,requireConnectorSemanticEvidence:true,requireHighSpeedEvidence:true });
+	const report = judgeBoardTokens(model, { ...effectiveTokenEvidence, nets:prediction.nets, drc:baselineDrc,
+		moduleRegions,cellRegions,requirePageEvidence:true,requireConnectorSemanticEvidence:true,requireLiveFootprintEvidence:true,requireHighSpeedEvidence:true,requirePassiveEvidence:true });
   const predicted = {...report,drc:baselineDrc,shots:[],regionEvidence:{moduleRegions,cellRegions},
     predictionEvidence:prediction.evidence||null,sourceCoverage:coverage,catalogBindings,nativeDrcStatus:'pending-post-write-verification'};
   const gate = evaluateDeliveryGate(predicted,{before:baselineReport,repair:true});

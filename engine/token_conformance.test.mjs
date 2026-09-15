@@ -1,7 +1,7 @@
 // 几何严标检查器单测(RED 验证:无实现)
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { checkOrtho, checkGrid, checkNoCross, checkNoThru, checkNoOverlap, checkTextOverlap, checkWireThruText, checkLabelCrowd, checkDensity, checkBodyClearance, checkPage, checkModuleSpacing, checkCellSpacing, checkConnectorMountingPins, checkConnectorPinSemantics, checkHighSpeedIntent, checkAnnotPlace, checkAnnotSide, checkAnnotFull, checkRegionCoverage, checkDrc, judgeTokens, auditTokenCoverage, checkLabelAlign, checkFlagAlign, checkFlagOrient, checkAdjacency } from './token_conformance.mjs';
+import { checkOrtho, checkGrid, checkNoCross, checkNoThru, checkNoOverlap, checkTextOverlap, checkWireThruText, checkLabelCrowd, checkDensity, checkBodyClearance, checkPage, checkModuleSpacing, checkCellSpacing, checkConnectorMountingPins, checkConnectorPinSemantics, checkHighSpeedIntent, checkPassiveFootprints, checkAnnotPlace, checkAnnotSide, checkAnnotFull, checkRegionCoverage, checkDrc, judgeTokens, auditTokenCoverage, checkLabelAlign, checkFlagAlign, checkFlagOrient, checkAdjacency } from './token_conformance.mjs';
 
 /* IC U1(电源脚P1在(0,0)接VCC)+ 去耦cap C1(电源脚接VCC、地脚接GND)。nets=权威pin→net。 */
 const adjNets = { U1: { '1': 'VCC', '2': 'GND', '3': 'SIG' }, C1: { '1': 'VCC', '2': 'GND' } };
@@ -589,6 +589,19 @@ test('T-HIGHSPEED:权威网表中新增的差分对不能漏出合同覆盖', ()
 	assert.ok(r.deviations.some(d=>d.kind==='highspeed-pair-uncovered'&&d.positive==='BUS1_P'));
 });
 
+test('T-PASSIVE:每个 R/C 都需要逐项电气依据和当前绑定封装源',()=>{
+	const rec=(type,id,atom)=>`${JSON.stringify({type,id})}||${JSON.stringify(atom)}|`;
+	const fp=[rec('PAD','p1',{layerId:1,num:'1',centerX:-28,centerY:0,defaultPad:{width:31.5,height:35.4},hole:null}),rec('PAD','p2',{layerId:1,num:'2',centerX:28,centerY:0,defaultPad:{width:31.5,height:35.4},hole:null})].join('\n');
+	const model={components:[{designator:'R1',attrs:[{key:'Footprint',value:'fp'}]}]};
+	let r=checkPassiveFootprints(model,{profiles:[],footprintSources:[],requireEvidence:true,requireLiveFootprintEvidence:true});
+	assert.ok(r.deviations.some(d=>d.kind==='passive-electrical-profile-missing'));
+	r=checkPassiveFootprints(model,{profiles:[{ref:'R1',status:'PASS',source:'datasheet',note:'stress checked'}],footprintSources:[{footprintUuid:'fp',verified:true,sourceText:fp}],requireEvidence:true,requireLiveFootprintEvidence:true});
+	assert.equal(r.conform,true);
+	assert.equal(r.detail.checked,1);
+	r=checkPassiveFootprints(model,{profiles:[{ref:'R1',status:'PASS',source:'datasheet',note:'stress checked'}],footprintSources:[{footprintUuid:'fp',verified:false}],requireEvidence:true,requireLiveFootprintEvidence:true});
+	assert.ok(r.deviations.some(d=>d.kind==='passive-footprint-live-source-unverified'));
+});
+
 test('T-HIGHSPEED:差分端点必须与连接器来源信号及极性一致',()=>{
 	const nets={J1:{1:'LINK_P',2:'LINK_N'},J2:{1:'LINK_P',2:'LINK_N'}};
 	const connectorProfiles=[
@@ -905,8 +918,8 @@ test('设计 token 注册表与裁判结果一一对应，缺检/重复/未知�
 	const report = judgeTokens({ components: [], wires: [], netflags: [] }, { drc: { error: 0, warn: 0, info: 0 } });
 	assert.deepEqual(report.coverage, {
 		complete: true,
-		expected: 26,
-		checked: 26,
+		expected: 27,
+		checked: 27,
 		missing: [],
 		duplicate: [],
 		unexpected: [],

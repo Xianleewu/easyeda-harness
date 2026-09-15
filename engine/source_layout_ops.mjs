@@ -87,6 +87,82 @@ export function placeSourceAttributes(records, edit, placements) {
   return edit;
 }
 
+function outsideSides(box, body) {
+  const out = [];
+  if (box.maxX <= body.minX) out.push('left');
+  if (box.minX >= body.maxX) out.push('right');
+  if (box.maxY <= body.minY) out.push('above');
+  if (box.minY >= body.maxY) out.push('below');
+  return out;
+}
+
+// Resolve T-ANNOT-SIDE findings without making the caller invent coordinates.
+// The already placed human-readable value/model is the visual anchor; only the
+// designator moves to the adjacent outward row on the same side. Real rendered
+// bboxes provide the text dimensions, and every result lands on the source grid.
+export function coLocateSourcePartAnnotations(records, edit, geometry, designators, { grid = 5, rowGap = 2 } = {}) {
+  if (!(edit instanceof Map)) throw new Error('Source annotation colocation needs an edit map');
+  if (!geometry || !Array.isArray(geometry.components)) throw new Error('Complete component geometry is required');
+  if (!Array.isArray(designators) || !designators.length) throw new Error('At least one designator is required');
+  if (!(finite(grid) && grid > 0) || !(finite(rowGap) && rowGap >= 0)) throw new Error('Invalid annotation grid or gap');
+  const current = recordsAt(records, edit), rootByDesignator = new Map(), attrsByRoot = new Map();
+  for (const r of current) if (r.head.type === 'ATTR' && r.atom.parentId) {
+    if (!attrsByRoot.has(r.atom.parentId)) attrsByRoot.set(r.atom.parentId, []);
+    attrsByRoot.get(r.atom.parentId).push(r);
+    if (r.atom.key === 'Designator' && r.atom.value) {
+      if (rootByDesignator.has(String(r.atom.value))) throw new Error(`Duplicate source designator ${r.atom.value}`);
+      rootByDesignator.set(String(r.atom.value), r.atom.parentId);
+    }
+  }
+  const geometryByDesignator = new Map();
+  for (const c of geometry.components) if (c.designator) {
+    if (geometryByDesignator.has(String(c.designator))) throw new Error(`Duplicate geometry designator ${c.designator}`);
+    geometryByDesignator.set(String(c.designator), c);
+  }
+  const snapDown = value => Math.floor((value + 1e-9) / grid) * grid;
+  const snapUp = value => Math.ceil((value - 1e-9) / grid) * grid;
+  const snap = value => Math.round(value / grid) * grid;
+  const placements = [], roots = [];
+  for (const rawRef of designators) {
+    const ref = String(rawRef), rootId = rootByDesignator.get(ref), component = geometryByDesignator.get(ref);
+    if (!rootId || !component?.bbox) throw new Error(`Missing complete source/geometry evidence for ${ref}`);
+    const sourceAttrs = attrsByRoot.get(rootId) || [], rendered = (component.attrs || []).filter(a =>
+      a?.valueVisible === true && a.bbox && a.bbox.maxX > a.bbox.minX && a.bbox.maxY > a.bbox.minY);
+    const sourceDesignator = sourceAttrs.find(a => a.atom.key === 'Designator');
+    const geomDesignator = rendered.find(a => a.key === 'Designator');
+    const geomValue = rendered.find(a => a.key === 'Name') || rendered.find(a => a.key === 'Value') ||
+      rendered.find(a => a.key !== 'Designator' && String(a.value || '').trim());
+    if (!sourceDesignator || !geomDesignator || !geomValue) throw new Error(`Missing visible annotation pair for ${ref}`);
+    const valueSides = outsideSides(geomValue.bbox, component.bbox);
+    if (!valueSides.length) throw new Error(`Value/model annotation is not outside ${ref}`);
+    const designatorSides = outsideSides(geomDesignator.bbox, component.bbox);
+    if (designatorSides.some(side => valueSides.includes(side))) continue;
+    const side = valueSides[0], width = geomDesignator.bbox.maxX - geomDesignator.bbox.minX;
+    const height = geomDesignator.bbox.maxY - geomDesignator.bbox.minY;
+    const originOffsetX = finite(geomDesignator.x) ? geomDesignator.bbox.minX - geomDesignator.x : 0;
+    const originOffsetY = finite(geomDesignator.y) ? geomDesignator.bbox.minY - geomDesignator.y : 0;
+    let boxX, boxY;
+    if (side === 'above') {
+      boxX = snap(geomValue.bbox.minX);
+      boxY = snapDown(geomValue.bbox.minY - rowGap - height);
+    } else if (side === 'below') {
+      boxX = snap(geomValue.bbox.minX);
+      boxY = snapUp(geomValue.bbox.maxY + rowGap);
+    } else if (side === 'left') {
+      boxX = snapDown(geomValue.bbox.minX - rowGap - width);
+      boxY = snap(geomValue.bbox.minY);
+    } else {
+      boxX = snapUp(geomValue.bbox.maxX + rowGap);
+      boxY = snap(geomValue.bbox.minY);
+    }
+    const x = snap(boxX - originOffsetX), y = snap(boxY - originOffsetY);
+    placements.push({ rootId, key:'Designator', x, y });
+    roots.push(rootId);
+  }
+  placeSourceAttributes(records, edit, placements);
+  return { edit, roots, placements };
+}
+
 // Move exactly one free endpoint of an existing wire group, preserving an
 // orthogonal segment. A visible NET attribute anchored at that endpoint follows
 // it, so the label remains electrically attached.

@@ -24,7 +24,7 @@
 | Q3 | P0 detector：per-side 标签锚点（同侧端点共享视觉轴） | engine | codex | done | `T-LABEL-ALIGN` 从自由端导线几何判左右，强制 LEFT_BOTTOM/RIGHT_BOTTOM 与列轴；`T-FLAG-ALIGN` 按同件同侧分组，相关 live identity lint 已通过 |
 | Q4 | live judge 与 model 同等完整（`getNetlistFile` 网表证据强制，缺数据=检查器缺陷） | engine | codex | done | live 固定 `requireNetlistEvidence=true`；网表缺失时 `T-ADJACENCY` 只报一个 `missing-authoritative-netlist` 根因并给出重新取证 recipe，禁止 skip-as-pass |
 | Q5 | P2 参数化单元原语（角色命名的高层操作 → 编译成 recs） | engine | 待认领 | todo | |
-| Q6 | 当前板按 judge 清单分模块修复 | live | codex | doing | 2026-09-16 新 Q9 门禁 identity lint：源断言 0、DRC 0/0/0、26/26 token 覆盖；`T-LABEL-CROWD` 与 `T-ORPHAN` 通过，`T-ANNOT-SIDE` 精确报 3 件位号/型号分列上下两侧。下一批按这 3 个对象一次性修复后再 audit；当前状态不得宣布完成 |
+| Q6 | 当前板按 judge 清单分模块修复 | live | codex | doing | 2026-09-16 标注异侧批已持久化并复读通过；随后 DR25 接入新 `T-PASSIVE`，identity lint 为源断言 0、DRC 0/0/0、27/27 token 覆盖，精确命中 9 个 R/C 缺逐项电气证据及三种当前绑定封装的外圈顶层丝印。当前状态保持红，下一批为逐项电气核验 + 参数化 Small 封装修复。 |
 | Q7 | **快路径 `wf quick`（最高优先）**：小板专用直达轨 = 引擎构造式布局（`cluster_generate`/`module_repack` 现成件）→ 离线候选 preflight（今日 Q1 已验收的门禁，即快路径的刹车）→ 单次 `wf commit` 写入 → 单次 `wf audit`。无修复循环。**KPI=skill 验收标准：≤25 件板，零细节沟通，≤2 次 live 写入，≤15 分钟，audit 全绿** | engine+live | 待认领 | todo | |
 | Q8 | **skill 装订**：把方法层打包成薄 skill（`.claude/skills/` SKILL.md + AGENTS.md 指针），内容=档位决策（quick/重棘轮）+ agent 每轮动作协议 + 唯一合法板级输入（模块/子区声明）。规则本体不复制——机器即规则，skill 只讲方法 | engine | claude | todo | |
 | Q9 | **P0 detector 三连（Q6 目审打回的直接反推）**：①T-LABEL-CROWD——扇出标签列内文字互叠/贴线（P2 实证）②T-ANNOT-SIDE——同器件位号/值标注同侧一致性（U1 周边实证）③T-ORPHAN——无功能归属的孤立件（D1 实证）。验收=各自在当前板复现真实缺陷并定位到对象/坐标 | engine | codex | done | 三项均为 token registry 中的独立 tier2 detector：标签 bbox/导线定位；所有装配件含多引脚器件逐件同侧；每件在 module/cell 中各恰好一次。单测含正反例；live identity lint 26/26，真实命中 `T-ANNOT-SIDE` 3 项，另外两项在当前已修状态为绿 |
@@ -33,6 +33,8 @@
 | Q12 | **黄金标定夹具（"一切都反了"的根治）**：把用户验收过/手改过的真板几何冻结为 calibration fixture（仓库外私有目录），T-LABEL-ALIGN / T-FLAG-ORIENT / T-ANNOT-SIDE 等一切"约定类" detector 必须对它 PASS 才算约定编码正确。此后任何约定改动都要过这个夹具=用户的眼睛被永久编码 | engine | claude | todo | |
 | Q13 | **`wf lint` 秒级只读前门（产品转折点）**：一次读取源/几何/权威网表/绑定封装并运行原生 DRC + 全量 token，输出根因队列且不截图、不写画布；成功后产生限时写前回执。验收：任意已绑定证据的打开文档 <10s 出清单 | engine | codex | done | 实测 1.4–1.7s；无环境变量时从活动文档绑定的回执+上下文恢复私有 evidence 路径，文档或路径不一致 fail-closed；当前图输出 26/26 和 3 个可定位标注侧别问题 |
 | Q14 | **asc 黄金样例 + 解析器（用户提议）**：`examples/` 自绘通用范式电路 `.asc`（buck/MCU 去耦组/USB 接口，规避 LTspice/AD 官方示例版权）+ `engine/asc_parse.mjs`（SYMBOL/WIRE/FLAG/TEXT → model）+ 标定报告（人工好图上跑 judge，约定类 detector 必须 PASS）+ README before/after 展示图。远期=asc→EasyEDA 导入入口。示例=数据非逻辑，引擎零特定内容 | engine | 待认领 | todo | |
+| Q15 | DR25 从离线脚本升级为全路径硬门禁：逐 R/C 电气证据 + 当前绑定封装源 + 参数化外圈丝印清理 + footprint-only identity repair；`wf api` 源码阶段补 candidate preflight | engine+live | codex | doing | 引擎已注册 `T-PASSIVE`（27/27），真实 lint 把旧假绿收紧为 18 项；封装 sanitizer、source rebind 原语和 API 写序回归已通过聚焦测试。待完成当前板三种封装修复、最终 audit 与全套回归。 |
+| Q16 | Bridge 窗口身份钉死：首个真实回包锁窗、所有读写透传并校验 windowId、API 临时库页后恢复原图、库写入纳入 mutation guard | engine | codex | done | 真实发现 `/eda-windows` 的活动 ID 已失效，而未定向执行落入另一个工程；现已消除未透传窗口的事务旁路，并增加跨窗、临时库页恢复和库写保护回归；API 异常会在回滚前持久化阶段/窗口/原因，避免只剩终端残片。 |
 
 ## 轨道定义（冲突隔离）
 

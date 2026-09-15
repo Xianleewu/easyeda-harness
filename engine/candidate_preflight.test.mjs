@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { netsFromEasyEdaNetlist, runCandidatePreflight, applyVerifiedPinStateChanges, applyVerifiedPinNetChanges } from './candidate_preflight.mjs';
+import { netsFromEasyEdaNetlist, runCandidatePreflight, applyVerifiedPinStateChanges, applyVerifiedPinNetChanges, applyBaselineLiveEvidence } from './candidate_preflight.mjs';
 
 const L=(type,id,atom)=>JSON.stringify({type,id})+'||'+JSON.stringify(atom);
 
@@ -29,6 +29,17 @@ test('candidate pin-net changes require an exact before value and produce the de
   assert.deepEqual(applyVerifiedPinNetChanges(before,[{ref:'J1',pin:'1',before:'OLD',after:'NEW'}]),{J1:{'1':'NEW','2':'GND'}});
   assert.equal(before.J1['1'],'OLD');
   assert.throws(()=>applyVerifiedPinNetChanges(before,[{ref:'J1',pin:'1',before:'WRONG',after:'NEW'}]),/baseline mismatch/);
+});
+
+test('candidate preflight reuses the exact live-resolved footprint source from its baseline report',()=>{
+  const tokenEvidence={connectorFootprintProfiles:[{ref:'J1',footprintUuid:'fp',sourceText:'stale'}]};
+  const source={footprintUuid:'fp',verified:true,sourceText:'resolved',artifact:'/tmp/fp.elibu',resolvedLibraryUuid:'project'};
+  const effective=applyBaselineLiveEvidence(tokenEvidence,{footprintEvidence:[source]});
+  assert.equal(effective.connectorFootprintProfiles[0].sourceText,'resolved');
+  assert.equal(effective.connectorFootprintProfiles[0].liveSourceVerified,true);
+	assert.equal(effective.connectorFootprintProfiles[0].liveSourceLibraryUuid,'project');
+	assert.deepEqual(effective.passiveFootprintSources,[source]);
+	assert.equal(tokenEvidence.connectorFootprintProfiles[0].sourceText,'stale');
 });
 
 test('candidate source/model coverage rejects a missing placed object',async()=>{

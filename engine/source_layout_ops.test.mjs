@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { translateSourceCells, placeSourceAttributes, reanchorSourceWireEndpoint, branchSourceWireLabel, replaceSingleSegmentSourceWire, findSourceLineSegment, mergeSourcePlans } from './source_layout_ops.mjs';
+import { translateSourceCells, placeSourceAttributes, coLocateSourcePartAnnotations, reanchorSourceWireEndpoint, branchSourceWireLabel, replaceSingleSegmentSourceWire, findSourceLineSegment, mergeSourcePlans } from './source_layout_ops.mjs';
 
 const R=(type,id,atom)=>({head:{type,id},atom});
 const records=[
@@ -35,6 +35,36 @@ test('placeSourceAttributes uses absolute visual coordinates after a cell transl
 	const p=translateSourceCells(visible,[{id:'a',roots:['part'],dx:15,dy:30}]);
 	placeSourceAttributes(visible,p.edit,[{rootId:'part',key:'Name',x:100,y:200,align:'LEFT_BOTTOM'}]);
 	assert.deepEqual(p.edit.get('name'),{parentId:'part',key:'Name',x:100,y:-200,value:'part',valueVisible:true,align:'LEFT_BOTTOM'});
+});
+
+test('coLocateSourcePartAnnotations moves a designator beside the value on its existing outside side',()=>{
+  const source=[
+    R('COMPONENT','part',{x:100,y:-100}),
+    R('ATTR','des',{parentId:'part',key:'Designator',value:'P1',x:105,y:-120,valueVisible:true}),
+    R('ATTR','name',{parentId:'part',key:'Name',value:'MODEL',x:100,y:-80,valueVisible:true}),
+  ];
+  const geometry={components:[{designator:'P1',bbox:{minX:100,minY:90,maxX:120,maxY:110},attrs:[
+    {key:'Designator',value:'P1',valueVisible:true,x:105,y:120,bbox:{minX:100,minY:120,maxX:110,maxY:128}},
+    {key:'Name',value:'MODEL',valueVisible:true,bbox:{minX:100,minY:75,maxX:130,maxY:83}},
+  ]}]};
+  const result=coLocateSourcePartAnnotations(source,new Map(),geometry,['P1']);
+  assert.deepEqual(result.placements,[{rootId:'part',key:'Designator',x:105,y:65}]);
+  assert.deepEqual(result.edit.get('des'),{parentId:'part',key:'Designator',value:'P1',x:105,y:-65,valueVisible:true});
+  assert.deepEqual(result.roots,['part']);
+});
+
+test('coLocateSourcePartAnnotations leaves an already conforming pair untouched and fails closed on incomplete geometry',()=>{
+  const source=[
+    R('COMPONENT','part',{x:100,y:-100}),
+    R('ATTR','des',{parentId:'part',key:'Designator',value:'P1',x:100,y:-70,valueVisible:true}),
+    R('ATTR','name',{parentId:'part',key:'Name',value:'MODEL',x:100,y:-80,valueVisible:true}),
+  ];
+  const geometry={components:[{designator:'P1',bbox:{minX:100,minY:90,maxX:120,maxY:110},attrs:[
+    {key:'Designator',value:'P1',valueVisible:true,bbox:{minX:100,minY:65,maxX:110,maxY:73}},
+    {key:'Name',value:'MODEL',valueVisible:true,bbox:{minX:100,minY:75,maxX:130,maxY:83}},
+  ]}]};
+  assert.equal(coLocateSourcePartAnnotations(source,new Map(),geometry,['P1']).edit.size,0);
+  assert.throws(()=>coLocateSourcePartAnnotations(source,new Map(),{components:[]},['P1']),/Missing complete source\/geometry evidence/);
 });
 
 test('reanchorSourceWireEndpoint keeps the wire orthogonal and moves its visible NET label',()=>{

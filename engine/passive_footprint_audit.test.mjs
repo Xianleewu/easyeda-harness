@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { analyzeFootprintSource, auditPassiveFootprints, passiveKind } from './passive_footprint_audit.mjs';
+import { analyzeFootprintSource, sanitizePassiveFootprintSource, editableFootprintDocumentSource, transplantFootprintGeometry, parseEasyEdaRecords, auditPassiveFootprints, passiveKind } from './passive_footprint_audit.mjs';
 
 const rec = (type, id, atom) => `${JSON.stringify({ type, id })}||${JSON.stringify(atom)}|`;
 const pad = (num, x) => rec('PAD', `p${num}`, { layerId: 1, num: String(num), centerX: x, centerY: 0,
@@ -55,4 +55,45 @@ test('passive classification stays generic', () => {
 	assert.equal(passiveKind({ designator: 'R27' }), 'resistor');
 	assert.equal(passiveKind({ designator: 'C12' }), 'capacitor');
 	assert.equal(passiveKind({ designator: 'U1' }), null);
+});
+
+test('sanitizer removes only outer top silk and preserves pads while rebinding metadata',()=>{
+	const input=[rec('DOCHEAD','doc',{docType:'FOOTPRINT',uuid:'old'}),rec('META','META',{title:'old'}),...source([...outerSilk,...centralSilk]).trim().split('\n')].join('\n');
+	const out=sanitizePassiveFootprintSource(input,{uuid:'new',title:'SMALL'});
+	assert.equal(out.removedTopSilk,2);
+	assert.equal(out.after.conform,true);
+	assert.match(out.source,/\"uuid\":\"new\"/);
+	assert.match(out.source,/\"title\":\"SMALL\"/);
+	assert.equal(parseInt(String(out.after.detail.pads)),2);
+});
+
+test('downloaded library bundles become one editable PCB document before library update',()=>{
+	const catalogue=[rec('DOCHEAD','catalogue',{docType:'FOOTPRINT',uuid:'old'}),rec('META','META',{title:'old'})];
+	const drawing=[rec('DOCHEAD','drawing',{docType:'FOOTPRINT',uuid:'old'}),...source(centralSilk).trim().split('\n')];
+	const output=editableFootprintDocumentSource([...catalogue,...drawing].join('\n'),{uuid:'new'});
+	const rows=parseEasyEdaRecords(output);
+	assert.equal(rows.filter(row=>row.head.type==='DOCHEAD').length,1);
+	assert.equal(rows[0].atom.docType,'PCB');
+	assert.equal(rows[0].atom.uuid,'new');
+	assert.equal(rows.filter(row=>row.head.type==='PAD').length,2);
+});
+
+test('geometry transplant preserves target editor identity and retickets donor primitives',()=>{
+	const template=[rec('DOCHEAD','target',{docType:'PCB',client:'current',uuid:'target'}),rec('CANVAS','canvas',{unit:'mm'}),rec('ATTR','fp',{key:'Footprint',value:'old'})].join('\n');
+	const donor=[rec('DOCHEAD','donor',{docType:'PCB',client:'stale',uuid:'donor'}),...source(centralSilk).trim().split('\n')].join('\n');
+	const out=transplantFootprintGeometry(template,donor,{uuid:'target',title:'SMALL'});
+	const rows=parseEasyEdaRecords(out.source);
+	assert.equal(rows[0].atom.client,'current');
+	assert.equal(rows[0].atom.uuid,'target');
+	assert.equal(rows.find(row=>row.head.type==='ATTR').atom.value,'SMALL');
+	assert.equal(rows.filter(row=>row.head.type==='PAD').length,2);
+	assert.ok(rows.filter(row=>['PAD','POLY'].includes(row.head.type)).every(row=>Number.isFinite(row.head.ticket)));
+	assert.equal(out.audit.conform,true);
+});
+
+test('sanitizer fails closed for non-passive or oversize geometry unless a reviewed policy is supplied',()=>{
+	assert.throws(()=>sanitizePassiveFootprintSource(''),/empty|unreadable/);
+	const wide=[pad(1,-80),pad(2,80)].join('\n');
+	assert.throws(()=>sanitizePassiveFootprintSource(wide),/still fails/);
+	assert.equal(sanitizePassiveFootprintSource(wide,{policy:{maxCopperLongMil:220,maxCopperShortMil:60}}).after.conform,true);
 });

@@ -5,12 +5,12 @@ import { scanSpecificContent } from './rubric_audit.mjs';
 
 test('TOKENS 含核心 token 且字段完整', () => {
 	const ids = TOKENS.map(t => t.id);
-	for (const id of ['T-DRC','T-ORTHO','T-GRID','T-NOCROSS','T-NOTHRU','T-NOOVERLAP','T-LABEL-CROWD','T-DENSITY','T-PAGE','T-ANNOT-PLACE','T-ANNOT-SIDE','T-ANNOT-FULL','T-ORPHAN','T-VISUAL']) {
+	for (const id of ['T-DRC','T-ORTHO','T-GRID','T-NOCROSS','T-NOTHRU','T-NOOVERLAP','T-LABEL-CROWD','T-DENSITY','T-PAGE','T-PASSIVE','T-ANNOT-PLACE','T-ANNOT-SIDE','T-ANNOT-FULL','T-ORPHAN','T-VISUAL']) {
 		assert.ok(ids.includes(id), `缺 ${id}`);
 	}
 	for (const t of TOKENS) {
 		assert.ok(t.category && t.desc && t.source, `${t.id} 缺字段`);
-		assert.ok(['drc','geom','netlist','vision'].includes(t.evidence), `${t.id} evidence 非法`);
+		assert.ok(['drc','geom','netlist','footprint','vision'].includes(t.evidence), `${t.id} evidence 非法`);
 		assert.ok([1,2,3].includes(t.tier), `${t.id} tier 非法`);
 	}
 });
