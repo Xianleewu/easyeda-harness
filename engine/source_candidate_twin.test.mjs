@@ -50,6 +50,20 @@ test('source candidate twin does not resurrect a source footprint intentionally 
   assert.equal(out.model.components[0].attrs.some(a=>a.key==='Footprint'),false);
 });
 
+test('a current net flag replaces the preserved wire root name instead of creating a false dual identity',()=>{
+	const flag=(x)=>[
+		L('COMPONENT','g',{partId:'ground.1',x,y:-10,rotation:0,isMirror:false}),
+		L('ATTR','gg',{parentId:'g',key:'Global Net Name',value:'GND',x,y:-10,valueVisible:false}),
+	];
+	const baseline=[source(10),L('ATTR','wn',{parentId:'w',key:'NET',value:'OLD',x:30,y:-10,valueVisible:true}),...flag(50)].join('|\n');
+	const candidate=[source(10),...flag(10)].join('|\n');
+	const withFlag={...geometry,netflags:[{id:'g',kind:'ground',net:'GND',x:50,y:10,rotation:0,bbox:{minX:45,minY:5,maxX:55,maxY:15}}],
+		wires:[{id:'w#0',net:'OLD',line:[10,10,30,10]}]};
+	const out=predictSourceCandidate(candidate,{baselineSource:baseline,baselineGeometry:withFlag,baselineNets:{P1:{'1':'GND'}},componentTypes:{p:'part',g:'netflag'}});
+	assert.equal(out.nets.P1['1'],'GND');
+	assert.equal(out.model.wires[0].net,'GND');
+});
+
 test('source candidate twin fails closed when an added component has no proven geometry donor',()=>{
   const candidate=source(10)+'|\n'+L('COMPONENT','q',{partId:'unknown.1',x:40,y:-10,rotation:0,isMirror:false})+'|\n'+L('ATTR','qd',{parentId:'q',key:'Designator',value:'P2'});
   assert.throws(()=>predictSourceCandidate(candidate,{baselineSource:source(10),baselineGeometry:geometry,baselineNets:{P1:{'1':'N'}},componentTypes:{p:'part',q:'part'}}),/geometry-donor-missing/);

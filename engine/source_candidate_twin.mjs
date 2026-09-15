@@ -95,8 +95,11 @@ function assertNamedPinsHaveNamedWireRoots({index,rootLines,components,netflags,
     const names=new Set();
     const explicit=String(attrValue(index,id,'NET')||'').trim();
     if(explicit)names.add(explicit);
-    else if(oldWireNets.get(id))names.add(oldWireNets.get(id));
     for(const f of netflags||[])if(segments.some(line=>pointOnSegment(f.x,f.y,line)))names.add(f.net);
+	// A current candidate label or built-in flag owns the root's identity. The
+	// baseline name is only a fallback for a preserved, still-unlabelled root;
+	// otherwise label→flag repairs become falsely dual-named in the twin.
+	if(!names.size&&oldWireNets.get(id))names.add(oldWireNets.get(id));
     roots.push({id,segments,names:[...names]});
   }
   // A preserved root may be an intentionally unnamed local connection. Its
@@ -214,7 +217,10 @@ export function predictSourceCandidate(candidateSource,{baselineSource,baselineG
   if(donorFailures.length)throw Error(`Source candidate twin cannot prove geometry: ${JSON.stringify(donorFailures)}`);
   const oldWireNets=baselineWireNets(baselineGeometry),wires=[];
   for(const [wireId,lines] of after.lines){
-    const explicit=String(attrValue(after,wireId,'NET')||'').trim();const net=explicit||oldWireNets.get(wireId)||'';
+    const explicit=String(attrValue(after,wireId,'NET')||'').trim();
+	const segments=lines.map(r=>[r.atom.startX,-r.atom.startY,r.atom.endX,-r.atom.endY]);
+	const currentNames=new Set([explicit,...netflags.filter(f=>segments.some(line=>pointOnSegment(f.x,f.y,line))).map(f=>f.net)].filter(Boolean));
+	const net=currentNames.size===1?[...currentNames][0]:currentNames.size?'':oldWireNets.get(wireId)||'';
     for(let i=0;i<lines.length;i++){const a=lines[i].atom;wires.push({id:`${wireId}#${i}`,net,line:[a.startX,-a.startY,a.endX,-a.endY]});}
   }
   const texts=(baselineGeometry.texts||[]).map(x=>structuredClone(x));
