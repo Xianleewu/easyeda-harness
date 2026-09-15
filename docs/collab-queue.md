@@ -35,6 +35,7 @@
 | Q14 | **asc 黄金样例 + 解析器（用户提议）**：`examples/` 自绘通用范式电路 `.asc`（buck/MCU 去耦组/USB 接口，规避 LTspice/AD 官方示例版权）+ `engine/asc_parse.mjs`（SYMBOL/WIRE/FLAG/TEXT → model）+ 标定报告（人工好图上跑 judge，约定类 detector 必须 PASS）+ README before/after 展示图。远期=asc→EasyEDA 导入入口。示例=数据非逻辑，引擎零特定内容 | engine | 待认领 | todo | |
 | Q15 | DR25 从离线脚本升级为全路径硬门禁：逐 R/C 电气证据 + 当前绑定封装源 + 参数化外圈丝印清理 + footprint-only identity repair；`wf api` 源码阶段补 candidate preflight | engine+live | codex | doing | 引擎已注册 `T-PASSIVE`（27/27），真实 lint 把旧假绿收紧为 18 项；封装 sanitizer、source rebind 原语和 API 写序回归已通过聚焦测试。待完成当前板三种封装修复、最终 audit 与全套回归。 |
 | Q16 | Bridge 窗口身份钉死：首个真实回包锁窗、所有读写透传并校验 windowId、API 临时库页后恢复原图、库写入纳入 mutation guard | engine | codex | done | 真实发现 `/eda-windows` 的活动 ID 已失效，而未定向执行落入另一个工程；现已消除未透传窗口的事务旁路，并增加跨窗、临时库页恢复和库写保护回归；API 异常会在回滚前持久化阶段/窗口/原因，避免只剩终端残片。 |
+| Q17 | 连接器协议拓扑硬门：逐脚语义之外核对必须同网、异网、可选 NC 隔离和经指定器件连接 | engine | codex | done | `T-PIN-SEMANTICS` 新增 source-cited topology review，candidate/live 均要求每个连接器有复核覆盖；支持 `same-net` / `different-net` / `not-same-net` / `through-component`。当前板缓存权威网表已真实命中一组 presence 引脚意外同网，证明旧 DRC+逐脚检查的漏判已被补上。 |
 
 ## 轨道定义（冲突隔离）
 

@@ -17,7 +17,7 @@ export const TOKENS = [
 	{ id: 'T-MODULE-SPACING', category: '模块', desc: '模块内容框不拥挤、不孤立且框内留白明确', value: { minGap: 60, maxNearestGap: 180, minInnerPadding: 8 }, source: 'DR21/用户规则 2026-09-14', evidence: 'geom', tier: 2 },
 	{ id: 'T-CELL-SPACING', category: '模块', desc: '模块内部功能子区块按关系留白，非直接关系不得拥挤', value: { minGap: 40, unrelatedGap: 60, minInnerPadding: 8 }, source: 'DR26/用户规则 2026-09-14', evidence: 'geom', tier: 2 },
 	{ id: 'T-CONN-MOUNT', category: '电气', desc: '连接器屏蔽/固定焊盘逐脚接入声明地或有显式隔离例外', value: { requireGround: true }, source: 'DR24/用户规则 2026-09-14', evidence: 'geom', tier: 2 },
-	{ id: 'T-PIN-SEMANTICS', category: '电气', desc: '每个连接器逐针核对符号针名、权威网表和已验证接口定义', value: { coveragePct: 100 }, source: 'DR28/商业连接器审计', evidence: 'netlist', tier: 2 },
+	{ id: 'T-PIN-SEMANTICS', category: '电气', desc: '每个连接器逐针核对符号针名、权威网表、接口定义及跨引脚拓扑关系', value: { coveragePct: 100 }, source: 'DR28/商业连接器审计', evidence: 'netlist', tier: 2 },
 	{ id: 'T-HIGHSPEED', category: '高速', desc: '差分网络逐对声明协议、阻抗、偏斜和两端针脚，且覆盖权威网表中的全部差分对', value: { coveragePct: 100 }, source: 'DR29/高速接口审计', evidence: 'netlist', tier: 2 },
 	{ id: 'T-PASSIVE', category: '物料', desc: '每个装配 R/C 逐项核验电气应力，并从当前绑定库对象证明真实焊盘尺寸及顶层丝印符合封装策略', value: { coveragePct: 100 }, source: 'DR25/用户规则 2026-09-14', evidence: 'footprint', tier: 2 },
 	{ id: 'T-ANNOT-PLACE',category: '标注', desc: '标号+阻值在件外、同侧、错开堆叠', value: { outsidePct: 100, sameSideMinPct: 70 }, source: '商用实测/CR-10', evidence: 'geom', tier: 2 },

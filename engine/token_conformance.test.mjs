@@ -545,6 +545,45 @@ test('T-PIN-SEMANTICS:空连接器封装或缺失焊盘映射必须失败',()=>{
 	assert.ok(r.deviations.some(d=>d.kind==='connector-footprint-pads-missing'));
 });
 
+test('T-PIN-SEMANTICS:跨引脚拓扑复核覆盖连接器并拒绝意外短接',()=>{
+	const model={components:[
+		{designator:'J1',pins:[{num:'1',name:'DETECT_A',noConnected:false},{num:'2',name:'DETECT_B',noConnected:false}]},
+		{designator:'J2',pins:[{num:'A',name:'CTRL',noConnected:false}]},
+	]};
+	const profiles=[
+		{ref:'J1',source:'connector table',pins:{1:{sourceSignal:'DETECT_A',nets:['SENSE_A'],state:'connected'},2:{sourceSignal:'DETECT_B',nets:['SENSE_B'],state:'connected'}}},
+		{ref:'J2',source:'connector table',pins:{A:{sourceSignal:'CTRL',nets:['CTRL'],state:'connected'}}},
+	];
+	const topologyProfiles=[{id:'interface-detect',refs:['J1','J2'],source:'protocol specification',status:'PASS',note:'relationships reviewed',relations:[
+		{id:'detect-isolation',kind:'different-net',endpoints:[{ref:'J1',pin:'1'},{ref:'J1',pin:'2'}]},
+		{id:'optional-detect-isolation',kind:'not-same-net',endpoints:[{ref:'J1',pin:'2'},{ref:'J2',pin:'A'}]},
+		{id:'control-series',kind:'through-component',endpoints:[{ref:'J1',pin:'1'},{ref:'J2',pin:'A'}],via:{ref:'R7',pins:['1','2']}},
+	]}];
+	const nets={J1:{1:'SENSE_A',2:'SENSE_B'},J2:{A:'CTRL'},R7:{1:'SENSE_A',2:'CTRL'}};
+	let r=checkConnectorPinSemantics(model,{nets,profiles,topologyProfiles,requireTopologyEvidence:true});
+	assert.equal(r.conform,true);
+	assert.equal(r.detail.topologyCoveredConnectors,2);
+	r=checkConnectorPinSemantics(model,{nets:{...nets,J1:{1:'SENSE_A',2:'SENSE_A'}},profiles,topologyProfiles,requireTopologyEvidence:true});
+	assert.ok(r.deviations.some(d=>d.kind==='connector-topology-unexpected-short'&&d.id==='detect-isolation'));
+	const optional={...nets,J2:{A:''}};
+	assert.equal(checkConnectorPinSemantics(model,{nets:optional,profiles,topologyProfiles,requireTopologyEvidence:true}).deviations.some(d=>d.id==='optional-detect-isolation'),false,'not-same-net 允许一端按逐脚合同声明为 NC');
+});
+
+test('T-PIN-SEMANTICS:live 模式缺跨引脚拓扑复核时逐连接器失败关闭',()=>{
+	const model={components:[{designator:'P4',pins:[{num:'1',name:'SIG',noConnected:false}]}]};
+	const profiles=[{ref:'P4',source:'table',pins:{1:{sourceSignal:'SIG',nets:['N'],state:'connected'}}}];
+	const r=checkConnectorPinSemantics(model,{nets:{P4:{1:'N'}},profiles,requireTopologyEvidence:true});
+	assert.ok(r.deviations.some(d=>d.kind==='connector-topology-profile-missing'&&d.designator==='P4'));
+});
+
+test('T-PIN-SEMANTICS:证据声明的连接器若从候选模型消失也必须失败',()=>{
+	const profiles=[{ref:'J9',source:'table',pins:{1:{sourceSignal:'SIG',nets:['N'],state:'connected'}}}];
+	const topologyProfiles=[{id:'review',refs:['J9'],source:'spec',status:'PASS',note:'reviewed',relations:[]}];
+	const r=checkConnectorPinSemantics({components:[]},{nets:{},profiles,topologyProfiles,requireEvidence:true,requireTopologyEvidence:true});
+	assert.ok(r.deviations.some(d=>d.kind==='connector-semantic-component-missing'&&d.designator==='J9'));
+	assert.ok(r.deviations.some(d=>d.kind==='connector-topology-component-missing'&&d.designator==='J9'));
+});
+
 test('T-PIN-SEMANTICS:封装证据必须绑定当前器件且源 UUID 一致，重复焊盘需定向声明',()=>{
 	const model={components:[{designator:'J9',attrs:[{key:'Footprint',value:'fp-live'}],pins:[{num:'1',name:'SIG'}]}]};
 	const profiles=[{ref:'J9',source:'table',pins:{1:{sourceSignal:'SIG',nets:['N'],state:'connected'}}}];

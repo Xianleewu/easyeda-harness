@@ -139,7 +139,7 @@ export async function runCandidatePreflight({ candidateSource, baselineSource, p
   if (baselineReport.tier1?.conform !== true || baselineDrc?.evidence?.verified !== true)
     throw new Error('Baseline native DRC is not verified clean for offline carry-forward');
 	const report = judgeBoardTokens(model, { ...effectiveTokenEvidence, nets:prediction.nets, drc:baselineDrc,
-		moduleRegions,cellRegions,requirePageEvidence:true,requireConnectorSemanticEvidence:true,requireLiveFootprintEvidence:true,requireHighSpeedEvidence:true,requirePassiveEvidence:true });
+		moduleRegions,cellRegions,requirePageEvidence:true,requireConnectorSemanticEvidence:true,requireConnectorTopologyEvidence:true,requireLiveFootprintEvidence:true,requireHighSpeedEvidence:true,requirePassiveEvidence:true });
   const predicted = {...report,drc:baselineDrc,shots:[],regionEvidence:{moduleRegions,cellRegions},
     predictionEvidence:prediction.evidence||null,sourceCoverage:coverage,catalogBindings,nativeDrcStatus:'pending-post-write-verification'};
   const gate = evaluateDeliveryGate(predicted,{before:baselineReport,repair:true});

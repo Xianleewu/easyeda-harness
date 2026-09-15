@@ -123,7 +123,7 @@ export function judgeSnapshot(snapshotPath, { drc } = {}) {
 }
 
 export async function runLiveJudge({ windowId = '', port = 0, outDir = '.', timeoutMs = 120000,
-	moduleRegions, cellRegions, placementExceptions, connectorMountExceptions, connectorSemanticProfiles, connectorFootprintProfiles, highSpeedProfiles, passiveElectricalProfiles, adjacency,
+	moduleRegions, cellRegions, placementExceptions, connectorMountExceptions, connectorSemanticProfiles, connectorFootprintProfiles, connectorTopologyProfiles, highSpeedProfiles, passiveElectricalProfiles, adjacency,
 	sheetBounds, titleBlockKeepout, pageClearance, captureCanvas = true, verifiedDrc = null } = {}) {
 	/* Canonical reader merges source NET labels and fails closed if label coverage is unknown. */
 	const model = await readCompleteGeometry({ windowId, port, timeoutMs });
@@ -166,8 +166,8 @@ export async function runLiveJudge({ windowId = '', port = 0, outDir = '.', time
 		try { await captureRegion({ windowId, port, region, outFile: out, timeoutMs }); shots.push(out); } catch { /* 截图失败不伪装,留空证据 */ }
 	}
 	const report = judgeBoardTokens(model, { drc, shots, nets, moduleRegions:measuredModules, cellRegions:measuredCells,
-		placementExceptions, connectorMountExceptions, connectorSemanticProfiles, connectorFootprintProfiles:measuredFootprintProfiles, highSpeedProfiles, passiveElectricalProfiles, passiveFootprintSources:liveFootprintSources, adjacency, sheetBounds, titleBlockKeepout, pageClearance,
-		requirePageEvidence: true, requireConnectorSemanticEvidence: true, requireLiveFootprintEvidence:true, requireHighSpeedEvidence: true, requirePassiveEvidence:true, requireNetlistEvidence:true, requireRegionEvidence:true });
+		placementExceptions, connectorMountExceptions, connectorSemanticProfiles, connectorFootprintProfiles:measuredFootprintProfiles, connectorTopologyProfiles, highSpeedProfiles, passiveElectricalProfiles, passiveFootprintSources:liveFootprintSources, adjacency, sheetBounds, titleBlockKeepout, pageClearance,
+		requirePageEvidence: true, requireConnectorSemanticEvidence: true, requireConnectorTopologyEvidence:true, requireLiveFootprintEvidence:true, requireHighSpeedEvidence: true, requirePassiveEvidence:true, requireNetlistEvidence:true, requireRegionEvidence:true });
 	const geometryArtifact = `${outDir}/complete_geometry.json`;
 	writeFileSync(geometryArtifact, JSON.stringify(model, null, 2), 'utf8');
 	const liveReport = { ...report, drc, regionEvidence:{moduleRegions:measuredModules,cellRegions:measuredCells}, footprintEvidence:liveFootprintSources.map(({base64,...item})=>item), geometryArtifact, netlistArtifact,

@@ -451,15 +451,65 @@ function componentAttribute(component,key){
 	return String((component?.attrs||[]).find(a=>a?.key===key)?.value??'');
 }
 
-export function checkConnectorPinSemantics(model, { nets, profiles, footprintProfiles, requireEvidence = false, requireLiveFootprintEvidence = false } = {}) {
+function connectorTopologyEndpoint(endpoint, nets, connectorPins) {
+	const ref=String(endpoint?.ref||''),pin=String(endpoint?.pin??'');
+	if(!ref||!pin)return {valid:false,ref,pin,net:'',key:`${ref}.${pin}`};
+	const key=`${ref}.${pin}`;
+	return {valid:connectorPins.has(key),ref,pin,key,net:String(nets?.[ref]?.[pin]??'')};
+}
+
+function checkConnectorTopology({components,nets,profiles,topologyProfiles,requireEvidence}) {
+	const dev=[],connectors=new Set(components.map(c=>String(c.designator||'')));
+	const connectorPins=new Set();
+	for(const profile of profiles||[])for(const pin of Object.keys(profile?.pins||{}))connectorPins.add(`${profile.ref}.${pin}`);
+	const declared=Array.isArray(topologyProfiles)?topologyProfiles:[];
+	const covered=new Set();
+	for(const profile of declared){
+		const id=String(profile?.id||'').trim()||'unnamed';
+		const refs=Array.isArray(profile?.refs)?profile.refs.map(String):[];
+		for(const ref of refs)if(connectors.has(ref))covered.add(ref);else dev.push({kind:'connector-topology-component-missing',id,designator:ref});
+		if(requireEvidence&&!String(profile?.source||'').trim())dev.push({kind:'connector-topology-source-missing',id});
+		if(requireEvidence&&String(profile?.status||'').toUpperCase()!=='PASS')dev.push({kind:'connector-topology-review-open',id,status:profile?.status||''});
+		if(requireEvidence&&!String(profile?.note||'').trim())dev.push({kind:'connector-topology-note-missing',id});
+		const relations=Array.isArray(profile?.relations)?profile.relations:[];
+		for(const relation of relations){
+			const relationId=String(relation?.id||'').trim()||`${id}:unnamed`;
+			const endpoints=Array.isArray(relation?.endpoints)?relation.endpoints.map(e=>connectorTopologyEndpoint(e,nets,connectorPins)):[];
+			if(endpoints.length!==2){dev.push({kind:'connector-topology-endpoint-count',id:relationId,got:endpoints.length,expect:2});continue;}
+			for(const endpoint of endpoints)if(!endpoint.valid)dev.push({kind:'connector-topology-endpoint-unverified',id:relationId,endpoint:endpoint.key});
+			if(endpoints.some(e=>!e.valid))continue;
+			const [a,b]=endpoints;
+			if(relation.kind!=='not-same-net'&&(!a.net||!b.net)){dev.push({kind:'connector-topology-endpoint-net-missing',id:relationId,endpoints:endpoints.map(e=>e.key),nets:endpoints.map(e=>e.net)});continue;}
+			if(relation.kind==='same-net'){
+				if(a.net!==b.net)dev.push({kind:'connector-topology-same-net-mismatch',id:relationId,endpoints:[a.key,b.key],nets:[a.net,b.net]});
+			}else if(relation.kind==='different-net'){
+				if(a.net===b.net)dev.push({kind:'connector-topology-unexpected-short',id:relationId,endpoints:[a.key,b.key],net:a.net});
+			}else if(relation.kind==='not-same-net'){
+				if(a.net&&a.net===b.net)dev.push({kind:'connector-topology-unexpected-short',id:relationId,endpoints:[a.key,b.key],net:a.net});
+			}else if(relation.kind==='through-component'){
+				const viaRef=String(relation?.via?.ref||''),viaPins=Array.isArray(relation?.via?.pins)?relation.via.pins.map(String):[];
+				if(!viaRef||viaPins.length!==2){dev.push({kind:'connector-topology-via-invalid',id:relationId,via:relation?.via||null});continue;}
+				const viaNets=viaPins.map(pin=>String(nets?.[viaRef]?.[pin]??''));
+				if(!viaNets[0]||!viaNets[1])dev.push({kind:'connector-topology-via-net-missing',id:relationId,via:`${viaRef}.${viaPins.join('/')}`,nets:viaNets});
+				else if(a.net!==viaNets[0]||b.net!==viaNets[1])dev.push({kind:'connector-topology-via-mismatch',id:relationId,endpoints:[a.key,b.key],endpointNets:[a.net,b.net],via:`${viaRef}.${viaPins.join('/')}`,viaNets});
+				else if(a.net===b.net)dev.push({kind:'connector-topology-via-bypassed',id:relationId,endpoints:[a.key,b.key],net:a.net,via:viaRef});
+			}else dev.push({kind:'connector-topology-kind-unknown',id:relationId,got:relation?.kind||''});
+		}
+	}
+	if(requireEvidence)for(const ref of connectors)if(!covered.has(ref))dev.push({kind:'connector-topology-profile-missing',designator:ref});
+	return {deviations:dev,profiles:declared.length,coveredConnectors:covered.size,relations:declared.reduce((n,p)=>n+(Array.isArray(p?.relations)?p.relations.length:0),0)};
+}
+
+export function checkConnectorPinSemantics(model, { nets, profiles, footprintProfiles, topologyProfiles, requireEvidence = false, requireLiveFootprintEvidence = false, requireTopologyEvidence = false } = {}) {
 	const components = (model.components || []).filter(c => /^(J|P|CN|CON)\d/i.test(String(c.designator || '')));
 	const declared = Array.isArray(profiles) ? profiles : [];
 	const byRef = new Map(declared.map(p => [String(p?.ref || ''), p]));
 	const footprints = new Map((Array.isArray(footprintProfiles)?footprintProfiles:[]).map(p=>[String(p?.ref||''),p]));
 	const dev = [];
-	if (!components.length) return res('T-PIN-SEMANTICS', [], { connectors: 0, profiles: declared.length, checkedPins: 0 });
+	if(!components.length&&!declared.length&&!(Array.isArray(topologyProfiles)&&topologyProfiles.length))
+		return res('T-PIN-SEMANTICS',[],{connectors:0,profiles:0,footprintProfiles:footprints.size,checkedPins:0,topologyProfiles:0,topologyRelations:0,topologyCoveredConnectors:0});
 	if (!nets) dev.push({ kind: 'connector-semantic-netlist-missing', connectors: components.map(c => c.designator) });
-	if (requireEvidence && !declared.length) dev.push({ kind: 'connector-semantic-profiles-missing', connectors: components.map(c => c.designator) });
+	if (requireEvidence && components.length && !declared.length) dev.push({ kind: 'connector-semantic-profiles-missing', connectors: components.map(c => c.designator) });
 	let checkedPins = 0;
 	for (const c of components) {
 		const ref = String(c.designator || '');
@@ -520,7 +570,9 @@ export function checkConnectorPinSemantics(model, { nets, profiles, footprintPro
 	}
 	for (const ref of byRef.keys()) if (!components.some(c => String(c.designator || '') === ref))
 		dev.push({ kind: 'connector-semantic-component-missing', designator: ref });
-	return res('T-PIN-SEMANTICS', dev, { connectors: components.length, profiles: declared.length, footprintProfiles:footprints.size, checkedPins });
+	const topology=checkConnectorTopology({components,nets,profiles:declared,topologyProfiles,requireEvidence:requireTopologyEvidence});
+	dev.push(...topology.deviations);
+	return res('T-PIN-SEMANTICS', dev, { connectors: components.length, profiles: declared.length, footprintProfiles:footprints.size, checkedPins,topologyProfiles:topology.profiles,topologyRelations:topology.relations,topologyCoveredConnectors:topology.coveredConnectors });
 }
 
 const endpointKey = e => `${e.ref}.${e.pin}`;
@@ -1190,8 +1242,8 @@ export function checkPassiveFootprints(model, {
 }
 
 // 三层符合裁判(tier1=DRC底线, tier2=几何项, tier3=视觉占位)。opts.nets 给定(权威网表 pin→net)时启用 T-ADJACENCY。
-export function judgeTokens(model, { drc, nets, moduleRegions, cellRegions, placementExceptions, connectorMountExceptions, connectorSemanticProfiles, connectorFootprintProfiles, highSpeedProfiles, passiveElectricalProfiles, passiveFootprintSources, adjacency,
-	sheetBounds, titleBlockKeepout, pageClearance, requirePageEvidence = false, requireConnectorSemanticEvidence = false, requireLiveFootprintEvidence = false, requireHighSpeedEvidence = false, requirePassiveEvidence = false, requireNetlistEvidence = false, requireRegionEvidence = false } = {}) {
+export function judgeTokens(model, { drc, nets, moduleRegions, cellRegions, placementExceptions, connectorMountExceptions, connectorSemanticProfiles, connectorFootprintProfiles, connectorTopologyProfiles, highSpeedProfiles, passiveElectricalProfiles, passiveFootprintSources, adjacency,
+	sheetBounds, titleBlockKeepout, pageClearance, requirePageEvidence = false, requireConnectorSemanticEvidence = false, requireConnectorTopologyEvidence = false, requireLiveFootprintEvidence = false, requireHighSpeedEvidence = false, requirePassiveEvidence = false, requireNetlistEvidence = false, requireRegionEvidence = false } = {}) {
 	const tier1 = checkDrc(drc);
 	const tier2 = [
 		checkOrtho(model), checkGrid(model), checkNoCross(model), checkNoThru(model), checkNoOverlap(model),
@@ -1200,7 +1252,7 @@ export function judgeTokens(model, { drc, nets, moduleRegions, cellRegions, plac
 		checkPage(model, { sheetBounds, titleBlockKeepout, clearance: pageClearance, moduleRegions, requireEvidence: requirePageEvidence }),
 		checkModuleSpacing(model, { moduleRegions }), checkCellSpacing(model, { cellRegions }),
 		checkConnectorMountingPins(model, { nets, exceptions: connectorMountExceptions }),
-		checkConnectorPinSemantics(model, { nets, profiles: connectorSemanticProfiles, footprintProfiles:connectorFootprintProfiles, requireEvidence: requireConnectorSemanticEvidence, requireLiveFootprintEvidence }),
+		checkConnectorPinSemantics(model, { nets, profiles: connectorSemanticProfiles, footprintProfiles:connectorFootprintProfiles, topologyProfiles:connectorTopologyProfiles, requireEvidence: requireConnectorSemanticEvidence, requireTopologyEvidence:requireConnectorTopologyEvidence, requireLiveFootprintEvidence }),
 		checkHighSpeedIntent(model, { nets, profiles: highSpeedProfiles, connectorProfiles: connectorSemanticProfiles, requireEvidence: requireHighSpeedEvidence }),
 		checkPassiveFootprints(model, { profiles: passiveElectricalProfiles, footprintSources: passiveFootprintSources, requireEvidence: requirePassiveEvidence, requireLiveFootprintEvidence }),
 		checkAnnotPlace(model), checkAnnotSide(model), checkAnnotFull(model), checkRegionCoverage(model,{moduleRegions,cellRegions,requireEvidence:requireRegionEvidence}),

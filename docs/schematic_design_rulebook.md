@@ -85,7 +85,11 @@ as the **review grammar** for judging any existing schematic.
     pin profile with complete pin coverage. Compare the live physical pin number,
     symbol pin name, authoritative net, and connected/NoConnected state. A green
     connectivity DRC cannot substitute for endpoint/root-side or cable-crossover
-    semantics.
+    semantics. Add a source-cited topology review covering every connector and
+    encode required straps, isolation and intervening parts as `same-net`,
+    `different-net`, `not-same-net` or `through-component`; use `not-same-net`
+    when one endpoint may be explicitly NC. DRC-clean topology mistakes must fail
+    before the first write.
 12. **Prove high-speed intent (DR29).** Infer candidate differential pairs from
     the authoritative netlist and require complete coverage by private, cited
     pair contracts. Each contract fixes protocol, impedance, skew, polarity,
