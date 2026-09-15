@@ -26,6 +26,15 @@ node bin/plexus.mjs deliver live.json          # 投递到 live EasyEDA
 npm test                                       # 通用测试套件
 ```
 
+已有原理图的受保护实时工作流使用 `wf.mjs`。`lint` 只读并生成绑定当前文档、源码、规则和证据的
+上下文；`compile` 在本地拒绝红候选；不超过 25 个装配器件的小板可用一键轨道：
+
+```bash
+EASYEDA_TOKEN_EVIDENCE=/absolute/evidence.json node wf.mjs lint
+node compile.mjs /private/transform.mjs
+node wf.mjs quick /private/transform.mjs       # lint → compile → 一次提交 → 一次最终截图审计
+```
+
 > 体检/修复闭环:`qc` 检测 → `repair` 修复 schematic 层可修缺陷(几何/短路标)+ 报 DRC 前后。
 > ERC 引脚电气类型错标(无源件标 IN、GPIO 标 Undefined)由 `qc` 检出但需在 EasyEDA 符号库编辑器修正
 > —— 引脚电气类型由符号定义,扩展 API 只读不可写。

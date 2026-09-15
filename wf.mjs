@@ -6,6 +6,7 @@
 //   node wf.mjs render [out.png]   源→模型→渲染(对齐感知真标签)
 //   node wf.mjs commit <t.mjs>     srccommit(写前/复读双断言已内建)
 //   node wf.mjs api <p.mjs>        API 图元事务(同样备份/重载/棘轮/回滚)
+//   node wf.mjs quick <t.mjs>      ≤25件板 lint→compile→单次提交→单次最终截图
 //   node wf.mjs runbook            打印 SOP
 import { execFileSync } from 'node:child_process';
 import { writeFileSync, readFileSync, mkdirSync, realpathSync } from 'node:fs';
@@ -77,11 +78,12 @@ const RUNBOOK = `原理图商业化工作流 SOP(源级管线)
 6. \`node wf.mjs lint\`      —— 每个修复批次读完整实时几何、权威网表、实时绑定封装并运行 DRC；只输出根因队列，不截图（\`check\` 为兼容名称）。
 7. \`node wf.mjs audit\`     —— 确定性项全绿后只截一次整图做残余视觉复核；任一失败即状态“未完成”，必须返回修复队列继续收敛。
 8. 新教训 → 通用断言或 token 检查加一条测试(棘轮,只增不减)。
+9. \`node wf.mjs quick t.mjs\` —— ≤25 件小板的一键轨道；允许红 lint 作为修复基线，compile 红则零写入，提交后只在最终 audit 截一次图。
 布局语法基线: 10 间距信号列=同侧单列标签(文字贴线下);连接器双侧各自线下;电源密集列=支线+轨名,轨源端用旗标。`;
 
 const [cmd, ...args] = process.argv.slice(2);
 try {
-  if (['lint', 'check', 'audit', 'render', 'commit', 'seed', 'api', 'pcb-sync'].includes(cmd)) prepareArtifacts();
+  if (['lint', 'check', 'audit', 'render', 'commit', 'seed', 'api', 'pcb-sync', 'quick'].includes(cmd)) prepareArtifacts();
   if (cmd === 'lint' || cmd === 'check' || cmd === 'audit') {
     const { src, doc, componentTypes, pinOwners } = await readSrc();
     const tokenEvidencePath = resolveTokenEvidencePath({ explicitPath:process.env.EASYEDA_TOKEN_EVIDENCE,
@@ -114,7 +116,7 @@ try {
     const pass = finalAudit ? report.sourcePass && deliveryGate.pass : deterministicPass;
     const outputName = finalAudit ? 'workflow-audit.json' : cmd === 'lint' ? 'workflow-lint.json' : 'workflow-check.json';
     const outputPath = path.join(outDir, outputName);
-    const auditRecord = { time: new Date().toISOString(), document: doc, componentTypes, pinOwners, source: r, rawDrc: drc.result?.raw, drcEvidence:drc.result, ...report,live,geometryPass,deterministicPass,deliveryGate,pass };
+    const auditRecord = { time: new Date().toISOString(), windowId:workflowWindowId, document: doc, componentTypes, pinOwners, source: r, rawDrc: drc.result?.raw, drcEvidence:drc.result, ...report,live,geometryPass,deterministicPass,deliveryGate,pass };
     writeFileSync(outputPath, JSON.stringify(auditRecord, null, 2));
     // A clean read-only check is the authoritative baseline for the next
     // offline compile. This also replaces stale failed-commit evidence after
@@ -180,9 +182,14 @@ try {
     await syncPcbFromSchematic({pcbUuid,outDir,windowId:workflowWindowId,repo,
       receiptPath,contextPath,tokenEvidencePath,
       footprintMapPath:(()=>{const i=args.indexOf('--footprint-map');return i>=0?args[i+1]:'';})()});
+  } else if (cmd === 'quick') {
+    if (!args[0]) throw Error('Usage: wf quick <transform.mjs>');
+    const {runQuickWorkflow}=await import('./engine/quick_workflow.mjs');
+    const result=runQuickWorkflow({repo,artifactDir:outDir,transformPath:path.resolve(args[0])});
+    console.log(`quick 完成：${result.fitted} 件，${result.steps.join(' → ')}`);
   } else if (cmd === 'runbook') {
     console.log(RUNBOOK);
   } else {
-    console.log('用法: node wf.mjs lint | check | audit | render [out.png] | commit <t.mjs> | seed <private-device-manifest.json> | api <private-plan.mjs> | pcb-sync --pcb <uuid> [--footprint-map file.json] | runbook');
+    console.log('用法: node wf.mjs lint | check | audit | render [out.png] | commit <t.mjs> | api <private-plan.mjs> | quick <transform.mjs> | seed <private-device-manifest.json> | pcb-sync --pcb <uuid> [--footprint-map file.json] | runbook');
   }
 } catch (e) { console.error('FAIL:', e.message); process.exit(1); }

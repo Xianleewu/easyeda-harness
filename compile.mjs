@@ -35,9 +35,9 @@ const fail = msg => { console.error(`FAIL[${stage}] (${Date.now() - t0}ms): ${ms
 try {
   stage = '读取基线源';
   stage = '读取并验证 lint/check 基线证据';
-  const {source:baselineSource,baselineReport,componentTypes,pinOwners}=loadCompileContext({artifactDir,repo:path.dirname(fileURLToPath(import.meta.url))});
-  if (!evidenceFile) fail('缺少 token 证据：设 EASYEDA_TOKEN_EVIDENCE=<私有 evidence.json> 或传 --token-evidence');
-  const tokenEvidence = loadDeliveryEvidence(evidenceFile);
+  const {source:baselineSource,baselineReport,componentTypes,pinOwners,boundEvidencePath}=loadCompileContext({artifactDir,repo:path.dirname(fileURLToPath(import.meta.url))});
+  const effectiveEvidenceFile=evidenceFile||boundEvidencePath;
+  const tokenEvidence = loadDeliveryEvidence(effectiveEvidenceFile);
 
   stage = '执行变换';
   const transform = (await import(pathToFileURL(path.resolve(transformPath)).href)).default;
