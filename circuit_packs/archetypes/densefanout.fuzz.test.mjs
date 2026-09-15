@@ -32,7 +32,9 @@ function genConfig(rnd, idx) {
 	const pick = (lo, hi) => lo + Math.floor(rnd() * (hi - lo + 1));
 	const bw = pick(2, 8) * 10;             // 体半宽
 	const bh = pick(4, 12) * 10;            // 体半高
-	const nL = pick(0, 12), nR = pick(0, 12), nB = pick(0, 8), nT = pick(0, 8);   // 含底/顶边脚(覆盖边路由)
+	const ySlots = bh / 5 + 1, xSlots = Math.max(1, bw / 5 - 1);
+	const nL = pick(0, Math.min(12, ySlots)), nR = pick(0, Math.min(12, ySlots));
+	const nB = pick(0, Math.min(8, xSlots)), nT = pick(0, Math.min(8, xSlots));   // 含底/顶边脚(覆盖边路由)
 	if (nL + nR + nB + nT === 0) return genConfig(rnd, idx);   // 至少 1 脚
 	const pins = []; const pinNets = {};
 	let k = 1;
@@ -42,14 +44,21 @@ function genConfig(rnd, idx) {
 		const w = widths[pick(0, widths.length - 1)];
 		pinNets[num] = { name: `${side}${num}_${'X'.repeat(Math.max(1, w - String(num).length - 2))}`, class: cls[pick(0, 2)] };
 	};
+	const pools = {
+		L: Array.from({ length: ySlots }, (_, i) => -bh + i * 10),
+		R: Array.from({ length: ySlots }, (_, i) => -bh + i * 10),
+		B: Array.from({ length: xSlots }, (_, i) => -bw + 10 + i * 10),
+		T: Array.from({ length: xSlots }, (_, i) => -bw + 10 + i * 10),
+	};
+	const take = side => pools[side].splice(pick(0, pools[side].length - 1), 1)[0];
 	const mk = (side) => {            // 左/右边脚:x 在体侧边,y 体内
 		const x = side === 'L' ? -bw : bw;
-		const y = (pick(-bh / 10, bh / 10)) * 10;
+		const y = take(side);
 		const num = String(k++); pins.push({ num, local: [x, y] }); addNet(num, side);
 	};
 	const mkBT = (side) => {          // 底/顶边脚:y 在体上下边,x 体内(留 1 栅离侧边避免被判左右)
 		const y = side === 'B' ? -bh : bh;
-		const x = (pick(-bw / 10 + 1, bw / 10 - 1)) * 10;
+		const x = take(side);
 		const num = String(k++); pins.push({ num, local: [x, y] }); addNet(num, side);
 	};
 	for (let i = 0; i < nL; i++) mk('L');

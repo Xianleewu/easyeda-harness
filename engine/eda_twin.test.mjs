@@ -27,6 +27,14 @@ test('twinPredict:输出与 readGeometry 同形(顶层键齐全)', () => {
 	for (const k of ['components', 'wires', 'netflags', 'texts', 'rectangles']) assert.ok(k in g, `缺 ${k}`);
 });
 
+test('twinPredict:显式移动的标注保持自身渲染方向，不随器件旋转', () => {
+	const model = { components: [{ designator: 'X1', x: 100, y: 100, rotation: 90, mirror: false,
+		attrs: [{ key: 'Name', x: 130, y: 140 }] }] };
+	const c = twinPredict(model, snap).components[0];
+	const a = c.attrs.find(x => x.key === 'Name');
+	assert.deepEqual(a.bbox, { minX: 130, minY: 140, maxX: 140, maxY: 154 });
+});
+
 test('twinPredict:模型件不在快照 → 抛(fail-closed,不瞎猜)', () => {
 	assert.throws(() => twinPredict({ components: [{ designator: 'ZZ', x: 0, y: 0 }] }, snap), /不在快照/);
 });

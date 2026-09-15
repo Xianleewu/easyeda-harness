@@ -8,7 +8,24 @@
 //
 // 连通不变性:任意点 (x,y) 与重合于它的另一点都映到同一新点 → 重合关系保持 → 电气连通不变。
 
-// 水平镜像(绕 x=cx 翻 x)。alignMode 左右翻(6↔8)、rot 水平翻(0↔180)、component.mirror 翻。
+const mirrorBoxX = (box, fx) => {
+	if (!box) return;
+	const a = fx(box.minX), b = fx(box.maxX);
+	box.minX = Math.min(a, b); box.maxX = Math.max(a, b);
+};
+const mirrorBoxY = (box, fy) => {
+	if (!box) return;
+	const a = fy(box.minY), b = fy(box.maxY);
+	box.minY = Math.min(a, b); box.maxY = Math.max(a, b);
+};
+const normRot = r => ((Number(r) % 360) + 360) % 360;
+const mirrorRotX = r => (360 - normRot(r)) % 360;
+const mirrorRotY = r => (180 - normRot(r) + 360) % 360;
+const swapNameSideX = side => side === 'left' ? 'right' : side === 'right' ? 'left' : side;
+
+// 水平镜像(绕 x=cx 翻 x)。件、脚、线、符号本体、可见名称框和文字朝向必须
+// 作为一个完整几何对象一起翻转；只移动锚点会让横向电源旗标再次变成“符号朝左、
+// 名字仍在右侧”的非法姿态。
 export function mirrorModuleX(sub, cx) {
 	const fx = x => 2 * cx - x;
 	for (const c of (sub.components || [])) {
@@ -20,8 +37,14 @@ export function mirrorModuleX(sub, cx) {
 	for (const w of (sub.wires || [])) w.line = w.line.map((v, i) => i % 2 === 0 ? fx(v) : v);
 	for (const f of (sub.netflags || [])) {
 		f.x = fx(f.x); if (f.textX != null) f.textX = fx(f.textX);
-		if (f.alignMode === 6) f.alignMode = 8; else if (f.alignMode === 8) f.alignMode = 6;
-		if (f.rot === 0) f.rot = 180; else if (f.rot === 180) f.rot = 0;
+		mirrorBoxX(f.bbox, fx); mirrorBoxX(f.nameBox, fx);
+		if (f.rotation != null) f.rotation = mirrorRotX(f.rotation);
+		if (f.rot != null) f.rot = f.kind === 'power' || f.kind === 'ground' || f.kind === 'gnd'
+			? mirrorRotX(f.rot) : mirrorRotY(f.rot);
+		if (f.nameSide != null) f.nameSide = swapNameSideX(f.nameSide);
+		if (f.kind === 'sig' || f.alignMode != null) {
+			if (f.alignMode === 6) f.alignMode = 8; else if (f.alignMode === 8) f.alignMode = 6;
+		}
 	}
 	return sub;
 }
@@ -37,7 +60,10 @@ export function mirrorModuleY(sub, cy) {
 	for (const w of (sub.wires || [])) w.line = w.line.map((v, i) => i % 2 === 1 ? fy(v) : v);
 	for (const f of (sub.netflags || [])) {
 		f.y = fy(f.y); if (f.textY != null) f.textY = fy(f.textY);
-		if (f.rot === 90) f.rot = 270; else if (f.rot === 270) f.rot = 90;
+		mirrorBoxY(f.bbox, fy); mirrorBoxY(f.nameBox, fy);
+		if (f.rotation != null) f.rotation = mirrorRotY(f.rotation);
+		if (f.rot != null) f.rot = f.kind === 'power' || f.kind === 'ground' || f.kind === 'gnd'
+			? mirrorRotY(f.rot) : mirrorRotX(f.rot);
 	}
 	return sub;
 }

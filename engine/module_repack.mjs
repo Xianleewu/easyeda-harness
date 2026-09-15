@@ -100,10 +100,11 @@ export function moduleRepack(model, modules, opts = {}) {
 		for (const w of s.g.wires) out.wires.push({ ...w, line: w.line.map((v, i) => i % 2 === 0 ? v + ox : v + oy) });
 		for (const f of s.g.netflags) out.netflags.push({ ...f, x: f.x + ox, y: f.y + oy, textX: (f.textX ?? f.x) + ox, textY: (f.textY ?? f.y) + oy, bbox: f.bbox ? { minX: f.bbox.minX + ox, minY: f.bbox.minY + oy, maxX: f.bbox.maxX + ox, maxY: f.bbox.maxY + oy } : undefined });
 		const frameBox = { minX: cx - 14, minY: cy + TITLE - 10, maxX: cx + s.w + 14, maxY: cy + TITLE + s.h + 12 };
-		moduleRegions.push({ name: s.id, title: titleOf.get(s.id) || s.id, box: frameBox });
+		moduleRegions.push({ name: s.id, title: titleOf.get(s.id) || s.id, box: frameBox, contentBox: { minX: cx, minY: cy + TITLE, maxX: cx + s.w, maxY: cy + TITLE + s.h } });
 		out.rectangles.push({ role: 'module-frame', module: s.id, bbox: frameBox, minX: frameBox.minX, minY: frameBox.minY, maxX: frameBox.maxX, maxY: frameBox.maxY });
 		cx += s.w + PAD; rowH = Math.max(rowH, TITLE + s.h);
 	}
 	out.noConnects = model.noConnects || [];   // NC 按 ref/pin,位置无关,原样保留(清悬空脚 DRC)
+	out.moduleRegions = moduleRegions;
 	return { model: out, moduleRegions, orphanWires: opts.orphanWires || [], orphanFlags: opts.orphanFlags || [] };
 }

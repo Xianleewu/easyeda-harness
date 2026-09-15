@@ -24,18 +24,53 @@ export async function listEdaWindows({ port = 0, timeoutMs = 3000 } = {}) {
 	return { bridge, windows };
 }
 
+// Some bridge versions decode each HTTP chunk separately. ASCII JSON keeps a
+// split UTF-8 sequence from silently corrupting document text at that boundary.
+export function encodeBridgePayload(payload) {
+	return JSON.stringify(payload).replace(/[^\x00-\x7f]/g, c =>
+		'\\u' + c.charCodeAt(0).toString(16).padStart(4, '0'));
+}
+
+const WRITE_CONTEXTS = new Set([
+	'source-transaction', 'catalog-seed', 'api-transaction',
+	'delivery-transaction', 'rollback-transaction', 'pcb-transaction',
+]);
+
+const MUTATION_SIGNATURES = [
+	/\bsetDocumentSource\s*\(/,
+	/\bsch_Document\.save\s*\(/,
+	/\b(?:sch|pcb)_Primitive[A-Za-z0-9_]*\.(?:create|delete|modify|update)\s*\(/,
+	/\bdmt_(?:Schematic|Pcb|Board)[A-Za-z0-9_]*\.(?:create|delete|copy|modify|update|rename)\s*\(/,
+];
+
+export function bridgeMutationSignatures(code) {
+	const source = String(code || '');
+	return MUTATION_SIGNATURES.filter(re => re.test(source)).map(re => re.source);
+}
+
+export function assertBridgeWriteAuthorized(code, writeContext = '') {
+	const signatures = bridgeMutationSignatures(code);
+	if (!signatures.length) return { mutating: false, signatures: [] };
+	if (!WRITE_CONTEXTS.has(writeContext)) {
+		throw new Error('LIVE_WRITE_BLOCKED: mutating EasyEDA calls must run inside wf commit, wf seed, or wf api transaction');
+	}
+	return { mutating: true, signatures };
+}
+
 export async function executeCode(code, {
 	port = Number(process.env.EASYEDA_BRIDGE_PORT || 0),
 	windowId = process.env.EASYEDA_WINDOW_ID || '',
 	timeoutMs = 120000,
+	writeContext = '',
 } = {}) {
+	assertBridgeWriteAuthorized(code, writeContext);
 	const bridge = await findBridge(port, { timeoutMs });
 	const payload = { code: String(code || '').replace(/^\uFEFF/, '') };
 	if (windowId) payload.windowId = windowId;
 	const resp = await fetch(`${bridge.base}/execute`, {
 		method: 'POST',
 		headers: { 'content-type': 'application/json', connection: 'close' },
-		body: JSON.stringify(payload),
+		body: encodeBridgePayload(payload),
 		signal: AbortSignal.timeout(timeoutMs),
 	});
 	const body = await resp.json();

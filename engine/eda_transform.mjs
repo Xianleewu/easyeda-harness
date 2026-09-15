@@ -77,11 +77,13 @@ export function estimateTextBBox(text, x, y, alignMode = 6, fontSize = 14) {
  * component attrs 无 alignMode 字段,默认 6(右展开,标定后可钉死)。
  * TODO(calibration): 估算 bbox 待 live 标定钉死字宽公式 */
 export function fillVisibleAttrBBoxes(components) {
-	const DEFAULT_FONTSIZE = 14;
+	const DEFAULT_FONTSIZE = 8;   /* 标定:真板可见标注字高实测 8(原为凭空 14,致兜底框过大、布局被撑散) */
 	return (components || []).map(c => {
 		const attrs = (c.attrs || []).map(a => {
-			/* 仅处理可见、有坐标、且 bbox 确实缺失的 attr */
-			if (a.bbox != null) return a;
+			/* 兜底条件:bbox 缺失【或退化】(零/负面积——EDA 实测会对部分 attr 返回 {0,0,0,0} 零框,
+			 * 若不兜底,反解会得到野框、污染 rx → 标注被甩飞)。仅处理可见、有坐标的 attr。 */
+			const degenerate = !a.bbox || !(a.bbox.maxX > a.bbox.minX && a.bbox.maxY > a.bbox.minY);
+			if (!degenerate) return a;
 			const visible = a.valueVisible || a.keyVisible;
 			if (!visible) return a;
 			if (a.x == null || a.y == null) return a;

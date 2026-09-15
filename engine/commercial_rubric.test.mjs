@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { RUBRIC, THRESHOLDS, crOrthogonality, crGridSnap, crRotation, crSpacing, crNamedRatio, crLabelToLine, crLabelPlacement, crDrc, scoreAll } from './commercial_rubric.mjs';
+import { scanSpecificContent } from './rubric_audit.mjs';
 
 test('RUBRIC 含 CR-01..CR-10 且字段完整', () => {
 	const ids = RUBRIC.map(r => r.id);
@@ -22,7 +23,7 @@ test('阈值常量存在且为冻结值', () => {
 
 test('零特定电路字面量(无具体器件/网名指纹)', () => {
 	const src = RUBRIC.map(r => r.desc).join(' ');
-	assert.doesNotMatch(src, /AMS1117|AO3400|ESP32|RK3576|VCC3V3_|VDD_CPU/i);
+	assert.deepEqual(scanSpecificContent(src), []);
 });
 
 test('CR-02 全正交线 → 100% 通过', () => {

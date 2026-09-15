@@ -12,7 +12,7 @@ test('runLoop:deliver 之前必先写备份', async () => {
 	const deps = {
 		readSnapshot: async () => { calls.push('backup'); return { components: [] }; },
 		deliver: async () => { calls.push('deliver'); },
-		observe: async () => { calls.push('observe'); return { conform: false }; },
+		observe: async () => { calls.push('observe'); return { conform: true, coverage:{complete:true}, shots:['fresh.png'] }; },
 		writeBackup: (snap) => { calls.push('writeBackup'); return '/tmp/backup.json'; },
 	};
 	const r = await runLoop({ components: [] }, deps, { confirmOverwrite: true });
@@ -30,7 +30,7 @@ test('runLoop:restore 校验失败 → 大声抛(含备份路径)', async () => 
 	const deps = {
 		readSnapshot: async () => (call++ === 0 ? { components: [1, 2] } : { components: [] }), /* 还原后长度不一致 */
 		deliver: async () => {},
-		observe: async () => ({}),
+		observe: async () => ({conform:true,coverage:{complete:true},shots:['fresh.png']}),
 		writeBackup: () => '/tmp/bak.json',
 		restore: async () => {},
 	};
@@ -38,4 +38,18 @@ test('runLoop:restore 校验失败 → 大声抛(含备份路径)', async () => 
 		() => runLoop({}, deps, { confirmOverwrite: true, restore: true }),
 		/还原校验不过|备份/
 	);
+});
+
+test('runLoop:红门禁自动还原并拒绝交付', async () => {
+	let restored=false;
+	const snap={components:[{id:'a',x:1,y:2}],wires:[],netflags:[]};
+	const deps={
+		readSnapshot:async()=>snap,
+		deliver:async()=>{},
+		observe:async()=>({conform:false,coverage:{complete:true},shots:['fresh.png']}),
+		writeBackup:()=>'/tmp/bak.json',
+		restore:async()=>{restored=true;},
+	};
+	await assert.rejects(()=>runLoop({},deps,{confirmOverwrite:true}),/已自动还原/);
+	assert.equal(restored,true);
 });

@@ -20,15 +20,20 @@ export function placeComps(byDes, place, noConnects = []) {
 }
 
 export function flagBBox(f) {
-	const ext = 38, w = 4, gw = 9;
+	const ext = 38, w = 4;
 	const rot = (((f.rotation ?? f.rot ?? 0) % 360) + 360) % 360;
-	if (f.kind === 'gnd') { // 鏈濆悜鍐冲畾韬綋鏂瑰悜锛岀害 20 闀?11 瀹?		if (rot === 0) return { minX: f.x - gw, maxX: f.x + gw, minY: f.y - 20, maxY: f.y };
-		if (rot === 180) return { minX: f.x - gw, maxX: f.x + gw, minY: f.y, maxY: f.y + 20 };
-		if (rot === 90) return { minX: f.x, maxX: f.x + 20, minY: f.y - gw, maxY: f.y + gw };
-		return { minX: f.x - 20, maxX: f.x, minY: f.y - gw, maxY: f.y + gw };
+	if (f.kind === 'gnd') {
+		// createNetFlag 实测占位；与 structured_layout.FLAG_FP 同一口径。
+		if (rot === 0) return { minX: f.x - 11, maxX: f.x + 11, minY: f.y - 20, maxY: f.y - 10 };
+		if (rot === 180) return { minX: f.x - 11, maxX: f.x + 11, minY: f.y + 10, maxY: f.y + 20 };
+		if (rot === 90) return { minX: f.x + 10, maxX: f.x + 20, minY: f.y - 11, maxY: f.y + 11 };
+		return { minX: f.x - 20, maxX: f.x - 10, minY: f.y - 11, maxY: f.y + 11 };
 	}
-	if (f.kind === 'power') { // 鐢垫簮绗﹀彿锛歳ot0 鏈濅笂 / rot180 鏈濅笅锛岀珫鍚戝皬鐩?		if (rot === 180) return { minX: f.x - gw, maxX: f.x + gw, minY: f.y - 22, maxY: f.y };
-		return { minX: f.x - gw, maxX: f.x + gw, minY: f.y, maxY: f.y + 22 };
+	if (f.kind === 'power') {
+		if (rot === 0) return { minX: f.x - 6, maxX: f.x + 6, minY: f.y + 5, maxY: f.y + 11 };
+		if (rot === 180) return { minX: f.x - 6, maxX: f.x + 6, minY: f.y - 11, maxY: f.y - 5 };
+		if (rot === 90) return { minX: f.x + 5, maxX: f.x + 11, minY: f.y - 6, maxY: f.y + 6 };
+		return { minX: f.x - 11, maxX: f.x - 5, minY: f.y - 6, maxY: f.y + 6 };
 	}
 	// 淇″彿鏍囩 tag锛氭部 rot 鏂瑰悜浼稿嚭 ~ext
 	const fx = f.textX ?? f.x;

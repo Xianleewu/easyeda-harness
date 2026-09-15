@@ -21,7 +21,7 @@
 1. **忠实数字孪生 `twinPredict(model, snapshot)`**:对任意候选布局,预测它在 EDA 的真实几何——器件 bbox 按放置(rot/mirror)**重算**、脚位、**以及标号/阻值文字 + GND/NC/netflag + wire `Name` 的位置与 bbox**(规则文档 "Geometry Audit" 节要求审的全部可见对象)。输出与 `readGeometry` 同形,直接喂 `judgeTokens`。
 2. **几何裁判补全到规则**(扩 `geom_qc` + token,显式引 DR):
    - **DR4/DR5**:重叠检查纳入 text/attribute/GND/NC/netflag/wire-Name bbox —— 任何可见对象互不重叠、且不压器件本体(治"标号压标号/标号压线/标号压体")。
-   - **DR11/12/13/16**:同侧扇出标签对齐 —— 共列 `x`(容差内)、左 `alignMode=6`/右 `alignMode=8`、原点落对应底角、行距可读不糊。**注:B1 的 `T-LABEL-ALIGN` 是【经验几何判】(同侧标签实际是否共 x / alignMode / 原点角 / 行距,无需 `layoutPolicy`);"是否匹配【声明的】label-column"(DR8/8A/13-声明/14/15)依赖 `layoutPolicy`=生成器产物,留 B2。**
+   - **DR11/12/13/16**:同侧扇出标签对齐 —— 共列 `x`(容差内)、左 `alignMode=8`/`RIGHT_BOTTOM`、右 `alignMode=6`/`LEFT_BOTTOM`，文字朝模块外展开，原点落对应底角，行距可读不糊。**注:B1 的 `T-LABEL-ALIGN` 是【经验几何判】(同侧标签实际是否共 x / alignMode / 原点角 / 行距,无需 `layoutPolicy`);"是否匹配【声明的】label-column"(DR8/8A/13-声明/14/15)依赖 `layoutPolicy`=生成器产物,留 B2。**
    - rulebook 行 159(异网端点/重叠接触=0)、行 166(文字压线/压体=hard)纳入。
 3. **可信镜头预览 `twin_renderer`**:把 twin 几何忠实渲染(真 bbox + 真脚 + 文字位 + 线),**取代 `sheet_renderer` 当质量预览**(符号美术可不画,几何占位/重叠/对齐忠实)。
 4. **真 EDA 标定 `twin_calibrate`**:证明 `twinPredict` 预测 ≈ 真 EDA(含文字落点),否则镜头标"未钉死,不可信",禁 B2 用。

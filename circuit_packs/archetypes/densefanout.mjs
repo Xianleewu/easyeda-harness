@@ -121,11 +121,17 @@ export function densefanoutArchetype(spec = {}) {
 	const place = { [comp.designator]: { x: anchor.x, y: anchor.y, rot: 0, mirror: false } };
 	const lb = comp.localBox;
 	const left = [], right = [], bottom = [], top = [], pts = [];
+	const occupied = new Map();
 	for (const p of pins) {
 		const world = toWorld(p.local, [anchor.x, anchor.y], 0, false);
 		pts.push(world);
 		const net = pinNets[String(p.num)];
 		if (!net) continue;
+		const pointKey = `${world[0]},${world[1]}`;
+		const prior = occupied.get(pointKey);
+		if (prior && prior !== net.name) throw new Error(`densefanout ${comp.designator}: coincident pins at ${pointKey} carry different nets`);
+		if (prior === net.name) continue; // stacked same-net pins need one visible escape route
+		occupied.set(pointKey, net.name);
 		const entry = { num: p.num, world, net };
 		// 有 localBox 时按真实边分类(修底/顶边引脚被误判左右、水平横穿引脚排的根因);
 		// 无 localBox 退回 x 符号(老行为)。

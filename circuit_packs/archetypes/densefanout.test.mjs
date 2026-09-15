@@ -77,6 +77,13 @@ test('densefanout:fail-closed — 自体内部脚(无正交逃逸)抛错而非�
 	assert.throws(() => densefanoutArchetype({ parts: [part], anchor, nets }), /内部|interior/);
 });
 
+test('densefanout:重合脚若属于不同网络必须 fail-closed', () => {
+	const part = { designator: 'U6', localBox: { minX: -20, minY: -40, maxX: 20, maxY: 40 },
+		pins: [{ num: '1', local: [40, 10] }, { num: '2', local: [40, 10] }] };
+	const nets = { pinNets: { '1': { name: 'A', class: 'signal' }, '2': { name: 'B', class: 'signal' } } };
+	assert.throws(() => densefanoutArchetype({ parts: [part], anchor, nets }), /coincident pins/);
+});
+
 test('densefanout:边缘脚(脚贴体边)不误判内部,正常出图', () => {
 	// 右侧脚 local(20,0) 恰在体右边 x=20 上(非严格内部)→ 仍可逃逸,不应抛错。
 	const part = { designator: 'U6', localBox: { minX: -20, minY: -40, maxX: 20, maxY: 40 },

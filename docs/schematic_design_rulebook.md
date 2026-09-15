@@ -31,7 +31,73 @@ as the **review grammar** for judging any existing schematic.
 4. **Reference projects are read-only.** When a user opens a project as a
    reference, never create, modify, delete, move, save, or clean it up unless
    explicitly asked to edit *that* project.
-5. **Edit machine contracts, not the canvas.** For delivery, change the
+5. **Reserve the sheet information block before placing parts (DR19).** The
+   entire title block, including empty cells, belongs to drawing metadata.
+   Read its actual bounds, reserve a clearance of at least 10 coordinate units,
+   and prohibit all circuit content and module decoration there. The declared
+   sheet bbox must match the live sheet primitive, and every visible metadata
+   attribute bbox must be contained by the declared keepout; this prevents an
+   inverted coordinate axis from producing a false pass. Unknown bounds block
+   delivery. Relocate existing violations first. After changing paper size,
+   recheck the border, metadata positions and the complete sheet screenshot.
+6. **Make every fitted part identifiable (DR23).** Show both the designator and
+   the value/model on the schematic. Resolve bound attributes and measure their
+   rendered boxes; a hidden field or an internal supplier ID is not visible evidence.
+   The two visible annotations share at least one outside side of the component
+   body; corner placements may share either adjacent side, while opposite-side
+   placement fails per component.
+7. **Classify connector mounting metal (DR24).** Verify symbol pin numbers against
+   footprint pads before joining conductive shield or mounting tabs to the chosen
+   ground domain. Same-side mechanical pins use short orthogonal taps into one
+   shared bus and exactly one ground symbol; a vertical side group ends in one
+   visually downward ground symbol below the group. In live EasyEDA geometry this
+   means the flag Y is smaller than every pin Y and Ground rotation is `0`.
+   Never draw a comb of repeated per-pin
+   ground flags. Direct pin-on-flag overlap is not a connection in EasyEDA. An
+   intentional isolated tab needs an explicit recorded exception.
+   Every power, ground, and signal net flag elsewhere on the sheet must likewise
+   land on a real wire endpoint or directly on a component pin. Touching the
+   interior of a drawn segment is not an electrical connection in EasyEDA.
+8. **Audit small passive packages (DR25).** Select 0402/0603 size from voltage,
+   capacitance derating, current, power and assembly limits. Inspect the exported
+   footprint source and reject an enclosing silkscreen outline; names are hints,
+   not proof. Produce one evidence row for every placed reference even when several
+   parts share one device or footprint. Record the actual pad envelope, top-silk
+   result, value/rating decision and preservation of symbol/device/value. Missing
+   source or electrical evidence fails closed, and a REVIEW item remains open.
+   When an intentional footprint-only override triggers a supplier-property
+   warning, audit every placed reference again: device, symbol, supplier identity
+   and manufacturer part must remain unchanged; record the exact catalog and
+   replacement footprint UUIDs and attach passing mechanical evidence for that
+   replacement. A shared-device sample or unchanged warning count is not evidence.
+9. **Declare functional cells inside modules (DR26).** Give interface, protection,
+   driver/conversion and output cells separate content boxes. Record direct peers
+   and compact dependencies before placement. Sharing a module, ground, or supply
+   rail does not make two cells direct peers; direct relations come from their
+   functional signal path. Free sheet space should expand cells instead of forcing
+   unrelated roles together.
+10. **Align same-side electrical endpoints (DR27).** For one component or connector,
+    endpoints of each visual class on the same side share one axis: compare power,
+    ground and signal groups independently. Use
+    short local orthogonal stubs when pin pitch would otherwise force staggered
+    symbols, and re-run overlap checks after alignment.
+11. **Prove connector semantics (DR28).** Every connector uses a private, cited
+    pin profile with complete pin coverage. Compare the live physical pin number,
+    symbol pin name, authoritative net, and connected/NoConnected state. A green
+    connectivity DRC cannot substitute for endpoint/root-side or cable-crossover
+    semantics.
+12. **Prove high-speed intent (DR29).** Infer candidate differential pairs from
+    the authoritative netlist and require complete coverage by private, cited
+    pair contracts. Each contract fixes protocol, impedance, skew, polarity,
+    lane identity and both endpoint pins. Missing or extra endpoints and any
+    uncovered pair fail before PCB layout.
+13. **Prove judge coverage before accepting a result.** The executable judge returns
+    exactly one result for every registered design token. Missing, duplicate, or
+    unknown token results fail closed. After each edit, run the complete live model
+    through token coverage, geometry and native DRC. Once those deterministic checks
+    converge, capture one fresh full-sheet canvas for the residual visual judgment;
+    any unknown or failed evidence blocks delivery.
+14. **Edit machine contracts, not the canvas.** For delivery, change the
    structured contracts, deterministic cells, rules, and the gated writer path —
    never free-draw in the GUI.
 
@@ -45,7 +111,9 @@ as the **review grammar** for judging any existing schematic.
    `NC_...` ports. NC markers are *visible* schematic symbols with their own
    keepout: no power/ground symbol, net label, readable text, or unrelated wire
    may overlap a NoConnected marker. Model the marker geometry from the pin
-   coordinate even when a snapshot only exposes `pin.noConnected`.
+   coordinate even when a snapshot only exposes `pin.noConnected`. No drawable
+   wire may touch that coordinate, including a wire whose endpoint lands exactly
+   on the pin.
 3. **Power and ground use built-in net-flag symbols.** Supply and return rails
    (ground, board supplies, input rails) are drawn with EasyEDA built-in
    power/ground flag symbols, placed local to the part or local rail they serve —
@@ -55,7 +123,10 @@ as the **review grammar** for judging any existing schematic.
    wire may terminate at the symbol pin but must not continue through it, and the
    symbol's rotation must match the incoming wire direction — an endpoint that is
    electrically valid but visually pierces the graphic is not acceptable. Prefer
-   a short side-entry stub or relocate the symbol.
+   a short side-entry stub or relocate the symbol. A horizontal supply symbol
+   renders its name horizontally and vertically centered on the terminal axis;
+   vertical symbols render the name on the outward side. Only one source
+   attribute may visibly render that name.
 5. **Ordinary net labels are for signals**, cross-block controls, buses, and
    external-terminal semantics — not the default representation of ground or
    board supply rails.
@@ -99,6 +170,28 @@ as the **review grammar** for judging any existing schematic.
    Left/right neighbors must have vertical spans that are clearly separated or
    intentionally aligned; a mid-range partial overlap (a "jigsaw" interlock) is a
    failure. The same applies to horizontal spans for top/bottom neighbors.
+10. **Use two spacing scales.** Keep unrelated component bodies at least 10
+    coordinate units apart. Keep functional-module content boxes at least 60
+    units apart, and normally no more than 180 units from their nearest peer.
+    These are separate gates: a good page-wide average cannot excuse one
+    crowded cell or one isolated block.
+11. **Measure allocated and occupied geometry.** Every module plan records an
+    allocated `box` and the union of its visible geometry as `contentBox`.
+    Leave at least 8 units of padding on every side. Local wires, labels, flags
+    and NC markers count as content; a wire graph touching two modules belongs
+    to a separately reserved interface corridor. An apparently empty frame is
+    not usable clearance.
+12. **Align the whitespace.** Modules in a reading row share a baseline or
+    centerline within one coarse grid step. Repeated channels use the same box
+    size, orientation and inter-channel gap. Large residual page space stays at
+    the page margin or between major flow bands instead of being inserted
+    randomly inside one functional cell.
+13. **Measure whole-sheet balance.** Divide the actual usable sheet shape (after
+    subtracting the information-block keepout) into a fixed grid. Record available
+    area, occupied module-content area, density and normalized content weight for
+    every cell. When a multi-module sheet is spacious, keep the occupied-area
+    centroid inside the declared centre band of the usable shape; use the reported
+    grid-snapped shift as a placement input, then re-run page, module and cell gates.
 
 ---
 
@@ -167,6 +260,9 @@ thresholds are harness defaults; treat them as the floor, not the target.
 11. No module lane-interlock (see 2.9).
 12. Explanatory block text is optional and usually omitted; never use text to
     compensate for weak placement.
+13. Module content-box gap below 60, nearest-module gap above 180 without a
+    declared corridor, or module inner padding below 8: **0 violations**.
+14. Unrelated component body gap below 10: **0 violations**.
 
 ---
 
@@ -339,3 +435,9 @@ How this language stays honest and grows:
    (external connectors, power and return rails, switch/driver chains, controller
    control outputs, support paths) — a green DRC over a handful of checked nets is
    not enough.
+10. **Footprint-only changes use the device association.** Change the project
+    device's footprint association through the library API, one shared device family
+    at a time. Do not patch the placed component's `Footprint` source attribute and
+    do not clone an ad hoc symbol/device pair. After each family, read back every
+    affected reference and prove footprint resolution, unchanged symbol/device/value,
+    authoritative netlist continuity, and native DRC before continuing.

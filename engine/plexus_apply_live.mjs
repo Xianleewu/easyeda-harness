@@ -22,11 +22,14 @@ const SNAP_JS = `${ROOT}/snapshot2.js`;
 const BATCH = 15;
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
+if (!process.argv.includes('--undo') && process.env.EASYEDA_ALLOW_LEGACY_MUTATION !== '1')
+	throw new Error('Direct live apply is disabled; use wf.mjs commit so complete commercial gates and rollback are enforced');
+
 // 容错:断连/超时多次重试(更长退避);彻底失败返回 null(不抛),让整体续跑。
 async function execRetry(script, tries = 6) {
 	let last;
 	for (let t = 0; t < tries; t++) {
-		try { return await executeCode(script, {}); }
+		try { return await executeCode(script, { writeContext:'delivery-transaction' }); }
 		catch (e) { last = e; if (!/disconnect|timed out/i.test(e.message)) { console.error('  非连接错:', e.message.slice(0, 80)); return null; } await sleep(2500); }
 	}
 	console.error('  批彻底失败(跳过):', String(last && last.message).slice(0, 80));

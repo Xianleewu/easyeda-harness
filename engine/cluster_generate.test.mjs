@@ -183,7 +183,7 @@ test('generateLayout 模板布局:反馈分压(多无源件同脚)节点rail、�
 	assert.equal(r.stats.placements, comps.length, '不掉件(含分压 R1/R2)');
 	for (const d of ['R1', 'R2']) assert.ok(r.model.components.some(c => c.designator === d), `${d} 入图(非fallback浮空)`);
 	const g = geomQC(r.model), lh = labelQC(r.model).filter(f => f.severity === 'hard').length;
-	assert.equal(g.overlaps.length, 0, '零叠压'); assert.equal(g.crossings, 0, '零交叉'); assert.equal(lh, 0, '零硬标签');
+	assert.equal(g.overlaps.length, 0, '零叠压'); assert.equal(g.crossings, 0, `零交叉:${JSON.stringify(g.crossEx)}`); assert.equal(lh, 0, `零硬标签:${JSON.stringify(labelQC(r.model))}`);
 });
 
 // buck/LDO 稀疏块:两侧都有内联件(分压 R 在 FB 左、电感 L 在 SW 右),去耦电容
@@ -212,7 +212,7 @@ test('generateLayout 模板布局:buck稀疏块去耦电容贴IC(下方水平排
 	const r = await generateLayout(snap, { scale: false, deconflict: true });
 	assert.equal(r.stats.placements, comps.length, 'buck不掉件');
 	const g = geomQC(r.model), lh = labelQC(r.model).filter(f => f.severity === 'hard').length;
-	assert.equal(g.overlaps.length, 0, 'buck零叠压'); assert.equal(g.crossings, 0, 'buck零交叉'); assert.equal(lh, 0, 'buck零硬标签');
+	assert.equal(g.overlaps.length, 0, 'buck零叠压'); assert.equal(g.crossings, 0, `buck零交叉:${JSON.stringify(g.crossEx)}`); assert.equal(lh, 0, `buck零硬标签:${JSON.stringify(labelQC(r.model))}`);
 	// caps-below 触发:去耦电容横向贴 IC 中心(非远侧带)、且竖直分离于 IC(上/下方水平排)
 	const icC = r.model.components.find(c => c.designator === 'U1');
 	const icCx = (icC.bbox.minX + icC.bbox.maxX) / 2;
@@ -263,7 +263,7 @@ test('generateLayout 模板布局:密集总线(多并行跨簇信号)标签不�
 	const r = await generateLayout(snap, { scale: false, deconflict: true });
 	assert.ok(r.stats.clusters >= 2, '两 IC 成两簇');
 	const g = geomQC(r.model), lh = labelQC(r.model).filter(f => f.severity === 'hard').length;
-	assert.equal(g.overlaps.length, 0, '总线零叠压'); assert.equal(g.crossings, 0, '总线零交叉'); assert.equal(lh, 0, '密集总线标签零叠压');
+	assert.equal(g.overlaps.length, 0, '总线零叠压'); assert.equal(g.crossings, 0, `总线零交叉:${JSON.stringify(g.crossEx)}`); assert.equal(lh, 0, `密集总线标签零叠压:${JSON.stringify(labelQC(r.model))}`);
 });
 
 // 块排布:多模块板按 aspect 平衡换行(避免单行宽-短→渲染件小),且模块框两两不重叠。
@@ -312,7 +312,7 @@ test('generateLayout 模板布局:离散三极管级(递归子电路)零浮空�
 	const near = (px, py, pts, t) => pts.some(e => Math.abs(e[0] - px) < t && Math.abs(e[1] - py) < t);
 	let floating = 0; for (const c of cc.components) { if (!(c.pins || []).some(p => near(p.x, p.y, wends, 6) || near(p.x, p.y, labels, 10))) floating++; }
 	assert.equal(floating, 0, '离散级零浮空');
-	assert.equal(g.overlaps.length, 0, '零叠压'); assert.equal(g.crossings, 0, '零交叉'); assert.equal(lh, 0, '离散级零硬标签(不再fallback汤)');
+	assert.equal(g.overlaps.length, 0, '零叠压'); assert.equal(g.crossings, 0, '零交叉'); assert.equal(lh, 0, `离散级零硬标签(不再fallback汤): ${JSON.stringify(labelQC(r.model))}; DEBUG=${JSON.stringify({flags:r.model.netflags,wires:r.model.wires})}`);
 });
 
 // 集成:多子系统真实板(MCU+LDO+传感器+三极管驱动+运放反馈)全管线零浮空零叠压。
@@ -345,7 +345,7 @@ test('generateLayout 模板布局:多子系统集成板全管线干净', async (
 	const labels = (r.model.netflags || []).map(f => [f.x, f.y]);
 	const near = (px, py, pts, t) => pts.some(e => Math.abs(e[0] - px) < t && Math.abs(e[1] - py) < t);
 	let floating = 0; for (const c of cc.components) { if (!(c.pins || []).some(p => near(p.x, p.y, wends, 6) || near(p.x, p.y, labels, 10))) floating++; }
-	assert.equal(floating, 0, '集成板零浮空'); assert.equal(g.overlaps.length, 0, '零叠压'); assert.equal(g.crossings, 0, '零交叉'); assert.equal(lh, 0, '集成板零硬标签');
+	assert.equal(floating, 0, '集成板零浮空'); assert.equal(g.overlaps.length, 0, '零叠压'); assert.equal(g.crossings, 0, '零交叉'); assert.equal(lh, 0, `集成板零硬标签: ${JSON.stringify(labelQC(r.model))}; DEBUG=${JSON.stringify({components:r.model.components.map(c=>({designator:c.designator,bbox:c.bbox})),flags:r.model.netflags,wires:r.model.wires})}`);
 });
 
 // 健壮性:不完整输入(件缺 rotation、无 IC 锚点、空板)优雅处理,不崩溃。

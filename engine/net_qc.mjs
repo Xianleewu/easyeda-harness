@@ -76,12 +76,19 @@ export function netQC(snap, opts = {}) {
 		}
 	}
 
-	// ③ 畸形导线:相邻三点回折(第三点==第一点)或零长段
+	// ③ 畸形导线:相邻三点回折(第三点==第一点)或零长段。
+	// 平台规则(EasyEDA Pro 实证):网络标志引脚与器件引脚/导线同点不自动导通,必须存在导线媒介——
+	// 因此锚定在 netflag 上的零长/微短导线是"标志-引脚连接载体",不是畸形线,予以豁免。
+	const flagAnchorKeys = new Set(flags.map(f => keyOf(f.x, f.y, 1)));
+	const isFlagAnchor = (x, y) => flagAnchorKeys.has(keyOf(x, y, 1));
 	const malformedWires = [];
 	for (const w of wires) {
 		const l = w.line || [];
 		for (let i = 0; i + 3 < l.length; i += 2) {
-			if (l[i] === l[i + 2] && l[i + 1] === l[i + 3]) { malformedWires.push({ net: w.net || '', kind: 'zero-length', at: [l[i], l[i + 1]] }); break; }
+			if (l[i] === l[i + 2] && l[i + 1] === l[i + 3]) {
+				if (isFlagAnchor(l[i], l[i + 1])) break; // 标志锚点零长线 = 连接载体,豁免
+				malformedWires.push({ net: w.net || '', kind: 'zero-length', at: [l[i], l[i + 1]] }); break;
+			}
 			if (i + 5 < l.length && l[i] === l[i + 4] && l[i + 1] === l[i + 5]) { malformedWires.push({ net: w.net || '', kind: 'backtrack', at: [l[i + 2], l[i + 3]] }); break; }
 		}
 	}

@@ -5,6 +5,24 @@ import { geomQC } from './geom_qc.mjs';
 
 const box = (minX, minY, maxX, maxY) => ({ minX, minY, maxX, maxY });
 
+test('standalone text is checked against bodies, other text and wires', () => {
+	const model = { components:[{designator:'U1',bbox:box(0,0,20,20),pins:[]}],
+		wires:[{net:'signal',line:[30,10,80,10]}], netflags:[],
+		texts:[{id:'body-note',bbox:box(5,5,15,15)},{id:'wire-note',bbox:box(40,5,60,15)},
+			{id:'second-note',bbox:box(45,8,65,18)}] };
+	const result = geomQC(model);
+	assert.ok(result.overlaps.some(s => s.includes('body-note') && s.includes('U1')));
+	assert.ok(result.overlaps.some(s => s.includes('wire-note') && s.includes('second-note')));
+	assert.equal(result.textOnWire.length, 2);
+});
+
+test('grid tolerates rotation roundoff but detects actual displacement', () => {
+	const check = x => geomQC({ components: [{ designator: 'U1', bbox: box(0, 0, 20, 20),
+		pins: [{ num: '1', x, y: 10 }] }], wires: [], netflags: [] }, { grid: 5 }).offgrid;
+	assert.equal(check(10 + 1e-12), 0);
+	assert.equal(check(10.01), 1);
+});
+
 test('wireThruPin:线段内部压到外部引脚 → 报 hard', () => {
 	// U1 在 [0..20]x[0..100],引脚 U1.1 @(50,50) 伸出本体右侧;
 	// 一条线 [10,50→100,50] 水平穿过 (50,50) 这个引脚(内部,非端点)。
@@ -26,6 +44,67 @@ test('wireThruPin:线端点接引脚(正常连接)→ 不报', () => {
 	};
 	const r = geomQC(model);
 	assert.equal(r.wireThruPin.length, 0, '端点接引脚是正常连接,不应报');
+});
+
+test('wireThruPin:导线端点碰到 NoConnected 引脚 → 报 hard', () => {
+	const model = {
+		components: [{ designator: 'J1', bbox: box(0, 0, 20, 100), pins: [
+			{ num: '1', x: 50, y: 50, noConnected: true },
+		] }],
+		wires: [{ net: 'SIG', line: [50, 50, 100, 50] }],
+		netflags: [],
+	};
+	const r = geomQC(model);
+	assert.ok(r.wireThruPin.some(x => x.includes('wire-to-no-connect J1.1')));
+});
+
+test('wireThruPin:同网母线仅错开引脚列一个小栅格 → 报逃逸间距不足', () => {
+	const model = {
+		components: [{ designator: 'J1', bbox: box(0, 0, 40, 100), pins: [
+			{ num: '1', x: 40, y: 20 }, { num: '2', x: 40, y: 40 }, { num: '3', x: 40, y: 60 },
+		] }],
+		wires: [
+			{ net: 'GND', line: [40, 20, 45, 20] },
+			{ net: 'GND', line: [40, 40, 45, 40] },
+			{ net: 'GND', line: [40, 60, 45, 60] },
+			{ net: 'GND', line: [45, 0, 45, 60] },
+		],
+		netflags: [],
+	};
+	const r = geomQC(model);
+	assert.ok(r.wireThruPin.some(x => x.includes('bus-too-close-to-pin-column J1.1,2,3 clearance=5')));
+});
+
+test('wireThruPin:支线越过共享母线形成回折过冲 → 报错', () => {
+	const model = {
+		components: [{ designator: 'J4', bbox: box(0, 0, 20, 50), pins: [
+			{ num: '1', x: 30, y: 10 }, { num: '2', x: 30, y: 20 }, { num: '3', x: 30, y: 30 },
+		] }],
+		wires: [
+			{ id: 'g#0', net: '', line: [30,10,60,10] },
+			{ id: 'g#1', net: '', line: [40,10,40,30] },
+			{ id: 'g#2', net: '', line: [40,20,30,20] },
+			{ id: 'g#3', net: '', line: [40,30,30,30] },
+		],
+		netflags: [],
+	};
+	const r = geomQC(model);
+	assert.ok(r.wireThruPin.some(x => x.includes('bus-branch-overhang J4.1 overhang=20')));
+});
+
+test('wireThruPin:外置引脚首段必须沿引脚轴向器件外逃逸', () => {
+	const component = { designator: 'J7', bbox: box(20, 0, 60, 60), pins: [
+		{ num: '1', x: 10, y: 20 }, { num: '2', x: 70, y: 40 }, { num: '3', x: 10, y: 50 },
+	] };
+	const good = geomQC({ components: [component], wires: [
+		{ net: 'A', line: [10, 20, 0, 20] }, { net: 'B', line: [70, 40, 80, 40] },
+	], netflags: [] });
+	assert.ok(!good.wireThruPin.some(x => x.includes('pin-escape-inward')));
+	const bad = geomQC({ components: [component], wires: [
+		{ net: 'A', line: [10, 20, 20, 20] }, { net: 'B', line: [70, 40, 70, 50] },
+	], netflags: [] });
+	assert.ok(bad.wireThruPin.some(x => x.includes('pin-escape-inward J7.1')));
+	assert.ok(bad.wireThruPin.some(x => x.includes('pin-escape-inward J7.2')));
 });
 
 test('wireThruPin:线不经过任何引脚 → 不报', () => {
@@ -177,4 +256,44 @@ test('textOnWire[负]:穿过标注 bbox 的线其端点在本件自己脚上 →
 	};
 	const r = geomQC(m);
 	assert.equal(r.textOnWire.length, 0, `端点在本件脚上的线不应报 textOnWire,实际:${JSON.stringify(r.textOnWire)}`);
+});
+
+test('DR2:不同未命名 wire group 的正交中段交叉也必须报', () => {
+	const r=geomQC({components:[],netflags:[],wires:[
+		{id:'wire-a#0',net:'',line:[0,10,20,10]},
+		{id:'wire-b#0',net:'',line:[10,0,10,20]},
+	]});
+	assert.equal(r.crossings,1);
+	assert.ok(r.crossEx[0].includes('@unnamed:wire-a'));
+});
+
+test('DR2:同一未命名 wire group 的分段连接不误报', () => {
+	const r=geomQC({components:[],netflags:[],wires:[
+		{id:'wire-a#0',net:'',line:[0,10,10,10]},
+		{id:'wire-a#1',net:'',line:[10,10,10,20]},
+	]});
+	assert.equal(r.crossings,0);
+	assert.equal(r.endpointShort,0);
+	assert.equal(r.endpointOnWire,0);
+});
+
+test('DR2:分属不同 primitive 但经端点/T 接连续的未命名支线属于同一电气网', () => {
+	const r=geomQC({components:[],netflags:[],wires:[
+		{id:'trunk',line:[0,0,40,0]},
+		{id:'bend',line:[40,0,40,30]},
+		{id:'tap',line:[20,0,20,20]},
+	]});
+	assert.equal(r.endpointShort,0);
+	assert.equal(r.endpointOnWire,0);
+});
+
+test('DR2:命名线把身份传播到相连无名支线，但不同命名网仍报短路', () => {
+	const ok=geomQC({components:[],netflags:[],wires:[
+		{net:'A',line:[0,0,20,0]},{line:[20,0,20,20]},
+	]});
+	assert.equal(ok.endpointShort,0);
+	const bad=geomQC({components:[],netflags:[],wires:[
+		{net:'A',line:[0,0,20,0]},{line:[20,0,20,20]},{net:'B',line:[20,20,40,20]},
+	]});
+	assert.ok(bad.endpointShort>0||bad.endpointOnWire>0);
 });

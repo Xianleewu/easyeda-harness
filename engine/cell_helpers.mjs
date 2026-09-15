@@ -6,7 +6,7 @@
 //
 // 约定（与 engine/geom_qc.mjs、engine/label_qc.mjs、engine/wire_label_qc.mjs 对齐）：
 //   - EDA 坐标 y 朝上。
-//   - 网标方向：左向 rot=180 alignMode=6（左下角原点）；右向 rot=0 alignMode=8（右下角原点）。
+//   - 网标原点：左侧 rot=0 alignMode=6（左下外缘锚、向右朝电路展开）；右侧 rot=180 alignMode=8（右下外缘锚、向左朝电路展开）。
 //   - GND 符号朝向：下=rot0 上=rot180 左=rot270 右=rot90。
 //   - 信号网命名段只允许单条水平 stub；竖直汇流段必须无网名（否则 EDA 竖排网名）。
 //   - 网标锚点必须落在同网命名导线外端点（杜绝悬空标签）。
@@ -140,8 +140,8 @@ export function rectContains(r, x, y) {
 
 /* ── 网标 ── */
 const SIDE_FLAG = {
-	left: { rot: 180, alignMode: 6 },
-	right: { rot: 0, alignMode: 8 },
+	left: { rot: 0, alignMode: 6 },
+	right: { rot: 180, alignMode: 8 },
 };
 
 export function sigFlag(net, x, y, side) {

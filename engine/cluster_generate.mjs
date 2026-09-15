@@ -46,7 +46,9 @@ function consolidateRails(model) {
 function deconflictLabels(model) {
 	const lh = m => labelQC(m).filter(f => f.severity === 'hard').length;
 	const geo = m => { const g = geomQC(m); return { sh: g.overlaps.length + g.wireThruComp.length + g.wireThruPin.length + g.collinear + g.endpointShort + g.endpointOnWire, cr: g.crossings }; };   // sh 须含短路类(共线/端点短/端点落线):否则去突 L 桩制造的 endpointOnWire 短路看不见、不被拒
-	const dirOf = f => (f.alignMode === 8 || f.rot === 180) ? [-1, 0] : (f.alignMode === 6 || f.rot === 0) ? [1, 0] : (f.rot === 90) ? [0, 1] : (f.rot === 270) ? [0, -1] : null;
+	// Labels use their outer edge as anchor and render toward the circuit. Moving
+	// a crowded label farther out therefore goes opposite its text expansion.
+	const dirOf = f => (f.alignMode === 8 || f.rot === 180) ? [1, 0] : (f.alignMode === 6 || f.rot === 0) ? [-1, 0] : (f.rot === 90) ? [0, 1] : (f.rot === 270) ? [0, -1] : null;
 	const stubOf = (m, f) => m.wires.find(w => { const l = w.line; return Math.abs(l[l.length - 2] - f.x) < 2 && Math.abs(l[l.length - 1] - f.y) < 2; });
 	// 每 pass 1 个移动;`!best break` 在收敛(无改善)时退出。早退优化后每 pass 很快,上限放宽到 60
 	// 让多叠压板(如 58件板 22 叠压)解更多(实测 22→9)。评估预算封顶超大板时间(中小板早收敛不触及):
@@ -66,18 +68,56 @@ function deconflictLabels(model) {
 		// 实测 39 件板 deconflict 22.5s→快数十倍,结果不变(同首个改善移动)。
 		outer:
 		for (const f of model.netflags) {
+			// 电源/地是定向符号，不是可沿信号桩任意平移的文字标签。旧逻辑把
+			// rot=0 当成“向右标签”后会把正交电源线压成对角线，并破坏上下语义。
+			if (f.kind !== 'sig') continue;
 			if (!hot.has(f.net)) continue;
 			const dir = dirOf(f); if (!dir) continue; const stub = stubOf(model, f); if (!stub) continue;
+			const px = stub.line[0], py = stub.line[1];
 			const perp = dir[0] !== 0 ? [[0, 1], [0, -1]] : [[1, 0], [-1, 0]];
-			const cands = [...[24, 48, 72].map(s => ({ mode: 'out', dx: dir[0] * s, dy: dir[1] * s })), ...perp.flatMap(p => [24, 40].map(s => ({ mode: 'L', dx: p[0] * s, dy: p[1] * s })))];
+			// Every delta stays on the 5-unit design grid. For a horizontal
+			// label that needs more than one legal 55-unit escape segment, a
+			// dogleg moves it outward and splits the run into two short legs.
+			const cands = [10, 15, 20, 25, 30, 50, 75]
+				.map(s => ({ mode: 'out', dx: dir[0] * s, dy: dir[1] * s }));
+			const candidateLine = (c, ox, oy) => {
+				if (c.mode === 'out') return [px, py, f.x, f.y];
+				const total = Math.abs(f.x - px), sign = Math.sign(f.x - px) || dir[0];
+				if (total > 110) return null;
+				const first = Math.min(55, Math.max(5, Math.round((total / 2) / 5) * 5));
+				const mx = px + sign * first;
+				return [mx, f.y, f.x, f.y];
+			};
 			for (const c of cands) {
 				const ox = f.x, oy = f.y, otx = f.textX, oty = f.textY, ol = stub.line.slice();
-				const px = stub.line[0], py = stub.line[1];
 				f.x += c.dx; f.y += c.dy; if (f.textX != null) f.textX += c.dx; if (f.textY != null) f.textY += c.dy;
-				stub.line = c.mode === 'out' ? [px, py, f.x, f.y] : [px, py, ox, oy, f.x, f.y];
+				stub.line = candidateLine(c, ox, oy);
+				if (!stub.line) {
+					f.x = ox; f.y = oy; f.textX = otx; f.textY = oty; stub.line = ol;
+					continue;
+				}
+				let added = null;
+				if (c.mode === 'dogleg') {
+					const mx = stub.line[0];
+					added = { net: '', line: [px, py, mx, py, mx, f.y] };
+					model.wires.push(added);
+				}
+				// L9 is a hard rule. Reject a deconfliction candidate before the
+				// expensive judges when it creates any horizontal named segment
+				// longer than the allowed short-stub length.
+				let overlong = false;
+				for (let i = 0; i + 3 < stub.line.length; i += 2) {
+					if (stub.line[i + 1] === stub.line[i + 3] && Math.abs(stub.line[i + 2] - stub.line[i]) > 55) { overlong = true; break; }
+				}
+				if (overlong) {
+					if (added) model.wires.pop();
+					f.x = ox; f.y = oy; f.textX = otx; f.textY = oty; stub.line = ol;
+					continue;
+				}
 				const nl = lh(model); evals++;
 				let ok = false;
 				if (nl < base) { const ng = geo(model); ok = ng.sh <= bg.sh && ng.cr <= bg.cr; }   // 不增短路(原 ===0 在有基础短路的板上永不满足→deconflict 被禁用;干净板 bg.sh=0 行为不变=零回归)
+				if (added) model.wires.pop();
 				f.x = ox; f.y = oy; f.textX = otx; f.textY = oty; stub.line = ol;
 				if (ok) { best = { f, c, px, py, ox, oy }; break outer; }
 			}
@@ -85,7 +125,14 @@ function deconflictLabels(model) {
 		if (!best) break;
 		const { f, c, px, py, ox, oy } = best; const stub = stubOf(model, f);
 		f.x += c.dx; f.y += c.dy; if (f.textX != null) f.textX += c.dx; if (f.textY != null) f.textY += c.dy;
-		stub.line = c.mode === 'out' ? [px, py, f.x, f.y] : [px, py, ox, oy, f.x, f.y];
+		if (c.mode === 'out') stub.line = [px, py, f.x, f.y];
+		else {
+			const total = Math.abs(f.x - px), sign = Math.sign(f.x - px) || Math.sign(c.dx);
+			const first = Math.min(55, Math.max(5, Math.round((total / 2) / 5) * 5));
+			const mx = px + sign * first;
+			stub.line = [mx, f.y, f.x, f.y];
+			model.wires.push({ net: '', line: [px, py, mx, py, mx, f.y] });
+		}
 	}
 	return model;
 }
@@ -186,6 +233,7 @@ export function buildCleanLogical(snap, tol = 5) {
 // 无 signal 关联(去耦电容等)按【非GND电源网 + 负载均衡】分配,兜底分到共享任意电源网的锚点。
 export function clusterComponents(snap, logical) {
 	const comps = snap.components || [];
+	const byDesignator = new Map(comps.map(c => [c.designator, c]));
 	const isIC = d => /^(U|FPC|J)/.test(d);
 	const anchors = comps.map(c => c.designator).filter(isIC);
 	if (!anchors.length) return null;
@@ -195,13 +243,23 @@ export function clusterComponents(snap, logical) {
 	const aPG = new Map(anchors.map(a => [a, pgNets.get(a) || new Set()]));
 	const load = new Map(anchors.map(a => [a, 0]));
 	const cluster = new Map(anchors.map(a => [a, [a]]));
+	const center = c => c?.bbox ? [(c.bbox.minX + c.bbox.maxX) / 2, (c.bbox.minY + c.bbox.maxY) / 2]
+		: [Number(c?.x) || 0, Number(c?.y) || 0];
+	const rankCandidates = (part, candidates) => {
+		const [x, y] = center(part);
+		return [...candidates].sort((a, b) => {
+			const [ax, ay] = center(byDesignator.get(a)), [bx, by] = center(byDesignator.get(b));
+			const da = Math.hypot(x - ax, y - ay), db = Math.hypot(x - bx, y - by);
+			return da - db || load.get(a) - load.get(b) || a.localeCompare(b);
+		});
+	};
 	for (const c of comps) {
 		const d = c.designator; if (isIC(d)) continue;
 		const ms = sigNets.get(d) || new Set(), mp = pgNets.get(d) || new Set();
 		let best = null, bs = 0;
 		for (const a of anchors) { let s = 0; for (const nn of ms) if (aSig.get(a).has(nn)) s++; if (s > bs) { bs = s; best = a; } }
-		if (!best) { let cand = anchors.filter(a => { for (const nn of mp) if (aPG.get(a).has(nn) && !/^GND/i.test(nn)) return true; return false; }); if (cand.length) { cand.sort((x, y) => load.get(x) - load.get(y)); best = cand[0]; } }
-		if (!best) { let cand = anchors.filter(a => { for (const nn of mp) if (aPG.get(a).has(nn)) return true; return false; }); if (!cand.length) cand = anchors.slice(); cand.sort((x, y) => load.get(x) - load.get(y)); best = cand[0]; }
+		if (!best) { const cand = anchors.filter(a => { for (const nn of mp) if (aPG.get(a).has(nn) && !/^GND/i.test(nn)) return true; return false; }); if (cand.length) best = rankCandidates(c, cand)[0]; }
+		if (!best) { let cand = anchors.filter(a => { for (const nn of mp) if (aPG.get(a).has(nn)) return true; return false; }); if (!cand.length) cand = anchors.slice(); best = rankCandidates(c, cand)[0]; }
 		cluster.get(best).push(d); load.set(best, load.get(best) + 1);
 	}
 	return cluster;
@@ -243,6 +301,15 @@ export function layoutClusterTemplate(anchor, members, ctx, depth = 0) {
 	const out = { components: [{ ...ic }], wires: [], netflags: [], placements: [{ designator: anchor, x: ic.x, y: ic.y, rot: ic.rotation || 0, mirror: !!ic.mirror }] };
 	const used = new Set([anchor]);
 	const STUB = ctx.sp?.stub ?? 24, PASS = ctx.sp?.pass ?? 30, ROWC = ctx.sp?.rowc ?? 84, FLAGV = 26;   // 间距(opt 可调,twin 扫参)。ROWC=去耦带行距;FLAGV=电容脚到电源地符号间距
+	const pushSignalRun=(net,x1,y1,x2,y2)=>{
+		if(y1===y2&&Math.abs(x2-x1)>55){
+			const sign=Math.sign(x2-x1),split=x2-sign*50;
+			// The outer named segment owns the visible label and stays a short
+			// stub. The inner escape remains in the same eventual WIRE root.
+			out.wires.push({net,line:[split,y2,x2,y2]});
+			out.wires.push({net:'',line:[x1,y1,split,y2]});
+		}else out.wires.push({net,line:[x1,y1,x2,y2]});
+	};
 	const isPass = d => /^[CRL]/.test(d) || /^Y/.test(d);
 	const isDecoup = d => { const c = compByDes.get(d); return /^C/.test(d) && c && (c.pins || []).length === 2 && c.pins.every(p => { const nn = netOf(`${d}.${p.num}`); return nn && (nn.class === 'power' || nn.class === 'ground'); }); };
 	// 引脚真实边:优先合法 p.side,否则按【到 bbox 四边的最近距离】判定(aspect-aware,对高/宽 IC 都对;
@@ -257,17 +324,41 @@ export function layoutClusterTemplate(anchor, members, ctx, depth = 0) {
 	};
 	const sideOf = p => { const s = (p.side || '').toString().toLowerCase(); return /^l/.test(s) ? 'left' : /^r/.test(s) ? 'right' : /^t/.test(s) ? 'top' : /^b/.test(s) ? 'bottom' : inferEdge(p); };
 	const dirOf = s => s === 'left' ? [-1, 0] : s === 'right' ? [1, 0] : s === 'top' ? [0, -1] : [0, 1];
-	// 信号网标按边朝向(rot/alignMode 对齐 elk_layout 约定:左180/8、右0/6、上90/2、下270/2)。
-	const sigFlag = (net, x, y, s) => s === 'left' ? { kind: 'sig', net, x, y, textX: x, textY: y, rot: 180, alignMode: 8 }
-		: s === 'right' ? { kind: 'sig', net, x, y, textX: x, textY: y, rot: 0, alignMode: 6 }
+	// 信号网标按 DR11/12:左0/6、右180/8、上90/2、下270/2。
+	const sigFlag = (net, x, y, s) => s === 'left' ? { kind: 'sig', net, x, y, textX: x, textY: y, rot: 0, alignMode: 6 }
+		: s === 'right' ? { kind: 'sig', net, x, y, textX: x, textY: y, rot: 180, alignMode: 8 }
 		: { kind: 'sig', net, x, y, textX: x, textY: y, rot: s === 'top' ? 90 : 270, alignMode: 2 };
-	const pgCount = {};   // 每边电源/地 flag 计数,用于交错(相邻同边电源/地脚 flag 叠压时错开)。
+	// 侧边电源/地使用确定的水平短桩，power/ground 各自共轴分列。net flag
+	// 的电气锚点就是短桩末端，无需再造会切穿信号走廊的竖直 L 段。
+	const sidePgEscape = STUB;
+	const sidePgClassGap = 35;
+	const placeSidePg = (p, nn, s, dx) => {
+		const preferred = sidePgEscape + (nn.class === 'ground' ? sidePgClassGap : 0);
+		const escapes = [...new Set([preferred, sidePgEscape, ...[1, 2, 3, 4].map(i => sidePgEscape + i * sidePgClassGap)])];
+		let best = null;
+		for (const esc of escapes) {
+			const fx = p.x + dx * esc, fy = p.y;
+			const wire = { net: nn.name, line: [p.x, p.y, fx, fy] };
+			const flag = { kind: nn.class === 'ground' ? 'gnd' : 'power', net: nn.name, x: fx, y: fy, rot: 0,
+				nameSide: s === 'left' ? 'left' : 'right' };
+			out.wires.push(wire); out.netflags.push(flag);
+			const g = geomQC(out), hard = labelQC(out).filter(f => f.severity === 'hard').length;
+			const cost = g.crossings + g.collinear + g.endpointShort + g.endpointOnWire
+				+ g.wireThruComp.length + g.wireThruPin.length + g.overlaps.length + hard;
+			out.netflags.pop(); out.wires.pop();
+			if (!best || cost < best.cost || (cost === best.cost && esc < best.esc)) best = { cost, esc, wire, flag };
+			if (cost === 0) break;
+		}
+		out.wires.push(best.wire); out.netflags.push(best.flag);
+	};
 	for (const p of ic.pins) {
 		const nn = netOf(`${anchor}.${p.num}`);
 		if (!nn) continue;
 		if (nn.class === 'local') continue;   // 本地网脚不打标签逃逸 → 由 routeLocalNets 簇内直连(P0,opts.recover)
 		const s = sideOf(p), [dx, dy] = dirOf(s), lr = (s === 'left' || s === 'right');
-		const sStub = lr ? STUB : STUB + (ctx.sp?.topExtra ?? 40);   // 顶/底信号脚标签需更长逃逸,使旋转命名标签清出 IC body+keepout(rulebook 6.3:命名桩在 IC 体外)
+		const labelSpan=Math.max(40,String(nn.name||'').length*6+18);
+		const sStub = lr && nn.class==='signal' ? Math.max(STUB,labelSpan+22)
+			: lr ? STUB : STUB + (ctx.sp?.topExtra ?? 40);   // 水平标签以外缘为锚朝电路展开，整段文字须留在器件 keepout 外
 		const ex = p.x + dx * sStub, ey = p.y + dy * sStub;
 		if (nn.class === 'signal') {
 			// 该信号脚连接的簇内非去耦 2 脚无源件(串联/上拉/分压/RC),四方向均内联(顶/底脚竖直放置)。
@@ -295,23 +386,35 @@ export function layoutClusterTemplate(anchor, members, ctx, depth = 0) {
 					out.components.push({ designator: series, x: ccx, y: ccy, rotation: vert ? 90 : 0, mirror: false, bbox: vert ? { minX: ccx - 6, minY: ccy - PASS / 2, maxX: ccx + 6, maxY: ccy + PASS / 2 } : { minX: ccx - PASS / 2, minY: ccy - 6, maxX: ccx + PASS / 2, maxY: ccy + 6 }, pins: [{ num: tp.num, x: innerX, y: innerY }, { num: op.num, x: outerX, y: outerY }] });
 					out.placements.push({ designator: series, x: ccx, y: ccy, rot: vert ? 90 : 0, mirror: false });
 					out.wires.push({ net: nn.name, line: [railX, railY, innerX, innerY] });
-					const ax = outerX + dx * STUB, ay = outerY + dy * STUB;
-					out.wires.push({ net: on ? on.name : '', line: [outerX, outerY, ax, ay] });
-					if (on && (on.class === 'power' || on.class === 'ground')) out.netflags.push({ kind: on.class === 'ground' ? 'gnd' : 'power', net: on.name, x: ax, y: ay, rot: 0 });
-					else out.netflags.push(sigFlag(on ? on.name : '', ax, ay, s));
+					const outerLabelSpan=Math.max(40,String(on?.name||'').length*6+18);
+					const outerStub=lr&&on?.class==='signal'?Math.max(STUB,outerLabelSpan+22):STUB;
+					const ax = outerX + dx * outerStub, ay = outerY + dy * outerStub;
+					if (on && (on.class === 'power' || on.class === 'ground')) {
+						const fx = lr ? outerX + dx * (STUB + (on.class === 'ground' ? sidePgClassGap : 0)) : ax;
+						out.wires.push({ net: on.name, line: [outerX, outerY, fx, ay] });
+						out.netflags.push({ kind: on.class === 'ground' ? 'gnd' : 'power', net: on.name, x: fx, y: ay, rot: 0,
+							nameSide: s === 'left' ? 'left' : s === 'right' ? 'right' : undefined });
+					} else {
+						pushSignalRun(on ? on.name : '',outerX,outerY,ax,ay);
+						out.netflags.push(sigFlag(on ? on.name : '', ax, ay, s));
+					}
 					used.add(series);
 				});
 				continue;
 			}
-			out.wires.push({ net: nn.name, line: [p.x, p.y, ex, ey] });
+			pushSignalRun(nn.name,p.x,p.y,ex,ey);
 			out.netflags.push(sigFlag(nn.name, ex, ey, s));
 		} else {
-			// 电源/地脚:flag 外延;相邻同边电源/地脚交错外延距离(28),避免 flag 符号叠压。
-			const pc = (pgCount[s] = (pgCount[s] || 0) + 1);
-			const esc = STUB + ((pc - 1) % 2) * 28;
-			const fx2 = p.x + dx * esc, fy2 = p.y + dy * esc;
-			out.wires.push({ net: nn.name, line: [p.x, p.y, fx2, fy2] });
-			out.netflags.push({ kind: nn.class === 'ground' ? 'gnd' : 'power', net: nn.name, x: fx2, y: fy2, rot: 0 });
+			// 电源/地脚:同侧同类符号共轴。左右侧脚先水平逃逸，
+			// 再把电源引向上、地引向下，避免相邻电源/地符号及其引线互穿。
+			// 顶/底符号的 glyph 会朝连接点回伸约 20；额外留一个 glyph 深度，
+			// 防止符号压到同排的邻近无源件。
+			if (lr) placeSidePg(p, nn, s, dx);
+			else {
+				const esc = STUB + 20, fx2 = p.x + dx * esc, fy2 = p.y + dy * esc;
+				out.wires.push({ net: nn.name, line: [p.x, p.y, fx2, fy2] });
+				out.netflags.push({ kind: nn.class === 'ground' ? 'gnd' : 'power', net: nn.name, x: fx2, y: fy2, rot: 0 });
+			}
 		}
 	}
 	// 去耦电容:专用竖直去耦带,放在 IC 块【信号更少的一侧】(避开信号标签、更紧凑),各 [VDD]—C—[GND]。
@@ -370,7 +473,7 @@ export function layoutClusterTemplate(anchor, members, ctx, depth = 0) {
 		const bx = lp.x != null ? lp.x : cx, byy = lp.y != null ? lp.y : 0, dx0 = fx - bx, dy0 = fy0 - byy;
 		out.components.push({ ...lp, x: bx + dx0, y: byy + dy0, bbox: lp.bbox ? { minX: lp.bbox.minX + dx0, minY: lp.bbox.minY + dy0, maxX: lp.bbox.maxX + dx0, maxY: lp.bbox.maxY + dy0 } : { minX: fx - 8, minY: fy0 - 8, maxX: fx + 8, maxY: fy0 + 8 }, pins: (lp.pins || []).map(p => ({ ...p, x: p.x + dx0, y: p.y + dy0 })) });
 		out.placements.push({ designator: d, x: bx + dx0, y: byy + dy0, rot: lp.rotation || 0, mirror: !!lp.mirror });
-		for (const p of (lp.pins || [])) { const nn = netOf(`${d}.${p.num}`); if (!nn) continue; if (nn.class === 'local') continue; const px = p.x + dx0, py = p.y + dy0; if (nn.class === 'ground') { out.netflags.push({ kind: 'gnd', net: nn.name, x: px, y: py + 16, rot: 0 }); out.wires.push({ net: nn.name, line: [px, py, px, py + 16] }); } else if (nn.class === 'power') { out.netflags.push({ kind: 'power', net: nn.name, x: px, y: py - 16, rot: 0 }); out.wires.push({ net: nn.name, line: [px, py, px, py - 16] }); } else { out.netflags.push({ kind: 'sig', net: nn.name, x: px + 20, y: py, textX: px + 20, textY: py, rot: 0, alignMode: 6 }); out.wires.push({ net: nn.name, line: [px, py, px + 20, py] }); } }
+		for (const p of (lp.pins || [])) { const nn = netOf(`${d}.${p.num}`); if (!nn) continue; if (nn.class === 'local') continue; const px = p.x + dx0, py = p.y + dy0; if (nn.class === 'ground') { out.netflags.push({ kind: 'gnd', net: nn.name, x: px, y: py + 16, rot: 0 }); out.wires.push({ net: nn.name, line: [px, py, px, py + 16] }); } else if (nn.class === 'power') { out.netflags.push({ kind: 'power', net: nn.name, x: px, y: py - 16, rot: 0 }); out.wires.push({ net: nn.name, line: [px, py, px, py - 16] }); } else { out.netflags.push({ kind: 'sig', net: nn.name, x: px + 20, y: py, textX: px + 20, textY: py, rot: 180, alignMode: 8 }); out.wires.push({ net: nn.name, line: [px, py, px + 20, py] }); } }
 		used.add(d);
 	};
 	if (rem.length && depth < 1) {
@@ -385,6 +488,22 @@ export function layoutClusterTemplate(anchor, members, ctx, depth = 0) {
 		// fallback 子电路【包行】排在 IC 下方:超 IC 右边界换下一排,避免单行无限向右铺开撑宽模块+留白(真图证实主因)。
 		let fyRow = fy0, rowMaxH = 0;
 		const wrapW = (ic.bbox ? ic.bbox.maxX : cx) + 60;
+		const connectorLike = d => {
+			const c = compByDes.get(d), pins = c?.pins || [];
+			return pins.length >= 12 && (/^(J|CN|CON|FPC|P)/i.test(String(d || '')) || pins.length >= 24);
+		};
+		const sharedSignals = (a, b) => {
+			const nets = d => new Set((compByDes.get(d)?.pins || []).map(p => netOf(`${d}.${p.num}`)).filter(n => n?.class === 'signal').map(n => n.name));
+			const aa = nets(a), bb = nets(b); let count = 0;
+			for (const n of aa) if (bb.has(n)) count++;
+			return count;
+		};
+		const modelBounds = m => {
+			const b = { minX: Infinity, minY: Infinity, maxX: -Infinity, maxY: -Infinity };
+			for (const c of m.components || []) if (c.bbox) { b.minX=Math.min(b.minX,c.bbox.minX); b.minY=Math.min(b.minY,c.bbox.minY); b.maxX=Math.max(b.maxX,c.bbox.maxX); b.maxY=Math.max(b.maxY,c.bbox.maxY); }
+			for (const f of m.netflags || []) { b.minX=Math.min(b.minX,f.x-26); b.minY=Math.min(b.minY,f.y-12); b.maxX=Math.max(b.maxX,f.x+26); b.maxY=Math.max(b.maxY,f.y+12); }
+			return b;
+		};
 		for (const grp of groups.values()) {
 			const subAnchor = grp.slice().sort((a, b) => (compByDes.get(b).pins?.length || 0) - (compByDes.get(a).pins?.length || 0))[0];
 			const sub = layoutClusterTemplate(subAnchor, grp, ctx, depth + 1);   // 递归:子电路以最高脚件为锚成块
@@ -392,14 +511,26 @@ export function layoutClusterTemplate(anchor, members, ctx, depth = 0) {
 			for (const c of sub.components) if (c.bbox) { bb.minX = Math.min(bb.minX, c.bbox.minX); bb.minY = Math.min(bb.minY, c.bbox.minY); bb.maxX = Math.max(bb.maxX, c.bbox.maxX); bb.maxY = Math.max(bb.maxY, c.bbox.maxY); }
 			for (const f of sub.netflags) { bb.minX = Math.min(bb.minX, f.x - 20); bb.maxX = Math.max(bb.maxX, f.x + 20); bb.minY = Math.min(bb.minY, f.y - 10); bb.maxY = Math.max(bb.maxY, f.y + 10); }
 			const gw = bb.maxX - bb.minX, gh = bb.maxY - bb.minY;
-			if (fx0 > cx - 60 && fx0 + gw > wrapW) { fyRow += rowMaxH + 50; fx0 = cx - 60; rowMaxH = 0; }   // 换行
-			const dox = fx0 - bb.minX, doy = fyRow - bb.minY;
+			// Two dense connectors sharing a bus are one interface cell.  Put the
+			// peer beside the anchor as a rigid subcell; the old generic fallback
+			// always wrapped it below the anchor and doubled the module height.
+			const peer = connectorLike(anchor) && connectorLike(subAnchor) && sharedSignals(anchor, subAnchor) >= 4;
+			let targetX, targetY;
+			if (peer) {
+				const occupied = modelBounds(out);
+				targetX = occupied.maxX + 60;
+				targetY = occupied.minY;
+			} else {
+				if (fx0 > cx - 60 && fx0 + gw > wrapW) { fyRow += rowMaxH + 50; fx0 = cx - 60; rowMaxH = 0; }   // 换行
+				targetX = fx0; targetY = fyRow;
+			}
+			const dox = targetX - bb.minX, doy = targetY - bb.minY;
 			for (const c of sub.components) out.components.push({ ...c, x: (c.x ?? 0) + dox, y: (c.y ?? 0) + doy, bbox: { minX: c.bbox.minX + dox, minY: c.bbox.minY + doy, maxX: c.bbox.maxX + dox, maxY: c.bbox.maxY + doy }, pins: (c.pins || []).map(p => ({ ...p, x: p.x + dox, y: p.y + doy, _ax: (p._ax ?? p.x) + dox, _ay: (p._ay ?? p.y) + doy })) });
 			for (const w of sub.wires) out.wires.push({ net: w.net, line: w.line.map((v, k) => k % 2 === 0 ? v + dox : v + doy) });
 			for (const f of sub.netflags) out.netflags.push({ ...f, x: f.x + dox, y: f.y + doy, textX: (f.textX ?? f.x) + dox, textY: (f.textY ?? f.y) + doy });
 			for (const pl of (sub.placements || [])) out.placements.push({ ...pl, x: pl.x + dox, y: pl.y + doy });
 			grp.forEach(d => used.add(d));
-			fx0 += gw + 90; rowMaxH = Math.max(rowMaxH, gh);
+			if (!peer) { fx0 += gw + 90; rowMaxH = Math.max(rowMaxH, gh); }
 		}
 	} else {
 		for (const d of rem) { dumpOne(d, fx0); fx0 += 100; }
@@ -473,7 +604,7 @@ export async function generateLayout(snap, opts = {}) {
 	} else {
 		subs.sort((a, b) => b.h - a.h);
 	}
-	const PAD = opts.modPad ?? 40, TITLE = 36;   // 模块间距/标题带(opt 可调)。模块 bbox 已含逃逸标签,40px 缝不叠压。
+	const PAD = opts.modPad ?? 60, TITLE = 36;   // DR21:模块内容框至少 60px 缝；bbox 已含逃逸标签。
 	// 行宽:按目标 aspect 平衡换行(多模块单行=宽-短→渲染时件被缩小;平衡成接近 landscape sheet 让模块
 	// 渲染更大更易读)。保序 + PAD 不变 = 无叠压;单模块/总宽已小于 balancedW 的板不换行(行为不变)。
 	const totalW = subs.reduce((a, s) => a + s.w + PAD, 0);
@@ -516,8 +647,9 @@ export async function generateLayout(snap, opts = {}) {
 		for (const pl of (s.model.placements || [])) placements.push({ ...pl, x: pl.x + ox, y: pl.y + oy });
 		const anchorVal = resolveDisplayValue(compByDes.get(s.anchor));
 		const title = anchorVal && anchorVal !== s.anchor ? `${s.anchor}  ${anchorVal}` : `${s.anchor} (${s.count})`;
-		moduleRegions.push({ name: s.anchor, title, titleAt: { x: p.x, y: p.y + 6 }, box: { minX: p.x - 12, minY: p.y + TITLE - 8, maxX: p.x + s.w + 12, maxY: p.y + TITLE + s.h + 10 }, parts: s.count });
+		moduleRegions.push({ name: s.anchor, title, titleAt: { x: p.x, y: p.y + 6 }, box: { minX: p.x - 12, minY: p.y + TITLE - 8, maxX: p.x + s.w + 12, maxY: p.y + TITLE + s.h + 10 }, contentBox: { minX: p.x, minY: p.y + TITLE, maxX: p.x + s.w, maxY: p.y + TITLE + s.h }, parts: s.count });
 	}
+	out.moduleRegions = moduleRegions;
 	const valByDes = new Map((snap.components || []).map(c => [c.designator, resolveDisplayValue(c)]));
 	for (const c of out.components) { const v = valByDes.get(c.designator); if (v) c.value = v; }   // 解析真实器件名/值,替换 "={Value}" 坏模板串
 	if (opts.recover) routeLocalNets(out, logical.nets.filter(n => n.class === 'local'));   // P0:无名本地网簇内正交直连(重排后保连通,不打标签)
@@ -554,8 +686,12 @@ function placeAnnotations(model) {
 	const GAP = 10, PITCH = 16;
 	for (const c of model.components || []) {
 		const bb = c.bbox; if (!bb) continue;
-		const attrs = c.attrs || []; if (!attrs.length) continue;
-		const d = attrs.find(a => a.key === 'Designator'), n = attrs.find(a => a.key === 'Name');
+		if (!c.attrs) c.attrs = [];
+		const attrs = c.attrs;
+		// 补缺:每件都要有可见 Designator(=designator)+ Name(=value),否则 twin 退回快照偏移=标注错位
+		let d = attrs.find(a => a.key === 'Designator'), n = attrs.find(a => a.key === 'Name');
+		if (!d && c.designator) { d = { key: 'Designator', value: c.designator, valueVisible: true }; attrs.push(d); }
+		if (!n && c.value) { n = { key: 'Name', value: c.value, valueVisible: true }; attrs.push(n); }
 		if (!d && !n) continue;
 		const bcx = Math.round((bb.minX + bb.maxX) / 2 / 5) * 5;
 		const pins = c.pins || [];
@@ -575,16 +711,18 @@ function placeAnnotations(model) {
 // 把生成的模块图投递到 live EDA。2026-06-20 实测验证:必须用【命名线】(无名线被 EDA 删=0线),
 // 跨簇标签用 netport,电源/地用 NetFlag,末尾覆盖式自愈补漏网。验证:某真实板命名线持久、全网连通。
 export async function deliverGenerated(snap, opts = {}) {
+	if (process.env.EASYEDA_ALLOW_LEGACY_MUTATION !== '1')
+		throw new Error('Direct live delivery is disabled; use wf.mjs commit so complete commercial gates and rollback are enforced');
 	const { executeCode } = await import('./bridge_client.mjs');
 	const sleep = ms => new Promise(r => setTimeout(r, ms));
-	const exec = async js => { for (let t = 0; t < 6; t++) { try { return (await executeCode(js, { timeoutMs: 90000 })).result; } catch (e) { if (!/disconnect|timed out/i.test(e.message)) { console.error('  非连接错:', e.message.slice(0, 70)); return null; } await sleep(2500); } } return null; };
+	const exec = async js => { for (let t = 0; t < 6; t++) { try { return (await executeCode(js, { timeoutMs: 90000, writeContext:'delivery-transaction' })).result; } catch (e) { if (!/disconnect|timed out/i.test(e.message)) { console.error('  非连接错:', e.message.slice(0, 70)); return null; } await sleep(2500); } } return null; };
 	const runOps = async (label, ops, batch = 15) => { let done = 0; for (let i = 0; i < ops.length; i += batch) { await exec(`let n=0;\n${ops.slice(i, i + batch).join('\n')}\nreturn{n};`); done += Math.min(batch, ops.length - i); process.stdout.write(`\r  ${label}: ${done}/${ops.length}`); } console.log(' ✓'); };
 	const cg = await generateLayout(snap, { ...opts, scale: false, deconflict: opts.deconflict !== false, recover: opts.recover !== false });   // live 投递 scale=false 保脚位,默认去冲突 + 恢复无名本地网(保连通,P0)
 	if (!cg) { console.error('无 IC 锚点,无法生成'); return null; }
 	console.log('cluster 生成模块图投递:', JSON.stringify(cg.stats));
 	const cur = await exec(`const cs=await eda.sch_PrimitiveComponent.getAll();return cs.map(c=>({id:c.primitiveId||c.id,des:c.designator}));`);
 	const desToId = new Map((cur || []).filter(c => c.des).map(c => [c.des, c.id]));
-	await exec(`for(let p=0;p<10;p++){const ws=(await eda.sch_PrimitiveWire.getAll())||[];const wid=ws.map(w=>w.primitiveId);if(wid.length){try{await eda.sch_PrimitiveWire.delete(wid);}catch(e){}}const ids=(await eda.sch_PrimitiveComponent.getAllPrimitiveId())||[];const fc=[];for(const id of ids){const c=await eda.sch_Primitive.getPrimitiveByPrimitiveId(id);if(c&&(c.componentType==='netflag'||c.componentType==='netport'))fc.push(id);}if(fc.length){try{await eda.sch_PrimitiveComponent.delete(fc);}catch(e){}}if(!wid.length&&!fc.length)break;}return{};`);
+	await exec(`for(let p=0;p<10;p++){const ws=(await eda.sch_PrimitiveWire.getAll())||[];const wid=ws.map(w=>w.primitiveId);if(wid.length){try{await eda.sch_PrimitiveWire.delete(wid);}catch(e){}}const ids=(await eda.sch_PrimitiveComponent.getAllPrimitiveId())||[];const fc=[];for(const id of ids){const c=await eda.sch_Primitive.getPrimitiveByPrimitiveId(id);if(c&&(c.componentType==='netflag'||c.componentType==='netport'||c.designator==null||c.designator===undefined||c.designator===''))fc.push(id);}if(fc.length){try{await eda.sch_PrimitiveComponent.delete(fc);}catch(e){}}if(!wid.length&&!fc.length)break;}return{};`);
 	await runOps('移件', cg.placements.map(p => { const id = desToId.get(p.designator); return id ? `try{await eda.sch_PrimitiveComponent.modify(${JSON.stringify(id)},{x:${p.x},y:${p.y},rotation:${p.rot || 0},mirror:${!!p.mirror}});n++;}catch(e){}` : null; }).filter(Boolean));
 	await runOps('命名连线', cg.model.wires.map(w => `try{await eda.sch_PrimitiveWire.create(${JSON.stringify(w.line)},${JSON.stringify(w.net || '')});n++;}catch(e){}`));
 	// createNetPort/createNetFlag 旋转约定均为镜像(输入 R → 回读 360-R,已实证),

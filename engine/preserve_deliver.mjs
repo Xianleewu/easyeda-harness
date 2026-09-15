@@ -67,10 +67,12 @@ export function netflagCreateRotation(snapRot) {
 }
 
 async function deliverPreserve(model) {
+	if (process.env.EASYEDA_ALLOW_LEGACY_MUTATION !== '1')
+		throw new Error('Direct live delivery is disabled; use wf.mjs commit so complete commercial gates and rollback are enforced');
 	const { executeCode } = await import('./bridge_client.mjs');
 	const exec = async js => {
 		for (let t = 0; t < 6; t++) {
-			try { return (await executeCode(js, { timeoutMs: 90000 })).result; }
+			try { return (await executeCode(js, { timeoutMs: 90000, writeContext:'delivery-transaction' })).result; }
 			catch (e) { if (!/disconnect|timed out/i.test(e.message)) { console.error('  非连接错:', e.message.slice(0, 80)); return null; } await sleep(2500); }
 		}
 		return null;

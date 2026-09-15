@@ -7,7 +7,7 @@ import { labelQC } from '../../engine/label_qc.mjs';
 const LABEL_KEEP = 12;                                  // 标签离体净空(对齐 L6)
 const labelLen = name => Math.max(40, String(name).length * 6 + 18);
 
-// sig 标签列 x:右向文字(alignMode8)反向左生长、左向(6)右生长,宽名会压回器件体(L2/L6)。
+// sig 标签列遵循外缘锚点:左列 mode6 向右朝电路、右列 mode8 向左朝电路。
 // 按标签宽外推 escX,确保文字框清开体边 ≥LABEL_KEEP(同 densefanout 的宽名处理),让宽名也能渲染。
 // escX 朝「远离体」方向 snap 到 10 栅:既消除不对称体 minX/maxX 的半单位泄漏到标签位,又让 fanout
 // 标签与 densefanout 标签(同用 10 栅)在共列时对齐,避免 L1-align 列内 5 栅 spread。snap 方向保证

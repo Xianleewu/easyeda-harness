@@ -43,3 +43,10 @@ test('L4 仍报:与标签不连通的无名导线穿过文字框', () => {
 	};
 	assert.ok(L4(m).length >= 1, '异簇无名导线穿标必报(无名不等于豁免)');
 });
+
+test('live label QC uses the calibrated rendered bbox including BOTTOM vertical anchor', () => {
+	const a={...sig('A',100,100,6),bbox:{minX:100,minY:92,maxX:110,maxY:100}};
+	const b={...sig('B',100,106,6),bbox:{minX:100,minY:101,maxX:110,maxY:106}};
+	const findings=labelQC({components:[],wires:[],netflags:[a,b]});
+	assert.ok(!findings.some(f=>f.rule==='L3-label-over-label'),'真实字框之间有间隙时不得按重建假框误报');
+});

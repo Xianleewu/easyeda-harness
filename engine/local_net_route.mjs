@@ -37,7 +37,7 @@ export function routeLocalNets(model, localNets, opts = {}) {
 	for (const f of (model.netflags || [])) if (f.net) usedNames.add(f.net);
 	let nameSeq = 0;
 	const freshName = () => { let nm; do { nm = `N${++nameSeq}`; } while (usedNames.has(nm)); usedNames.add(nm); return nm; };
-	// 在脚处朝【器件外】放信号网标 + 正交桩。桩伸到 bbox 外 + 余隙,alignMode 随方向(文字背离器件,避免压回本体)。
+	// 在脚处按 DR11/12 放信号网标 + 正交桩。桩伸到 bbox 外 + 余隙。
 	const CLR = 16;   // 与 label_qc keepout 一致量级
 	const labelPin = (ref, name) => {
 		const p = pos.get(ref), c = compOf.get(ref);
@@ -45,8 +45,8 @@ export function routeLocalNets(model, localNets, opts = {}) {
 		const cx = (b.minX + b.maxX) / 2, cy = (b.minY + b.maxY) / 2, ddx = p.x - cx, ddy = p.y - cy;
 		let fx, fy, align;
 		if (Math.abs(ddx) >= Math.abs(ddy)) {   // 水平桩:文字向器件外侧展开
-			if (ddx >= 0) { fx = Math.max(p.x + 20, b.maxX + CLR); fy = p.y; align = 6; }   // 右:alignMode6 文字 +x
-			else { fx = Math.min(p.x - 20, b.minX - CLR); fy = p.y; align = 8; }   // 左:alignMode8 文字 -x
+			if (ddx >= 0) { fx = Math.max(p.x + 20, b.maxX + CLR); fy = p.y; align = 8; }
+			else { fx = Math.min(p.x - 20, b.minX - CLR); fy = p.y; align = 6; }
 		} else {   // 垂直桩:伸到 bbox 上/下外,文字横向展开(在器件上/下方,不压本体)
 			fx = p.x; fy = ddy >= 0 ? Math.max(p.y + 20, b.maxY + CLR) : Math.min(p.y - 20, b.minY - CLR); align = 6;
 		}

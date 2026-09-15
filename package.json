@@ -8,6 +8,9 @@
     "test": "node --test circuit_packs/archetypes/*.test.mjs engine/*.test.mjs",
     "layout": "node bin/plexus.mjs layout",
     "deliver": "node bin/plexus.mjs deliver",
+		"pcb:snapshot": "node bin/plexus.mjs pcb-snapshot",
+		"pcb:qc": "node bin/plexus.mjs pcb-qc",
+		"pcb:judge": "node bin/plexus.mjs pcb-judge-live",
     "live:save": "node engine/bridge_exec.mjs --js snapshot2.js --out live.json",
     "live:image": "node engine/bridge_exec.mjs --js snapshot-image.js --out live_canvas.png --mode image"
   },

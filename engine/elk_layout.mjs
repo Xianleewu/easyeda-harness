@@ -237,8 +237,8 @@ export async function elkLayout({ snapshot, logical, byDes, elk = new ELK(), lay
 		else if (role === 'label') {
 			// 左右脚→水平标签(文字朝外);上下脚→竖排标签(rot 90/270,窄框,密集横向不叠压)。
 			// 上下脚标签逃逸距加大到 48(>总线深~20),让竖排标签落在总线之外,避总线穿标(L4)。
-			if (p.side === 'left') { wires.push({ net: r.net, line: [p.x, p.y, ex, ey] }); netflags.push({ kind: 'sig', net: r.net, x: ex, y: ey, textX: ex, textY: ey, rot: 180, alignMode: 8 }); }
-			else if (p.side === 'right') { wires.push({ net: r.net, line: [p.x, p.y, ex, ey] }); netflags.push({ kind: 'sig', net: r.net, x: ex, y: ey, textX: ex, textY: ey, rot: 0, alignMode: 6 }); }
+			if (p.side === 'left') { wires.push({ net: r.net, line: [p.x, p.y, ex, ey] }); netflags.push({ kind: 'sig', net: r.net, x: ex, y: ey, textX: ex, textY: ey, rot: 0, alignMode: 6 }); }
+			else if (p.side === 'right') { wires.push({ net: r.net, line: [p.x, p.y, ex, ey] }); netflags.push({ kind: 'sig', net: r.net, x: ex, y: ey, textX: ex, textY: ey, rot: 180, alignMode: 8 }); }
 			else { const rb = rowByPin.get(id); const [tx, ty] = escape(p, 48 + (rb ? rb.row * rb.step : 0)); wires.push({ net: r.net, line: [p.x, p.y, tx, ty] }); netflags.push({ kind: 'sig', net: r.net, x: tx, y: ty, textX: tx, textY: ty, rot: p.side === 'top' ? 90 : 270, alignMode: 2 }); }
 		}
 	}

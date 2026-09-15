@@ -23,6 +23,11 @@ function ov(a, b) {
 }
 
 function sigBBox(f) {
+	/* Complete live geometry carries the calibrated, alignment-aware rendered
+	 * box.  Use it directly; reconstructing it from alignMode loses the vertical
+	 * BOTTOM anchor and can invent label collisions one row away. */
+	if (f?.bbox && [f.bbox.minX,f.bbox.minY,f.bbox.maxX,f.bbox.maxY].every(Number.isFinite)
+		&& f.bbox.maxX > f.bbox.minX && f.bbox.maxY > f.bbox.minY) return f.bbox;
 	const rot = ((f.rotation ?? f.rot ?? 0) % 360 + 360) % 360;
 	const len = Math.max(40, String(f.net || '').length * 6 + 18);
 	const h = 8;

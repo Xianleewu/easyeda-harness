@@ -42,6 +42,29 @@ for (const id of partIds) {
   if (c.componentType === 'part') {
     const ps = await eda.sch_PrimitiveComponent.getAllPinsByPrimitiveId(id) || [];
     const attrsRaw = await eda.sch_PrimitiveAttribute.getAll(id).catch(() => []) || [];
+    const componentAttrs = [];
+    for (const a of attrsRaw) {
+      const aid = a.primitiveId || (a.getState_PrimitiveId && a.getState_PrimitiveId());
+      const rb = aid ? await eda.sch_Primitive.getPrimitivesBBox([aid]).catch(() => null) : null;
+      const attrBbox = rb ? {
+        minX: round(rb.minX != null ? rb.minX : rb.x),
+        minY: round(rb.minY != null ? rb.minY : rb.y),
+        maxX: round(rb.maxX != null ? rb.maxX : (rb.x + rb.width)),
+        maxY: round(rb.maxY != null ? rb.maxY : (rb.y + rb.height)),
+      } : null;
+      componentAttrs.push({
+        id: aid,
+        key: a.key || (a.getState_Key && a.getState_Key()) || '',
+        value: a.value || (a.getState_Value && a.getState_Value()) || '',
+        x: a.x ?? (a.getState_X && a.getState_X()),
+        y: a.y ?? (a.getState_Y && a.getState_Y()),
+        rotation: a.rotation ?? (a.getState_Rotation && a.getState_Rotation()),
+        alignMode: a.alignMode ?? a.align ?? (a.getState_AlignMode && a.getState_AlignMode()),
+        keyVisible: a.keyVisible ?? (a.getState_KeyVisible && a.getState_KeyVisible()),
+        valueVisible: a.valueVisible ?? (a.getState_ValueVisible && a.getState_ValueVisible()),
+        bbox: attrBbox,
+      });
+    }
     components.push({
       id, designator: c.designator || null, name: c.name || null,
       value: (c.otherProperty && c.otherProperty.Value) || null,
@@ -52,15 +75,7 @@ for (const id of partIds) {
       addIntoBom: c.getState_AddIntoBom ? c.getState_AddIntoBom() : c.addIntoBom,
       addIntoPcb: c.getState_AddIntoPcb ? c.getState_AddIntoPcb() : c.addIntoPcb,
       x: c.x, y: c.y, rotation: c.rotation, mirror: !!c.mirror, bbox,
-      attrs: attrsRaw.map(a => ({
-        id: a.primitiveId,
-        key: a.key || (a.getState_Key && a.getState_Key()) || '',
-        value: a.value || (a.getState_Value && a.getState_Value()) || '',
-        x: a.x,
-        y: a.y,
-        keyVisible: a.keyVisible ?? null,
-        valueVisible: a.valueVisible ?? null,
-      })),
+      attrs: componentAttrs,
       pins: ps.map(p => {
         const ref = `${c.designator || ''}.${p.pinNumber}`;
         const sourceNc = sourceNcByPin.has(ref) ? sourceNcByPin.get(ref) : null;
@@ -107,12 +122,35 @@ for (const w of wiresRaw) {
       bbox,
     });
   }
-  wires.push({
-    id,
-    net: w.net || (w.getState_Net && w.getState_Net()) || '',
-    line: w.line || (w.getState_Line && w.getState_Line()) || [],
-    attrs,
-  });
+  // EasyEDA returns a wire group as a flat list of independent LINE records:
+  // [x1,y1,x2,y2, x3,y3,x4,y4, ...].  The records are not a continuous
+  // polyline and their order is not a traversal order.  Expose one segment per
+  // model wire so geometry checks never invent connector segments between two
+  // unrelated branches of the same electrical graph.
+  const rawLine = w.line || (w.getState_Line && w.getState_Line()) || [];
+  const segmentCount = Math.floor(rawLine.length / 4);
+  const pointOnSegment = (x, y, line) => {
+    const [x1, y1, x2, y2] = line;
+    if (![x, y, x1, y1, x2, y2].every(Number.isFinite)) return false;
+    if (x1 === x2) return Math.abs(x - x1) < 1e-7 && y >= Math.min(y1, y2) && y <= Math.max(y1, y2);
+    if (y1 === y2) return Math.abs(y - y1) < 1e-7 && x >= Math.min(x1, x2) && x <= Math.max(x1, x2);
+    return false;
+  };
+  for (let i = 0; i < segmentCount; i++) {
+    const line = rawLine.slice(i * 4, i * 4 + 4);
+    const segmentAttrs = attrs.filter(a => {
+      if (!Number.isFinite(a.x) || !Number.isFinite(a.y)) return i === 0;
+      if (!pointOnSegment(a.x, a.y, line)) return false;
+      return !rawLine.slice(0, i * 4).some((_, j) => j % 4 === 0 && pointOnSegment(a.x, a.y, rawLine.slice(j, j + 4)));
+    });
+    wires.push({
+      id: segmentCount === 1 ? id : `${id}#${i}`,
+      groupId: id,
+      net: w.net || (w.getState_Net && w.getState_Net()) || '',
+      line,
+      attrs: segmentAttrs,
+    });
+  }
 }
 const textsRaw = await eda.sch_PrimitiveText.getAll();
 const texts = [];

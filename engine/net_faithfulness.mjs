@@ -16,11 +16,11 @@
 //   - 安全位:背离器件中心的主轴方向外推,逐距试,落点不入任何 bbox(含余隙)、10px 内无他端点。
 
 const flagForSide = (net, x, y, dx, dy) => {
-	// 标签朝器件外:水平桩用 alignMode 6/8(文字 ±x),竖直桩用 alignMode 2(文字横展,在器件上/下)。
+	// 水平桩按 DR11/12:左端 mode6 向右朝电路展开，右端 mode8 向左朝电路展开；竖直桩用 mode2。
 	if (Math.abs(dx) >= Math.abs(dy)) {
 		return dx >= 0
-			? { kind: 'sig', net, x, y, textX: x, textY: y, rot: 0, alignMode: 6 }
-			: { kind: 'sig', net, x, y, textX: x, textY: y, rot: 180, alignMode: 8 };
+			? { kind: 'sig', net, x, y, textX: x, textY: y, rot: 180, alignMode: 8 }
+			: { kind: 'sig', net, x, y, textX: x, textY: y, rot: 0, alignMode: 6 };
 	}
 	return { kind: 'sig', net, x, y, textX: x, textY: y, rot: dy >= 0 ? 90 : 270, alignMode: 2 };
 };
