@@ -2,6 +2,9 @@
 
 [English](README.en.md)
 
+首次使用请从[安装与首次运行](docs/getting-started.md)开始；它覆盖可复现安装、官方 Bridge、
+EasyEDA 扩展、项目私有证据文件和三种使用路径。
+
 一个**通用、公共的工具**:把**任意** EasyEDA 原理图变成干净、商用级的 2D 布局——像前端设计工作流,
 但面向电路图。**零特定电路内容**——它通过角色与模式适配任意板,绝不硬编码任何特定电路的器件、网名或模块。
 
@@ -16,7 +19,8 @@
 ## 快速开始
 
 ```bash
-npm install
+npm ci
+npm run doctor:offline
 npm run live:save                              # 捕获打开的板 -> live.json(含引脚电气类型)
 node bin/plexus.mjs audit   live.json          # 商业化布局诊断:6 类(连接/走线/间距/电源地/标注/结构)按严重度量化
 node bin/plexus.mjs qc      live.json          # 网级体检:短路/杂散电源标/畸形线/ERC引脚类型/悬空标
@@ -30,9 +34,9 @@ npm test                                       # 通用测试套件
 上下文；`compile` 在本地拒绝红候选；不超过 25 个装配器件的小板可用一键轨道：
 
 ```bash
-EASYEDA_TOKEN_EVIDENCE=/absolute/evidence.json node wf.mjs lint
-node compile.mjs /private/transform.mjs
-node wf.mjs quick /private/transform.mjs       # lint → compile → 一次提交 → 一次最终截图审计
+EASYEDA_TOKEN_EVIDENCE=/absolute/evidence.json npm run wf -- lint
+npm run compile -- /private/transform.mjs
+npm run wf -- quick /private/transform.mjs     # lint → compile → 一次提交 → 一次最终截图审计
 ```
 
 > 体检/修复闭环:`qc` 检测 → `repair` 修复 schematic 层可修缺陷(几何/短路标)+ 报 DRC 前后。

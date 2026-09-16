@@ -36,6 +36,7 @@
 | Q15 | DR25 从离线脚本升级为全路径硬门禁：逐 R/C 电气证据 + 当前绑定封装源 + 参数化外圈丝印清理 + footprint-only identity repair；`wf api` 源码阶段补 candidate preflight | engine+live | codex | doing | 引擎已注册 `T-PASSIVE`（27/27），封装 sanitizer、source rebind 原语和 API 写序回归已通过；当前板 9/9 电气核验、9/9 封装审计的串联候选已达 0 偏差。live 库创建、绑定复读、最终 audit 与截图仍待 Bridge 扩展窗口连接。 |
 | Q16 | Bridge 窗口身份钉死：首个真实回包锁窗、所有读写透传并校验 windowId、API 临时库页后恢复原图、库写入纳入 mutation guard | engine | codex | done | 真实发现 `/eda-windows` 的活动 ID 已失效，而未定向执行落入另一个工程；现已消除未透传窗口的事务旁路，并增加跨窗、临时库页恢复和库写保护回归；API 异常会在回滚前持久化阶段/窗口/原因，避免只剩终端残片。 |
 | Q17 | 连接器协议拓扑硬门：逐脚语义之外核对必须同网、异网、可选 NC 隔离和经指定器件连接 | engine | codex | done | `T-PIN-SEMANTICS` 新增 source-cited topology review，candidate/live 均要求每个连接器有复核覆盖；支持 `same-net` / `different-net` / `not-same-net` / `through-component`。当前板缓存权威网表已真实命中一组 presence 引脚意外同网，证明旧 DRC+逐脚检查的漏判已被补上。 |
+| Q18 | 公共安装与首次使用闭环：全新 clone 可复现安装、环境分层诊断、Bridge 启动、项目私有 evidence 初始化及真实 CI | engine | codex | doing | 干净发布目录实测 `npm run setup` 成功；锁文件已覆盖全部直接依赖；`doctor` 区分 Node/依赖/API skill/Bridge/EDA 窗口；`evidence:init` 生成仓库外模板并拒绝覆盖；中英 getting-started 覆盖审计/受保护修复/快照布局三条路径；CI 已替换被删除的旧脚本，待本提交推送后以 GitHub Actions 结果作远端回执。 |
 
 ## 轨道定义（冲突隔离）
 

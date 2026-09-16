@@ -18,13 +18,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
+          cache: npm
       - name: Install dependencies
-        run: npm install
-      - name: Entrypoint audit (package scripts + CLI commands resolve)
-        run: npm run entrypoints
-      - name: Agent instruction contract
-        run: npm run agent:instructions
-      - name: Workflow smoke (reusable workflow regressions; helpers WS24, generalization WS25, actionable reports WS26/WS27)
-        run: npm run workflow:smoke
-      - name: Example pack generalization (circuit_packs/divider builds gate-clean geometry/labels)
-        run: npm run examples:divider
+        run: npm ci
+      - name: Public install and generic quality gates
+        run: npm run ci

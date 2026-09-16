@@ -1,0 +1,25 @@
+{
+  "_instructions": [
+    "Keep this project-specific file outside the public repository.",
+    "Replace every REPLACE_* value with evidence from the open schematic.",
+    "The first wf lint will list any missing connector, high-speed, passive, module or cell evidence."
+  ],
+  "moduleRegions": [
+    { "id": "functional-module", "members": ["REPLACE_WITH_DESIGNATOR"] }
+  ],
+  "cellRegions": [
+    { "id": "functional-cell", "module": "functional-module", "members": ["REPLACE_WITH_DESIGNATOR"], "relatedTo": [] }
+  ],
+  "sheetBounds": { "minX": 0, "minY": 0, "maxX": 1000, "maxY": 700 },
+  "titleBlockKeepout": { "minX": 700, "minY": 0, "maxX": 1000, "maxY": 160 },
+  "pageClearance": 10,
+  "placementExceptions": [],
+  "connectorMountExceptions": [],
+  "connectorSemanticProfiles": [],
+  "connectorFootprintProfiles": [],
+  "connectorTopologyProfiles": [],
+  "highSpeedProfiles": [],
+  "passiveElectricalProfiles": [],
+  "passiveFootprintSources": [],
+  "adjacency": []
+}

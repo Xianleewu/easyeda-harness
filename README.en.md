@@ -2,6 +2,8 @@
 
 [中文](README.md)
 
+New users should start with [Installation and first run](docs/getting-started.en.md).
+
 A **generic, public tool** that turns **any** EasyEDA schematic into a clean, commercial-grade 2D
 layout — like a frontend design workflow, but for circuits. It carries **zero specific-circuit
 content**: it adapts to any board via roles and patterns, never hardcoded devices, nets, or modules.
@@ -18,7 +20,8 @@ content**: it adapts to any board via roles and patterns, never hardcoded device
 ## Quick start
 
 ```bash
-npm install
+npm ci
+npm run doctor:offline
 npm run live:save                              # capture the open board -> live.json (incl. pin electrical types)
 node bin/plexus.mjs qc      live.json          # net QC: shorts / stray power flags / malformed wires / ERC pin types / dangling flags
 node bin/plexus.mjs repair  live.json          # auto-repair (delete stray power-short flags / straighten malformed wires) + report DRC before/after

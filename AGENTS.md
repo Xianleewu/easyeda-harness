@@ -159,11 +159,15 @@ primitive or diagnostic that caused the stall.
 Install and start the official EasyEDA API Skill first: <https://github.com/easyeda/easyeda-api-skill>.
 It provides the WebSocket bridge + the EasyEDA-side extension. The bridge exposes
 `http://127.0.0.1:49620/execute` (ports `49620-49629`). Open **any** schematic in EasyEDA Pro.
+For a clean-machine installation, Bridge setup, project-private evidence bootstrap, and the supported user paths,
+follow `docs/getting-started.md` (Chinese) or `docs/getting-started.en.md` (English). Run `npm run doctor`
+before diagnosing workflow failures; it distinguishes dependency, API-skill, Bridge, and EasyEDA-window faults.
 
 ## Usage
 
 ```bash
-npm install
+npm ci
+npm run doctor:offline
 node wf.mjs lint                              # live read-only root-cause queue; no screenshot
 npm run live:save                              # capture the open board -> live.json
 node bin/plexus.mjs layout  live.json out.png  # any board -> commercial 2D layout + render + gates
